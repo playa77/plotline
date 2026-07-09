@@ -1,0 +1,5 @@
+name: Missing Prompt Workflow
+steps:
+  - name: step1
+    prompt_file: prompts/nonexistent.md
+    model: openai/gpt-4o

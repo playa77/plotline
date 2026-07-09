@@ -1,0 +1,5 @@
+name: Empty Prompt File Workflow
+steps:
+  - name: step1
+    prompt_file: ""
+    model: openai/gpt-4o

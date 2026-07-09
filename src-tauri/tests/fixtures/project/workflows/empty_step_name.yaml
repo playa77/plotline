@@ -1,0 +1,5 @@
+name: Test Workflow
+steps:
+  - name: ""
+    prompt_file: prompts/step1.md
+    model: openai/gpt-4o

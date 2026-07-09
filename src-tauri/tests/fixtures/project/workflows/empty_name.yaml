@@ -1,0 +1,5 @@
+name: ""
+steps:
+  - name: step1
+    prompt_file: prompts/step1.md
+    model: openai/gpt-4o

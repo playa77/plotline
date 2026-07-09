@@ -1,0 +1,8 @@
+name: Test Workflow
+steps:
+  - name: step1
+    prompt_file: prompts/step1.md
+    model: openai/gpt-4o
+  - name: step2
+    prompt_file: prompts/step2.md
+    model: anthropic/claude-3.5-sonnet

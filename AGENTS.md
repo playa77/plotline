@@ -4,67 +4,57 @@
 
 ## Current state
 
-**No code exists yet.** This repo contains design docs and a binding implementation contract. Every future OpenCode session starts by reading these docs before writing any code.
+Scaffolding complete, working build + test pipeline. Rust error types, workflow types, and frontend types are implemented and tested. The execution engine, substitution, command handlers, and full frontend UI are still to build. `docs/roadmap.md` tracks remaining work.
 
-## Architecture (from docs/)
+## Architecture
 
 | Layer | Tech | Entrypoint |
 |-------|------|------------|
-| Desktop shell | Tauri 2.0 | `src-tauri/src/main.rs` |
-| Backend engine | Rust (async/tokio) | `src-tauri/src/lib.rs` (module decls) |
+| Desktop shell | Tauri 2.0 | `src-tauri/src/main.rs` (calls `plotline_lib::run()`) |
+| Backend engine | Rust (async/tokio) | `src-tauri/src/lib.rs` (module decls + Tauri builder) |
 | Frontend | React 18 / TypeScript | `src/main.tsx` |
 | IPC bridge | Tauri commands + events | `src-tauri/src/commands.rs` ↔ `src/api/tauri.ts` |
 
-**Rust modules** (strict separation): `workflow`, `substitution`, `engine`, `openrouter`, `run_manager`, `config`, `commands`, `error`.
-
-**Frontend layers**: `api/` (typed invoke wrappers) → `hooks/` (state) → `components/` (UI).
-
-## Implementation rules (NON-NEGOTIABLE)
-
-`docs/roadmap.md` is a **binding implementation contract** with 16 sequential Work Packages (WP0–WP16). Key constraints:
-
-- **Strictly sequential.** Never parallelize, skip, or reorder Work Packages.
-- **Zero-tolerance verification.** Every WP requires: all tasks done, all acceptance criteria proven, 100% test coverage for new code, **full** `cargo test` and `npm test` suites passing, `cargo check` zero warnings, `npm run build` zero errors, `npx tsc --noEmit` zero errors.
-- **Verification report format** is mandatory (see `docs/roadmap.md` Appendix A). No WP is "done" without it.
-- **No unapproved dependencies.** Only crates/npm packages listed in `docs/technical_specification.md` Section 3.
-- **No skipped tests.** No `#[ignore]`, no `.skip`, no exceptions.
-- **Regression testing every WP.** All previous WP tests must still pass.
-
-Read `docs/example_prompt.md` for the intent behind this rigor.
+**Rust crate name**: `plotline_lib`. Library crate with `lib`, `cdylib`, and `staticlib` types.
+**Rust modules**: `workflow`, `substitution`, `engine`, `openrouter`, `run_manager`, `config`, `commands`, `error`.
+**Frontend layers**: `api/` (typed invoke wrappers) → `hooks/` (state) → `components/` (UI). These directories exist but are empty (not yet implemented).
 
 ## Developer commands
 
+All commands run from repo root unless noted:
+
 ```bash
-# Dev mode (Vite + Tauri)
+# Dev (full Tauri app with hot-reload):
 npm run tauri dev
 
-# Production build
+# Dev (Vite frontend only, no Rust backend):
+npm run dev
+
+# Full production build:
 npm run tauri build
 
-# Rust tests (all)
-cd src-tauri && cargo test
+# Frontend build only (tsc + vite):
+npm run build
 
-# Rust tests (filtered)
-cd src-tauri && cargo test <module_name>
-
-# Rust check (no build)
-cd src-tauri && cargo check
-
-# Frontend tests
-npm test
-
-# Frontend typecheck
+# Frontend typecheck:
 npx tsc --noEmit
 
-# Frontend build only
-npm run build
+# Rust check and tests run from src-tauri/:
+cargo check         # (in src-tauri/)
+cargo test          # (in src-tauri/) - 5 tests pass (error module)
+cargo test <module> # (in src-tauri/) - filtered run
+
+# Frontend tests (vitest):
+npm test
 ```
 
-## Key design decisions an agent would miss
+**Test config**: Vitest with `jsdom` environment, `globals: true`, setup file `./src/test-setup.ts` (imports `@testing-library/jest-dom`). TypeScript is strict with `noUnusedLocals` and `noUnusedParameters`.
 
-### Data flow quirk: prompts are snapshotted, variables are live
+## Design decisions an agent would miss
 
-During execution, the engine reads prompt files from the **run snapshot** (`_prompts/`), but resolves variable files from the **project root** (`project_root/variables/`). This means editing a prompt file mid-run won't affect the running workflow, but editing a variable file will.
+### Data flow: prompts are snapshotted, variables are live
+
+During execution, the engine reads prompt files from the **run snapshot** (`_prompts/`), but resolves variable files from the **project root** (`project_root/variables/`). Editing a prompt file mid-run won't affect the running workflow, but editing a variable file will.
 
 ### Step output paths are 1-indexed, code indices are 0-indexed
 
@@ -102,28 +92,13 @@ Format: `runs/YYYY-MM-DD-HHMM-<slug>/`. If a directory exists, append `-2`, `-3`
 
 All requests must include headers: `HTTP-Referer: https://plotline.app` and `X-Title: Plotline`. Non-streaming only for MVP (`"stream": false`). 30-second timeout. Error mapping: 401→ApiKeyInvalid, 429→RateLimited, 5xx→ProviderError, timeout→NetworkTimeout.
 
-### Directory structure conventions
+### Tauri config
 
-```
-src-tauri/src/         # Rust source
-src-tauri/tests/fixtures/project/  # Rust test fixtures
-src/                   # Frontend source
-src/api/tauri.ts       # Typed IPC wrappers (invoke)
-src/hooks/             # React hooks (useTauriEvent, useRunState, useProjectRoot)
-src/components/        # React components
-src/types/index.ts     # Shared TypeScript types
-src/styles/global.css  # Dark theme CSS variables
-docs/                  # Design docs (read before implementing)
-```
+- App window: 1200×800, min 800×600
+- Store plugin configured in `tauri.conf.json` plugins section
+- `beforeDevCommand: "npm run dev"` — Vite starts before Tauri
+- `beforeBuildCommand: "npm run build"` — frontend built before Tauri bundles
 
 ### Dark theme CSS variables
 
-Background: `#1a1a2e`, panels: `#16213e`, accents: `#0f3460`, primary action: `#e94560`. Monospace for status, sans-serif for UI.
-
-## References
-
-- `docs/design_document.md` — Architecture and design decisions
-- `docs/technical_specification.md` — Module specs, types, API contracts
-- `docs/roadmap.md` — Implementation contract (16 WPs)
-- `docs/example_prompt.md` — How to prompt an AI to implement this project
-- `README.md` — User-facing overview
+Already set up in `src/styles/global.css`: background `#1a1a2e`, panels `#16213e`, accents `#0f3460`, primary action `#e94560`. Monospace for status/code, sans-serif for UI. CSS custom properties (`--color-bg`, `--color-panel`, etc.) are available; use them rather than hardcoding colors.
