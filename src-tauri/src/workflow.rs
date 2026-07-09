@@ -67,6 +67,24 @@ pub struct RunStepStatus {
     pub output_path: Option<PathBuf>,
 }
 
+/// Lightweight summary of a workflow file, returned by list_workflows.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowSummary {
+    pub name: String,
+    pub file_path: String,
+    pub step_count: usize,
+}
+
+/// Lightweight summary of a run directory, returned by list_runs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunSummary {
+    pub run_dir: String,
+    pub workflow_name: String,
+    pub started_at: String,
+    pub completed_steps: usize,
+    pub total_steps: usize,
+}
+
 /// Parses a workflow YAML file from the given path.
 /// Validates that all required fields are present.
 pub fn parse_workflow(

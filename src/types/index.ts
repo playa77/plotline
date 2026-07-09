@@ -30,6 +30,22 @@ export interface RunInfo {
   steps: RunStepStatus[];
 }
 
+/** Lightweight summary of a workflow file, returned by list_workflows. */
+export interface WorkflowSummary {
+  name: string;
+  file_path: string;
+  step_count: number;
+}
+
+/** Lightweight summary of a run directory, returned by list_runs. */
+export interface RunSummary {
+  run_dir: string;
+  workflow_name: string;
+  started_at: string;
+  completed_steps: number;
+  total_steps: number;
+}
+
 /**
  * Payload shape for Tauri events emitted by the backend:
  *   run_started, step_started, step_completed, run_completed, run_error

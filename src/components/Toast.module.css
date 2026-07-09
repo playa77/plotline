@@ -1,0 +1,87 @@
+/* Toast styles — references global CSS custom properties
+ * (see src/styles/global.css). Colored left border encodes severity. */
+
+.container {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Let clicks pass through the empty gaps between toasts; each toast
+   * re-enables pointer events on itself. */
+  pointer-events: none;
+  max-width: 380px;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px 12px 16px;
+  min-width: 260px;
+  background: var(--color-panel);
+  border: 1px solid rgba(136, 136, 170, 0.18);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.6);
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+  /* Default left border; severity classes override the color below. */
+  border-left: 3px solid var(--color-text-dim);
+  animation: toastIn 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+  overflow: hidden;
+}
+
+.toastSuccess {
+  border-left-color: var(--color-success);
+}
+.toastError {
+  border-left-color: var(--color-error);
+}
+
+/* Swap to the fade-out animation when a toast is marked as leaving. */
+.leaving {
+  animation: toastOut 280ms ease-in forwards;
+}
+
+.icon {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  line-height: 1.4;
+}
+.iconSuccess {
+  color: var(--color-success);
+}
+.iconError {
+  color: var(--color-error);
+}
+
+.message {
+  flex: 1;
+  word-break: break-word;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
