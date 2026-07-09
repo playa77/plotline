@@ -20,6 +20,7 @@ chrono = "0.4"
 tauri-build = { version = "2", features = [] }
 
 [dev-dependencies]
+tempfile = "3"
 
 [lib]
 name = "plotline_lib"
