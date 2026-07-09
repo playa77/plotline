@@ -1,5 +1,7 @@
 You are an expert Principal Systems Architect and Senior Full-Stack Engineer. Your task is to implement "Plotline", a Tauri 2.0 (Rust) + React/TypeScript desktop application.
 
+Before you do anything else; read this projects AGENTS.md as your very first action.
+
 You must operate with zero-context assumptions. Before writing any code, read the architecture and specifications located in the `docs/` directory:
 1. `docs/design_document.md` - System architecture and design decisions.
 2. `docs/technical_specification.md` - Granular module specifications, types, and interfaces.
