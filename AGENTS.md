@@ -4,7 +4,7 @@
 
 ## Current state
 
-Scaffolding complete, working build + test pipeline. Rust error types, workflow types, and frontend types are implemented and tested. The execution engine, substitution, command handlers, and full frontend UI are still to build. `docs/roadmap.md` tracks remaining work.
+The full MVP backend is implemented and tested: workflow parsing/validation, variable substitution, OpenRouter client, execution engine, run manager, config/keyring, and all 12 IPC commands. The frontend is fully built: typed API wrappers, all hooks (useTauriEvent, useRunState, useProjectRoot), and all components (WorkflowSelector, RunMonitor, StepCard, OutputEditor with CodeMirror, SettingsModal, Toast, ErrorBoundary). Build and test pipelines pass with 86 Rust tests and 35 frontend tests. Remaining work tracked in `docs/roadmap.md`: WP15 (Testing & QA) and WP16 (Build & Package).
 
 ## Architecture
 
@@ -17,7 +17,7 @@ Scaffolding complete, working build + test pipeline. Rust error types, workflow 
 
 **Rust crate name**: `plotline_lib`. Library crate with `lib`, `cdylib`, and `staticlib` types.
 **Rust modules**: `workflow`, `substitution`, `engine`, `openrouter`, `run_manager`, `config`, `commands`, `error`.
-**Frontend layers**: `api/` (typed invoke wrappers) → `hooks/` (state) → `components/` (UI). These directories exist but are empty (not yet implemented).
+**Frontend layers**: `api/` (typed invoke wrappers) → `hooks/` (state) → `components/` (UI). All layers are fully implemented and tested.
 
 ## Developer commands
 
@@ -41,7 +41,7 @@ npx tsc --noEmit
 
 # Rust check and tests run from src-tauri/:
 cargo check         # (in src-tauri/)
-cargo test          # (in src-tauri/) - 5 tests pass (error module)
+cargo test          # (in src-tauri/) - 86 tests pass (all modules)
 cargo test <module> # (in src-tauri/) - filtered run
 
 # Frontend tests (vitest):

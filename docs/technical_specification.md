@@ -48,16 +48,25 @@ plotline/
 │   │   ├── RunMonitor.tsx
 │   │   ├── StepCard.tsx
 │   │   ├── OutputEditor.tsx
-│   │   └── SettingsModal.tsx
+│   │   ├── SettingsModal.tsx
+│   │   ├── Toast.tsx
+│   │   └── ErrorBoundary.tsx
 │   ├── hooks/
 │   │   ├── useTauriEvent.ts
-│   │   └── useRunState.ts
+│   │   ├── useRunState.ts
+│   │   └── useProjectRoot.ts
 │   ├── types/
 │   │   └── index.ts
 │   ├── api/
 │   │   └── tauri.ts             # Typed wrappers around invoke()
-│   └── styles/
-│       └── global.css
+│   ├── styles/
+│   │   └── global.css
+│   └── __tests__/
+│       ├── api.test.ts
+│       ├── App.test.tsx
+│       ├── useTauriEvent.test.ts
+│       ├── useRunState.test.ts
+│       └── useProjectRoot.test.ts
 ├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
@@ -150,7 +159,8 @@ plotline/
     "core:default",
     "core:event:allow-listen",
     "core:event:allow-emit",
-    "store:default"
+    "store:default",
+    "dialog:allow-open"
   ]
 }
 ```
@@ -685,7 +695,7 @@ pub async fn read_file_content(
 pub async fn set_api_key(key: String) -> Result<(), String>;
 
 #[tauri::command]
-pub async fn get_api_key() -> Result<Option<String>, String>;
+pub async fn get_api_key() -> Result<String, String>;
 
 #[tauri::command]
 pub async fn has_api_key() -> Result<bool, String>;
@@ -770,24 +780,14 @@ Workflow execution runs as a Tauri async command. The command holds a reference 
 ## 10. Observability
 
 ### Logging
-- Rust backend uses `env_logger` with log level configurable via environment variable (`RUST_LOG=debug`).
-- Logs are written to stderr (visible in terminal during dev, suppressed in production).
-- Log format: `[timestamp] [level] [module] message`
-
-**Key Log Points**:
-- Workflow parsed: `INFO`
-- Run directory created: `INFO`
-- Step started: `INFO`
-- OpenRouter request sent (model, prompt length): `DEBUG`
-- OpenRouter response received (status, tokens): `DEBUG`
-- Step output written: `INFO`
-- Step failed: `ERROR`
-- Run completed: `INFO`
+- Rust backend logs warnings and errors to stderr using `eprintln!` with ISO 8601 timestamps.
+- Logs are visible in terminal during dev, suppressed in GUI in production.
 
 ### Frontend Observability
 - No telemetry or analytics for MVP.
 - Errors are displayed in the UI as toast notifications.
 - The Run Monitor shows step status and error messages inline.
+- The `ErrorBoundary` component catches unhandled React render crashes with a fallback UI.
 
 `[ASSUMPTION]`: No centralized error reporting or crash analytics for MVP. Desktop apps can rely on user-reported issues for V1.
 

@@ -28,7 +28,7 @@
 | Automatic concatenation of previous output | `[Confirmed Answer]` | Approved |
 | Variable substitution (`{{variables.name}}`) | `[Confirmed Answer]` | Approved |
 | Run directory contains outputs + snapshot | `[Confirmed Answer]` | Approved |
-| Non-streaming API calls for MVP | `[ASSUMPTION]` | Pending validation |
+| Non-streaming API calls for MVP | `[ASSUMPTION]` | Confirmed |
 
 ## 3. System Architecture
 
@@ -133,7 +133,7 @@ runs/
 
 ## 7. Security Architecture
 
-- **API Key Storage**: `[PROPOSED DESIGN DECISION]` The OpenRouter API key will be stored in the OS-specific secure storage (e.g., Keychain on macOS, Credential Manager on Windows) using a Tauri plugin (e.g., `tauri-plugin-stronghold` or OS keyring wrapper). It will never be written to plaintext project files.
+- **API Key Storage**: `[PROPOSED DESIGN DECISION]` The OpenRouter API key is stored in the OS-specific keyring (Keychain on macOS, Credential Manager on Windows, Secret Service on Linux) using the `keyring` Rust crate (service: `plotline`, account: `openrouter`). It is never written to plaintext project files or `settings.json`.
 - **File Access**: The Rust backend restricts file operations to the user-selected project directory and its subdirectories. Path traversal in workflow definitions will be sanitized.
 
 ## 8. Infrastructure & Deployment

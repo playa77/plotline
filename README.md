@@ -11,7 +11,7 @@ It is not a chatbot. It is an execution engine for human-directed cognitive work
 - **File-Based Workflows**: Define workflows in YAML. Prompts and variables are plain Markdown files.
 - **Sequential Execution**: Automatically passes the output of step N as context to step N+1.
 - **Variable Substitution**: Inject reusable context using `{{variables.filename}}` syntax.
-- **Human-in-the-Loop**: Auto-runs to completion, but allows you to edit any step's output in the GUI and re-run from that point.
+- **Human-in-the-Loop**: Auto-runs to completion, but allows you to edit any step's output in a built-in CodeMirror editor and re-run from that point.
 - **Reproducibility**: Every run creates a snapshot of the workflow and prompts, ensuring results are always traceable.
 - **BYOK**: Bring your own OpenRouter API key. Stored securely in your OS keyring.
 
@@ -69,6 +69,19 @@ steps:
    ```bash
    npm run tauri dev
    ```
+
+### Running Tests
+
+```bash
+# Rust tests (86 tests, all 8 modules)
+cd src-tauri && cargo test
+
+# Frontend tests (35 tests via vitest)
+npm test
+
+# TypeScript typecheck
+npx tsc --noEmit
+```
 
 ### Production Build
 
