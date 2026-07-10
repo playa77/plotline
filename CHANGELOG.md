@@ -4,6 +4,49 @@ All notable changes to the Plotline project.
 
 ## [1.0.0] — 2026-07-10 (in progress)
 
+### Feature — OpenRouter retry with exponential backoff (2026-07-10)
+- Added retry logic to `openrouter::complete()` per global AGENTS.md "Respectful API usage"
+  requirement. Up to 3 retries with exponential backoff (1s, 2s, 4s) for transient failures.
+- New `is_retryable_error()` classifies errors: retryable (network timeout, connection failure,
+  HTTP 5xx, body decode glitch, response parse error) vs. non-retryable (401 auth, 429 rate
+  limit, API key not set, config/permanent errors).
+- Verbose logging with ISO 8601 timestamps on every retry attempt, including the previous
+  error and backoff delay.
+- Body decode failures with HTTP 200 (e.g., truncated chunked response) are now retried
+  instead of immediately failing the run with a confusing "HTTP 200: error decoding response
+  body" message.
+
+### Feature — WorkflowRunDialog: pre-flight variable editor (2026-07-10)
+- New `WorkflowRunDialog` component (`src/components/WorkflowRunDialog.tsx` +
+  `.module.css`): modal dialog that appears when running a workflow with
+  `{{variables.<name>}}` placeholders. Shows each variable with a Title Case
+  label, raw name, "from file" badge (if a default exists), "Used in: step1,
+  step2" context, and an auto-resizing textarea (caps at 300px, then scrolls).
+  Staggered card reveal animation (50ms per card). Escape cancels,
+  Cmd/Ctrl+Enter runs. Uses CSS modules (not inline styles) as the pattern
+  for new components.
+- New `src/utils/variables.ts`: `scanWorkflowVariables()` reads the workflow
+  YAML, extracts step prompt_file paths via a lightweight line-by-line parser
+  (no js-yaml dependency), reads each prompt file, scans for the backend's
+  `{{variables.<name>}}` regex, and loads current values from
+  `<project_root>/variables/<name>.md`. Returns sorted `VariableInfo[]`.
+  Also exports `titleCaseFromVariableName()` and `VariableInfo` type.
+- `WorkflowSelector.tsx` modified: `handleRun` now scans for variables first.
+  Zero variables → runs immediately (no dialog). Variables found → opens
+  `WorkflowRunDialog`. New `handleDialogRun` passes edited values to the
+  backend as `variable_overrides`, which take precedence over file-based
+  values in `substitution.rs` without mutating any project files on disk.
+  Errors shown in the dialog footer so the user can retry without losing edits.
+- Backend: `substitution::substitute_variables` now accepts `variable_overrides:
+  &HashMap<String, String>` — checks overrides first, falls back to
+  `<project_root>/variables/<name>.md`. `engine::run_workflow` and the
+  `run_workflow` IPC command accept `variable_overrides: HashMap<String, String>`.
+- New API wrapper `runWorkflow()` in `src/api/tauri.ts` accepts optional
+  `variableOverrides: Record<string, string>`.
+- Design: dialog matches SettingsModal aesthetic (same overlay gradient/blur,
+  coral hairline border, panel animation) but wider (640px) for textareas.
+  Variable cards have subtle accent background that brightens on focus-within.
+
 ### Bugfix — Run directory race condition (2026-07-10)
 - Fixed double directory creation: `commands::run_workflow` now snapshots `_workflow.yaml`
   into the pre-created run dir before returning to the frontend, so `getRunStatus`

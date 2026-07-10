@@ -26,6 +26,7 @@ describe("api/tauri", () => {
       expect(mockedInvoke).toHaveBeenCalledWith("run_workflow", {
         workflowPath: "/path/to/wf.yaml",
         projectRoot: "/project",
+        variableOverrides: {},
       });
       expect(result).toBe("/tmp/run-dir");
     });

@@ -15,13 +15,22 @@ import type {
 // Workflow & Run Commands
 // ---------------------------------------------------------------------------
 
+/**
+ * Starts a new workflow run.
+ *
+ * @param variableOverrides — map of variable name → value to override file-based
+ *   variable content. Empty map or null means use file-based values for all variables.
+ *   Keys are variable names (e.g. "chapter_number"), not file paths.
+ */
 export async function runWorkflow(
   workflowPath: string,
-  projectRoot: string
+  projectRoot: string,
+  variableOverrides?: Record<string, string>
 ): Promise<string> {
   return invoke<string>("run_workflow", {
     workflowPath,
     projectRoot,
+    variableOverrides: variableOverrides ?? {},
   });
 }
 

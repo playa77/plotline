@@ -12,6 +12,7 @@
 // Uses a 30-second timeout. Non-streaming only.
 
 use crate::error::PlotlineError;
+use chrono::Local;
 use serde::Serialize;
 
 /// Request payload for an OpenRouter completion call.
@@ -76,7 +77,84 @@ impl OpenRouterRequest {
 /// | 5xx         | `ProviderError { status, body }`  |
 /// | other       | `ProviderError { status, body }`  |
 /// | malformed   | `ResponseParseError`              |
+/// Maximum number of retry attempts (0 retries = 1 total attempt, 3 retries = 4 total).
+const MAX_RETRIES: u32 = 3;
+/// Base backoff delay in seconds. Doubles each retry: 1s, 2s, 4s.
+const BASE_BACKOFF_SECS: u64 = 1;
+
+/// Sends a non-streaming completion request to the OpenRouter API.
+///
+/// Retries up to `MAX_RETRIES` times with exponential backoff for retryable
+/// errors (transient network issues, HTTP 5xx, body decode/parse glitches).
+/// Non-retryable errors (auth, rate limit, API key, config issues) fail
+/// immediately.
+///
+/// # Timeout
+/// 30 seconds per attempt. Exceeded timeouts map to `PlotlineError::NetworkTimeout`.
+///
+/// # Error mapping (single attempt)
+/// | HTTP Status | Error Variant                     |
+/// |-------------|-----------------------------------|
+/// | 200         | Parsed `CompletionResponse`       |
+/// | 401         | `ApiKeyInvalid`                   |
+/// | 429         | `RateLimited`                     |
+/// | 5xx         | `ProviderError { status, body }`  |
+/// | other       | `ProviderError { status, body }`  |
+/// | malformed   | `ResponseParseError`              |
 pub async fn complete(request: CompletionRequest) -> Result<CompletionResponse, PlotlineError> {
+    let mut last_error: Option<String> = None;
+
+    for attempt in 0..=MAX_RETRIES {
+        if attempt > 0 {
+            let delay_secs = BASE_BACKOFF_SECS * 2u64.pow(attempt - 1);
+            eprintln!(
+                "[{}] OpenRouter attempt {}/{} failed; retrying in {}s — {}",
+                Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                attempt,
+                MAX_RETRIES,
+                delay_secs,
+                last_error.as_deref().unwrap_or("unknown error"),
+            );
+            tokio::time::sleep(std::time::Duration::from_secs(delay_secs)).await;
+        }
+
+        match try_complete(&request).await {
+            Ok(response) => return Ok(response),
+            Err(e) => {
+                let retryable = is_retryable_error(&e);
+                // Always log the attempt, regardless of retryability
+                eprintln!(
+                    "[{}] OpenRouter attempt {} error: {} (retryable: {})",
+                    Local::now().format("%Y-%m-%dT%H:%M:%S"),
+                    attempt,
+                    e,
+                    retryable,
+                );
+                if !retryable {
+                    return Err(e);
+                }
+                last_error = Some(e.to_string());
+            }
+        }
+    }
+
+    Err(PlotlineError::ProviderError {
+        status: 0,
+        body: format!(
+            "All {} retry attempts failed. Last error: {}",
+            MAX_RETRIES,
+            last_error.unwrap_or_else(|| "unknown".into()),
+        ),
+    })
+}
+
+/// Performs a single HTTP request to the OpenRouter API.
+///
+/// This is the inner one-shot implementation extracted from the original
+/// `complete()`. It builds the HTTP client, sends the request, reads the
+/// response body, and maps the HTTP status to the appropriate error variant.
+/// It is called by the retry-wrapping `complete()`.
+async fn try_complete(request: &CompletionRequest) -> Result<CompletionResponse, PlotlineError> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -85,7 +163,7 @@ pub async fn complete(request: CompletionRequest) -> Result<CompletionResponse, 
             body: format!("Failed to create HTTP client: {}", e),
         })?;
 
-    let body = OpenRouterRequest::new(request.model, request.prompt);
+    let body = OpenRouterRequest::new(request.model.clone(), request.prompt.clone());
 
     let response = client
         .post("https://openrouter.ai/api/v1/chat/completions")
@@ -130,6 +208,51 @@ pub async fn complete(request: CompletionRequest) -> Result<CompletionResponse, 
             status: status_code,
             body: body_text,
         }),
+    }
+}
+
+/// Determines whether an error is transient and worth retrying.
+///
+/// Retryable: transient network issues, HTTP 5xx, body decode failures,
+///            response parse errors (malformed JSON could be a network glitch).
+/// Not retryable: auth failures (401), rate limits (429), API key not set,
+///               missing variable files, filesystem errors (permanent config issues).
+fn is_retryable_error(error: &PlotlineError) -> bool {
+    match error {
+        // Never retry auth/rate-limit/config errors
+        PlotlineError::ApiKeyInvalid
+        | PlotlineError::ApiKeyNotSet
+        | PlotlineError::RateLimited => false,
+
+        // Transient transport errors
+        PlotlineError::NetworkTimeout => true,
+
+        // Provider errors: retry on connection failures (status 0) and 5xx,
+        // but NOT on 4xx (except the ones already handled above).
+        PlotlineError::ProviderError { status, body } => {
+            if *status == 0 {
+                // Connection-level failure (reqwest couldn't reach the server,
+                // or the response body couldn't be read).
+                return true;
+            }
+            if *status >= 500 && *status < 600 {
+                return true;
+            }
+            // Body decode with 200 status should be retried.
+            if *status == 200 && body.starts_with("Failed to read response body") {
+                return true;
+            }
+            // 4xx client errors (besides 401/429 already caught) are not retryable.
+            false
+        }
+
+        // Parse errors: the response came back but couldn't be parsed.
+        // This could be a truncated response or a provider glitch — retry.
+        PlotlineError::ResponseParseError(_) => true,
+
+        // All other errors (filesystem, workflow validation, variable files, etc.)
+        // are permanent configuration issues — don't retry API calls won't fix them.
+        _ => false,
     }
 }
 

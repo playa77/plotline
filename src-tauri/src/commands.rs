@@ -3,6 +3,7 @@
 // All commands return Result<T, String> mapping PlotlineError to string via Display.
 // See docs/technical_specification.md Section 8 for the complete command list.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use tauri::AppHandle;
@@ -34,6 +35,7 @@ fn resolve_project_root(path: &str) -> Result<PathBuf, String> {
 pub async fn run_workflow(
     workflow_path: String,
     project_root: String,
+    variable_overrides: HashMap<String, String>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
     let workflow_path = PathBuf::from(&workflow_path);
@@ -65,9 +67,14 @@ pub async fn run_workflow(
     let wf_path_clone = workflow_path.clone();
     let pr_clone = project_root.clone();
     let run_dir_clone = run_dir.clone();
+    let vo_clone = variable_overrides.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = engine::run_workflow(&app_clone, &wf_path_clone, &pr_clone, &run_dir_clone).await {
+        if let Err(e) = engine::run_workflow(
+            &app_clone, &wf_path_clone, &pr_clone, &run_dir_clone, vo_clone,
+        )
+        .await
+        {
             // The engine already emits run_error events internally.
             // We log here for server-side visibility.
             eprintln!(

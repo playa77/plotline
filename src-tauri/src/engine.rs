@@ -11,6 +11,7 @@
 //   - Step output paths are 1-indexed, zero-padded to 2 digits
 //   - Only one workflow at a time (MVP) — no background job queue
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use tauri::Emitter;
@@ -114,6 +115,7 @@ pub async fn run_workflow(
     workflow_path: &Path,
     project_root: &Path,
     run_dir: &Path,
+    variable_overrides: HashMap<String, String>,
 ) -> Result<(), PlotlineError> {
     // Step 1: Parse and validate the workflow
     let workflow = workflow::parse_workflow(workflow_path, project_root)?;
@@ -137,6 +139,7 @@ pub async fn run_workflow(
         app_handle,
         run_dir,
         project_root,
+        variable_overrides,
     };
     runner.execute_steps(&workflow, None).await
 }
@@ -205,6 +208,7 @@ pub async fn rerun_from_step(
         run_dir,
         // For re-runs, use run_dir as project_root since prompts are snapshotted
         project_root: run_dir,
+        variable_overrides: HashMap::new(),
     };
     runner.execute_steps(&workflow, Some((step_index, previous_output))).await
 }
@@ -217,6 +221,7 @@ struct EngineRunner<'a> {
     app_handle: &'a tauri::AppHandle,
     run_dir: &'a Path,
     project_root: &'a Path,
+    variable_overrides: HashMap<String, String>,
 }
 
 impl<'a> EngineRunner<'a> {
@@ -304,10 +309,12 @@ impl<'a> EngineRunner<'a> {
         })?;
 
         // 2. Substitute variables using LIVE project_root (not run_dir)
-        //    Variables are always read from the project root, not the snapshot
+        //    Variables are always read from the project root, not the snapshot.
+        //    Runtime overrides take precedence over file-based variables.
         let mut prompt = substitution::substitute_variables(
             &prompt_content,
             self.project_root,
+            &self.variable_overrides,
         )?;
 
         // 3. Append previous output (context concatenation)
@@ -561,12 +568,12 @@ mod tests {
         fs::write(project.join("variables/ctx.md"), "live context").unwrap();
 
         let prompt = "Use this: {{variables.ctx}}";
-        let result = substitution::substitute_variables(prompt, project).unwrap();
+        let result = substitution::substitute_variables(prompt, project, &HashMap::new()).unwrap();
         assert_eq!(result, "Use this: live context");
 
         // Now change the variable file (simulating "live" editing during a run)
         fs::write(project.join("variables/ctx.md"), "updated context").unwrap();
-        let result2 = substitution::substitute_variables(prompt, project).unwrap();
+        let result2 = substitution::substitute_variables(prompt, project, &HashMap::new()).unwrap();
         assert_eq!(result2, "Use this: updated context");
     }
 
@@ -685,7 +692,7 @@ steps:
         let prompt_content = fs::read_to_string(&prompt_snapshot).unwrap();
         assert!(prompt_content.contains("{{variables.tone}}"));
 
-        let substituted = substitution::substitute_variables(&prompt_content, project).unwrap();
+        let substituted = substitution::substitute_variables(&prompt_content, project, &HashMap::new()).unwrap();
         assert_eq!(substituted, "Write a greeting. friendly");
     }
 
@@ -773,13 +780,13 @@ steps:
         // Read from snapshot
         let prompt = fs::read_to_string(run_dir.join("_prompts/prompts/test.md")).unwrap();
         // Substitute using project_root (live variables)
-        let result = substitution::substitute_variables(&prompt, project).unwrap();
+        let result = substitution::substitute_variables(&prompt, project, &HashMap::new()).unwrap();
 
         assert_eq!(result, "Style: professional. Content: more text.");
 
         // Now change the variable — the next substitution should pick up the change
         fs::write(project.join("variables/tone.md"), "casual").unwrap();
-        let result2 = substitution::substitute_variables(&prompt, project).unwrap();
+        let result2 = substitution::substitute_variables(&prompt, project, &HashMap::new()).unwrap();
         assert_eq!(result2, "Style: casual. Content: more text.");
     }
 }

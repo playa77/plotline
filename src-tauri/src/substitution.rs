@@ -5,6 +5,7 @@
 // Files are read from <project_root>/variables/<name>.md
 
 use regex::Regex;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::LazyLock;
 
@@ -16,14 +17,17 @@ static VARIABLE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Scans prompt_content for {{variables.<name>}} patterns.
-/// For each match, reads <project_root>/variables/<name>.md.
-/// Replaces the placeholder with the file contents.
+/// For each match, checks variable_overrides first, then falls back
+/// to reading <project_root>/variables/<name>.md.
+/// Replaces the placeholder with the resolved value.
 ///
-/// Returns error if a referenced variable file does not exist.
-/// Unknown {{...}} patterns (not matching `variables.` prefix) are left untouched.
+/// Returns error if a referenced variable file does not exist and no
+/// override was provided. Unknown {{...}} patterns (not matching
+/// `variables.` prefix) are left untouched.
 pub fn substitute_variables(
     prompt_content: &str,
     project_root: &Path,
+    variable_overrides: &HashMap<String, String>,
 ) -> Result<String, PlotlineError> {
     let mut result = String::with_capacity(prompt_content.len());
     let mut last_end = 0;
@@ -31,20 +35,25 @@ pub fn substitute_variables(
     for captures in VARIABLE_REGEX.captures_iter(prompt_content) {
         let full_match = captures.get(0).expect("match 0 must exist");
         let var_name = captures.get(1).expect("capture group 1 must exist");
+        let var_str = var_name.as_str();
 
         // Copy text between matches unchanged
         result.push_str(&prompt_content[last_end..full_match.start()]);
 
-        // Construct path and read variable file
-        let var_path = project_root
-            .join("variables")
-            .join(format!("{}.md", var_name.as_str()));
+        // Check overrides first, then fall back to file
+        let content = if let Some(override_val) = variable_overrides.get(var_str) {
+            override_val.clone()
+        } else {
+            let var_path = project_root
+                .join("variables")
+                .join(format!("{}.md", var_str));
 
-        let content = std::fs::read_to_string(&var_path).map_err(|_| {
-            PlotlineError::VariableFileNotFound {
-                path: var_path.display().to_string(),
-            }
-        })?;
+            std::fs::read_to_string(&var_path).map_err(|_| {
+                PlotlineError::VariableFileNotFound {
+                    path: var_path.display().to_string(),
+                }
+            })?
+        };
 
         result.push_str(&content);
         last_end = full_match.end();
@@ -73,7 +82,7 @@ mod tests {
     #[test]
     fn test_single_substitution() {
         let input = "Write a story. Use this style: {{variables.style}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         assert_eq!(
             result,
@@ -88,7 +97,7 @@ mod tests {
     #[test]
     fn test_multiple_substitutions() {
         let input = "Style: {{variables.style}}\nProtagonist: {{variables.protagonist}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         let expected_protagonist = read_var("protagonist");
         assert_eq!(
@@ -106,7 +115,7 @@ mod tests {
     #[test]
     fn test_same_variable_twice() {
         let input = "Before: {{variables.style}}. After: {{variables.style}}.";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         assert_eq!(
             result,
@@ -121,14 +130,14 @@ mod tests {
     #[test]
     fn test_no_variables() {
         let input = "This prompt has no variable references at all.";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         assert_eq!(result, input);
     }
 
     #[test]
     fn test_unknown_placeholder_ignored() {
         let input = "Here is {{unknown.thing}} and {{variables.style}} and {{other.place}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         assert_eq!(
             result,
@@ -146,7 +155,7 @@ mod tests {
     #[test]
     fn test_missing_variable_file() {
         let input = "Style: {{variables.nonexistent_var}}";
-        let result = substitute_variables(input, &project_root());
+        let result = substitute_variables(input, &project_root(), &HashMap::new());
         assert!(result.is_err(), "Expected error for missing variable file");
         let err = result.unwrap_err();
         match err {
@@ -170,7 +179,7 @@ mod tests {
     fn test_variable_with_special_chars_in_name() {
         let input = "Var: {{variables.my-var_name}}";
         let result =
-            substitute_variables(input, &project_root()).expect("substitution should succeed");
+            substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         assert!(result.contains("Test variable with hyphens and underscores"));
         assert!(!result.contains("{{variables.my-var_name}}"));
     }
@@ -178,7 +187,7 @@ mod tests {
     #[test]
     fn test_mixed_placeholders() {
         let input = "A: {{variables.style}} B: {{not.variable}} C: {{variables.protagonist}} D: {{other}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         let expected_protagonist = read_var("protagonist");
         assert_eq!(
@@ -197,7 +206,7 @@ mod tests {
     #[test]
     fn test_empty_prompt() {
         let input = "";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         assert_eq!(result, "");
     }
 
@@ -205,7 +214,7 @@ mod tests {
     fn test_only_variable() {
         // Entire prompt is just a variable
         let input = "{{variables.style}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         assert_eq!(result, expected_style);
         assert!(!result.contains("{{"));
@@ -214,7 +223,7 @@ mod tests {
     #[test]
     fn test_adjacent_variables() {
         let input = "{{variables.style}}{{variables.protagonist}}";
-        let result = substitute_variables(input, &project_root()).expect("substitution should succeed");
+        let result = substitute_variables(input, &project_root(), &HashMap::new()).expect("substitution should succeed");
         let expected_style = read_var("style");
         let expected_protagonist = read_var("protagonist");
         assert_eq!(result, format!("{}{}", expected_style, expected_protagonist));

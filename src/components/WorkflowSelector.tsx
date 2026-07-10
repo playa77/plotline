@@ -1,9 +1,16 @@
+// Version: 1.1.0 | 2026-07-10
 // Workflow selector component: lists available workflows and past runs.
 // Provides "Run" buttons for workflows and displays run history.
+//
+// When a workflow with {{variables.<name>}} placeholders is run, a
+// WorkflowRunDialog appears so the user can provide values before execution.
+// Workflows with zero variables run immediately, skipping the dialog.
 
 import { useState, useEffect, useCallback } from "react";
 import * as api from "../api/tauri";
 import type { WorkflowSummary, RunSummary } from "../types";
+import { scanWorkflowVariables, type VariableInfo } from "../utils/variables";
+import { WorkflowRunDialog } from "./WorkflowRunDialog";
 
 interface WorkflowSelectorProps {
   projectRoot: string;
@@ -25,6 +32,17 @@ export function WorkflowSelector({
   const [errorWorkflows, setErrorWorkflows] = useState<string | null>(null);
   const [errorRuns, setErrorRuns] = useState<string | null>(null);
   const [runningPath, setRunningPath] = useState<string | null>(null);
+
+  // --- WorkflowRunDialog state ---
+  // When non-null, the dialog is open. Holds the workflow being configured
+  // and the variables detected in its prompt files.
+  const [runDialogWorkflow, setRunDialogWorkflow] = useState<WorkflowSummary | null>(null);
+  const [runDialogVariables, setRunDialogVariables] = useState<VariableInfo[]>([]);
+  // True while variable files are being written and the run is starting.
+  // Disables dialog inputs and shows "Starting…" on the Run button.
+  const [isStartingRun, setIsStartingRun] = useState(false);
+  // Error message shown in the dialog footer (write/run failure). Null = clean.
+  const [runDialogError, setRunDialogError] = useState<string | null>(null);
 
   const loadWorkflows = useCallback(async () => {
     setIsLoadingWorkflows(true);
@@ -57,12 +75,26 @@ export function WorkflowSelector({
     loadRuns();
   }, [loadWorkflows, loadRuns]);
 
+  // handleRun — called when the user clicks "Run" on a workflow card.
+  // Scans the workflow's prompt files for {{variables.<name>}} placeholders.
+  // If none are found, starts the run immediately (no dialog). If variables
+  // are found, opens the WorkflowRunDialog so the user can provide values.
   const handleRun = useCallback(
     async (wf: WorkflowSummary) => {
       setRunningPath(wf.file_path);
       try {
-        const runDir = await api.runWorkflow(wf.file_path, projectRoot);
-        onStartRun(runDir);
+        const variables = await scanWorkflowVariables(wf.file_path, projectRoot);
+
+        if (variables.length === 0) {
+          // No variables — skip the dialog and run immediately.
+          const runDir = await api.runWorkflow(wf.file_path, projectRoot);
+          onStartRun(runDir);
+        } else {
+          // Variables detected — open the dialog for the user to fill in.
+          setRunDialogWorkflow(wf);
+          setRunDialogVariables(variables);
+          setRunDialogError(null);
+        }
       } catch (err) {
         setErrorWorkflows(String(err));
       } finally {
@@ -71,6 +103,49 @@ export function WorkflowSelector({
     },
     [projectRoot, onStartRun]
   );
+
+  // handleDialogRun — called when the user clicks "Run" in the dialog.
+  // Passes the edited variable values as overrides to the backend.
+  // The backend uses them in preference to file-based variables, without
+  // mutating any project files on disk.
+  const handleDialogRun = useCallback(
+    async (values: Record<string, string>) => {
+      if (!runDialogWorkflow) return;
+
+      setIsStartingRun(true);
+      setRunDialogError(null);
+
+      try {
+        // Pass variable values as overrides — the backend substitution
+        // engine checks overrides first, then falls back to file-based
+        // variables. No project files are written.
+        const runDir = await api.runWorkflow(
+          runDialogWorkflow.file_path,
+          projectRoot,
+          values
+        );
+
+        // Close the dialog and switch to the run monitor.
+        setRunDialogWorkflow(null);
+        setRunDialogVariables([]);
+        onStartRun(runDir);
+      } catch (err) {
+        // Keep the dialog open so the user can see the error and retry.
+        setRunDialogError(String(err));
+      } finally {
+        setIsStartingRun(false);
+      }
+    },
+    [projectRoot, runDialogWorkflow, onStartRun]
+  );
+
+  // handleDialogCancel — closes the dialog without running.
+  const handleDialogCancel = useCallback(() => {
+    if (isStartingRun) return; // Don't allow canceling mid-write.
+    setRunDialogWorkflow(null);
+    setRunDialogVariables([]);
+    setRunDialogError(null);
+  }, [isStartingRun]);
 
   const formatDate = (iso: string) => {
     try {
@@ -166,6 +241,18 @@ export function WorkflowSelector({
             </div>
           </div>
         ))}
+
+      {/* Pre-flight variable dialog — only rendered when a workflow with
+          variables is being run. */}
+      <WorkflowRunDialog
+        workflowName={runDialogWorkflow?.name ?? ""}
+        variables={runDialogVariables}
+        isOpen={runDialogWorkflow !== null}
+        isStarting={isStartingRun}
+        error={runDialogError}
+        onRun={handleDialogRun}
+        onCancel={handleDialogCancel}
+      />
     </div>
   );
 }
