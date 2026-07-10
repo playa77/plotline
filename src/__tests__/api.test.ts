@@ -39,6 +39,7 @@ describe("api/tauri", () => {
       expect(mockedInvoke).toHaveBeenCalledWith("rerun_from_step", {
         runDir: "/tmp/run-dir",
         stepIndex: 2,
+        variableOverrides: {},
       });
     });
   });

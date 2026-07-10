@@ -13,6 +13,8 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use tauri::Emitter;
 
@@ -59,6 +61,43 @@ struct RunErrorPayload {
     #[serde(rename = "stepIndex")]
     step_index: usize,
     error: String,
+}
+
+// ---------------------------------------------------------------------------
+// Cancellation support — global flag checked between steps
+// ---------------------------------------------------------------------------
+
+/// Global cancel flag. Set by `cancel_run()`, checked by the engine between steps.
+/// Stores an `Arc<AtomicBool>` that is cloned into the active `EngineRunner`.
+static CANCEL_FLAG: Mutex<Option<Arc<AtomicBool>>> = Mutex::new(None);
+
+/// Sets the global cancel flag to `true` if a run is in progress.
+/// Returns `false` if no run is active (nothing to cancel).
+pub fn cancel_run() -> bool {
+    if let Ok(guard) = CANCEL_FLAG.lock() {
+        if let Some(flag) = guard.as_ref() {
+            flag.store(true, Ordering::SeqCst);
+            return true;
+        }
+    }
+    false
+}
+
+/// Creates a fresh cancel flag and stores it globally. Returns a clone
+/// for the engine runner. Called at the start of a run.
+fn create_cancel_flag() -> Arc<AtomicBool> {
+    let flag = Arc::new(AtomicBool::new(false));
+    if let Ok(mut guard) = CANCEL_FLAG.lock() {
+        *guard = Some(flag.clone());
+    }
+    flag
+}
+
+/// Clears the global cancel flag. Called when a run completes or errors.
+fn clear_cancel_flag() {
+    if let Ok(mut guard) = CANCEL_FLAG.lock() {
+        *guard = None;
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +156,8 @@ pub async fn run_workflow(
     run_dir: &Path,
     variable_overrides: HashMap<String, String>,
 ) -> Result<(), PlotlineError> {
+    let cancel_flag = create_cancel_flag();
+
     // Step 1: Parse and validate the workflow
     let workflow = workflow::parse_workflow(workflow_path, project_root)?;
     workflow::validate_workflow(&workflow, project_root)?;
@@ -135,13 +176,16 @@ pub async fn run_workflow(
     );
 
     // Step 3: Execute each step sequentially
-    let runner = EngineRunner {
+    let runner = EngineRunner::new(
         app_handle,
         run_dir,
         project_root,
         variable_overrides,
-    };
-    runner.execute_steps(&workflow, None).await
+        cancel_flag,
+    );
+    let result = runner.execute_steps(&workflow, None).await;
+    clear_cancel_flag();
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -161,10 +205,14 @@ pub async fn rerun_from_step(
     app_handle: &tauri::AppHandle,
     run_dir: &Path,
     step_index: usize,
+    variable_overrides: HashMap<String, String>,
 ) -> Result<(), PlotlineError> {
+    let cancel_flag = create_cancel_flag();
+
     // Parse workflow from snapshot
     let snapshot_yaml = run_dir.join("_workflow.yaml");
     if !snapshot_yaml.exists() {
+        clear_cancel_flag();
         return Err(PlotlineError::RunNotFound(
             run_dir.display().to_string(),
         ));
@@ -177,6 +225,7 @@ pub async fn rerun_from_step(
 
     // Validate step_index is within bounds
     if step_index >= workflow.steps.len() {
+        clear_cancel_flag();
         return Err(PlotlineError::InvalidStepIndex {
             index: step_index,
             total: workflow.steps.len(),
@@ -203,14 +252,16 @@ pub async fn rerun_from_step(
     };
 
     // Execute from step_index onward
-    let runner = EngineRunner {
+    let runner = EngineRunner::new(
         app_handle,
         run_dir,
-        // For re-runs, use run_dir as project_root since prompts are snapshotted
-        project_root: run_dir,
-        variable_overrides: HashMap::new(),
-    };
-    runner.execute_steps(&workflow, Some((step_index, previous_output))).await
+        run_dir, // For re-runs, use run_dir as project_root since prompts are snapshotted
+        variable_overrides,
+        cancel_flag,
+    );
+    let result = runner.execute_steps(&workflow, Some((step_index, previous_output))).await;
+    clear_cancel_flag();
+    result
 }
 
 // ---------------------------------------------------------------------------
@@ -222,9 +273,26 @@ struct EngineRunner<'a> {
     run_dir: &'a Path,
     project_root: &'a Path,
     variable_overrides: HashMap<String, String>,
+    cancel_flag: Arc<AtomicBool>,
 }
 
 impl<'a> EngineRunner<'a> {
+    fn new(
+        app_handle: &'a tauri::AppHandle,
+        run_dir: &'a Path,
+        project_root: &'a Path,
+        variable_overrides: HashMap<String, String>,
+        cancel_flag: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            app_handle,
+            run_dir,
+            project_root,
+            variable_overrides,
+            cancel_flag,
+        }
+    }
+
     /// Executes steps in the workflow from `start` to the end.
     ///
     /// `start` is `None` for a fresh run (start at step 0, no previous output).
@@ -237,6 +305,20 @@ impl<'a> EngineRunner<'a> {
         let (start_index, mut previous_output) = start.unwrap_or((0, None));
 
         for (index, step) in workflow.steps.iter().enumerate().skip(start_index) {
+            // Check cancellation before each step
+            if self.cancel_flag.load(Ordering::SeqCst) {
+                let _ = self.app_handle.emit(
+                    "run_error",
+                    RunErrorPayload {
+                        step_index: index,
+                        error: "Run cancelled by user".to_string(),
+                    },
+                );
+                return Err(PlotlineError::FilesystemError(
+                    "Run cancelled by user".to_string(),
+                ));
+            }
+
             // Emit step_started
             let _ = self.app_handle.emit(
                 "step_started",

@@ -50,9 +50,10 @@ export function titleCaseFromVariableName(name: string): string {
 // the time we reach this code the file is known-good. We only need to extract
 // step names and their prompt_file paths — enough to know which files to scan.
 
-interface ParsedStep {
+export interface ParsedStep {
   name: string;
   prompt_file: string;
+  model: string;
 }
 
 /** Strips surrounding quotes and trailing whitespace from a YAML scalar value. */
@@ -61,11 +62,11 @@ function cleanYamlValue(raw: string): string {
 }
 
 /**
- * Extracts step name + prompt_file pairs from a workflow YAML string.
+ * Extracts step name + prompt_file + model from a workflow YAML string.
  * Handles standard 2-space indentation, quoted values, and arbitrary field
  * ordering within each step entry.
  */
-function extractStepsFromYaml(yaml: string): ParsedStep[] {
+export function extractStepsFromYaml(yaml: string): ParsedStep[] {
   const steps: ParsedStep[] = [];
   const lines = yaml.split("\n");
 
@@ -101,18 +102,24 @@ function extractStepsFromYaml(yaml: string): ParsedStep[] {
       // The first field may sit on the same line as the dash.
       const inlineName = line.match(/^\s*-\s+name:\s*(.+)/);
       const inlinePrompt = line.match(/^\s*-\s+prompt_file:\s*(.+)/);
+      const inlineModel = line.match(/^\s*-\s+model:\s*(.+)/);
       if (inlineName) {
         currentStep.name = cleanYamlValue(inlineName[1]);
       } else if (inlinePrompt) {
         currentStep.prompt_file = cleanYamlValue(inlinePrompt[1]);
+      } else if (inlineModel) {
+        currentStep.model = cleanYamlValue(inlineModel[1]);
       }
     } else if (currentStep) {
       const nameMatch = line.match(/^\s+name:\s*(.+)/);
       const promptMatch = line.match(/^\s+prompt_file:\s*(.+)/);
+      const modelMatch = line.match(/^\s+model:\s*(.+)/);
       if (nameMatch) {
         currentStep.name = cleanYamlValue(nameMatch[1]);
       } else if (promptMatch) {
         currentStep.prompt_file = cleanYamlValue(promptMatch[1]);
+      } else if (modelMatch) {
+        currentStep.model = cleanYamlValue(modelMatch[1]);
       }
     }
   }

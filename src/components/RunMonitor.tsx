@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRunState } from "../hooks/useRunState";
 import { StepCard } from "./StepCard";
 import * as api from "../api/tauri";
+import { extractStepsFromYaml } from "../utils/variables";
 import type { RunStepStatus } from "../types";
 
 interface RunMonitorProps {
@@ -36,8 +37,11 @@ export function RunMonitor({
 
   const [workflowName, setWorkflowName] = useState<string>("");
   const [initialSteps, setInitialSteps] = useState<RunStepStatus[]>([]);
+  const [stepModels, setStepModels] = useState<Map<number, string>>(new Map());
   const [elapsed, setElapsed] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [rerunConfirmIndex, setRerunConfirmIndex] = useState<number | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Load initial state from filesystem
   useEffect(() => {
@@ -45,10 +49,26 @@ export function RunMonitor({
 
     async function load() {
       try {
-        const info = await api.getRunStatus(runDir);
+        const [info, workflowYaml] = await Promise.all([
+          api.getRunStatus(runDir),
+          api.readFileContent(`${runDir}/_workflow.yaml`).catch(() => ""),
+        ]);
         if (!cancelled) {
           setWorkflowName(info.workflow_name);
           setInitialSteps(info.steps);
+
+          // Parse models from workflow YAML snapshot
+          const models = new Map<number, string>();
+          if (workflowYaml) {
+            const steps = extractStepsFromYaml(workflowYaml);
+            for (let i = 0; i < steps.length; i++) {
+              if (steps[i].model) {
+                models.set(i, steps[i].model);
+              }
+            }
+          }
+          setStepModels(models);
+
           setIsLoading(false);
         }
       } catch {
@@ -115,6 +135,35 @@ export function RunMonitor({
     [mergedSteps, onViewOutput]
   );
 
+  const handleRerunClick = useCallback(
+    (stepIndex: number) => {
+      setRerunConfirmIndex(stepIndex);
+    },
+    []
+  );
+
+  const handleRerunConfirm = useCallback(() => {
+    if (rerunConfirmIndex !== null) {
+      onRerunFrom(rerunConfirmIndex);
+      setRerunConfirmIndex(null);
+    }
+  }, [rerunConfirmIndex, onRerunFrom]);
+
+  const handleRerunCancel = useCallback(() => {
+    setRerunConfirmIndex(null);
+  }, []);
+
+  const handleCancel = useCallback(async () => {
+    setIsCancelling(true);
+    try {
+      await api.cancelWorkflow();
+    } catch (err) {
+      // The run_error event will handle the UI — just catch errors
+    }
+    // Don't reset isCancelling — the run_error event will set isRunning=false
+    // which hides the button
+  }, []);
+
   const completedCount = mergedSteps().filter(
     (s) => s.status === "completed"
   ).length;
@@ -147,6 +196,15 @@ export function RunMonitor({
               {formatElapsed(elapsed)}
             </div>
           )}
+          {isRunning && (
+            <button
+              style={styles.stopButton}
+              onClick={handleCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? "Stopping…" : "Stop"}
+            </button>
+          )}
           {isComplete && (
             <span style={styles.badgeComplete}>Completed</span>
           )}
@@ -171,7 +229,7 @@ export function RunMonitor({
 
       {/* Step list */}
       <div style={styles.stepList}>
-        {mergedSteps().map((step) => (
+        {mergedSteps().map((step, index) => (
           <StepCard
             key={step.index}
             stepIndex={step.index}
@@ -181,15 +239,44 @@ export function RunMonitor({
             onViewOutput={step.status === "completed" ? handleViewOutput : undefined}
             onRerunFrom={
               step.status === "completed" || step.status === "error"
-                ? onRerunFrom
+                ? handleRerunClick
                 : undefined
             }
+            model={stepModels.get(step.index)}
+            showConnector={index < mergedSteps().length - 1}
           />
         ))}
         {mergedSteps().length === 0 && (
           <div style={styles.empty}>No steps found for this run.</div>
         )}
       </div>
+
+      {/* Re-run confirmation overlay */}
+      {rerunConfirmIndex !== null && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <p style={styles.dialogText}>
+              This will overwrite step outputs from Step{" "}
+              {(rerunConfirmIndex as number) + 1} onward. Previous step outputs
+              will be preserved. Continue?
+            </p>
+            <div style={styles.dialogButtons}>
+              <button
+                style={styles.cancelButton}
+                onClick={handleRerunCancel}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.rerunButton}
+                onClick={handleRerunConfirm}
+              >
+                Re-run from Step {(rerunConfirmIndex as number) + 1}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -285,6 +372,16 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
     fontSize: "0.8rem",
   },
+  stopButton: {
+    padding: "4px 12px",
+    backgroundColor: "var(--color-error)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    fontWeight: 500,
+  },
   errorSummary: {
     padding: "10px 16px",
     backgroundColor: "rgba(244, 67, 54, 0.1)",
@@ -301,5 +398,52 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
     color: "var(--color-text-dim)",
     padding: "32px",
+  },
+  // Confirmation overlay styles
+  overlay: {
+    position: "fixed" as const,
+    inset: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  dialog: {
+    backgroundColor: "var(--color-panel)",
+    padding: "24px",
+    borderRadius: "8px",
+    maxWidth: "400px",
+    width: "90%",
+  },
+  dialogText: {
+    margin: "0 0 16px 0",
+    color: "var(--color-text)",
+    fontSize: "0.95rem",
+    lineHeight: 1.5,
+  },
+  dialogButtons: {
+    display: "flex",
+    gap: "8px",
+    justifyContent: "flex-end",
+  },
+  cancelButton: {
+    padding: "6px 14px",
+    backgroundColor: "transparent",
+    color: "var(--color-text-dim)",
+    border: "1px solid var(--color-accent)",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+  },
+  rerunButton: {
+    padding: "6px 14px",
+    backgroundColor: "var(--color-error)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.85rem",
+    fontWeight: 500,
   },
 };

@@ -11,6 +11,10 @@ interface StepCardProps {
   outputPath: string | null;
   onViewOutput?: (index: number) => void;
   onRerunFrom?: (index: number) => void;
+  /** Optional model name shown below the step name in small monospace text. */
+  model?: string;
+  /** When true, renders a connector div after the card showing data flow to the next step. */
+  showConnector?: boolean;
 }
 
 export function StepCard({
@@ -21,50 +25,61 @@ export function StepCard({
   outputPath,
   onViewOutput,
   onRerunFrom,
+  model,
+  showConnector,
 }: StepCardProps) {
   const statusConfig = STATUS_CONFIG[status];
 
   return (
-    <div style={styles.card}>
-      <div style={styles.main}>
-        <span style={{ ...styles.indicator, color: statusConfig.color }}>
-          {statusConfig.icon}
-        </span>
-        <div style={styles.info}>
-          <div style={styles.stepName}>
-            Step {stepIndex + 1}: {stepName}
+    <>
+      <div style={styles.card}>
+        <div style={styles.main}>
+          <span style={{ ...styles.indicator, color: statusConfig.color }}>
+            {statusConfig.icon}
+          </span>
+          <div style={styles.info}>
+            <div style={styles.stepName}>
+              Step {stepIndex + 1}: {stepName}
+              {model && <span style={styles.modelText}>{model}</span>}
+            </div>
+            <div style={{ ...styles.statusText, color: statusConfig.color }}>
+              {statusConfig.label}
+              {status === "running" && (
+                <span style={styles.pulse}> </span>
+              )}
+            </div>
           </div>
-          <div style={{ ...styles.statusText, color: statusConfig.color }}>
-            {statusConfig.label}
-            {status === "running" && (
-              <span style={styles.pulse}> </span>
+          <div style={styles.actions}>
+            {status === "completed" && onViewOutput && outputPath && (
+              <button
+                style={styles.viewButton}
+                onClick={() => onViewOutput(stepIndex)}
+              >
+                View Output
+              </button>
+            )}
+            {(status === "completed" || status === "error") && onRerunFrom && (
+              <button
+                style={styles.rerunButton}
+                onClick={() => onRerunFrom(stepIndex)}
+                title="Uses the original workflow snapshot."
+              >
+                Re-run from here
+              </button>
             )}
           </div>
         </div>
-        <div style={styles.actions}>
-          {status === "completed" && onViewOutput && outputPath && (
-            <button
-              style={styles.viewButton}
-              onClick={() => onViewOutput(stepIndex)}
-            >
-              View Output
-            </button>
-          )}
-          {(status === "completed" || status === "error") && onRerunFrom && (
-            <button
-              style={styles.rerunButton}
-              onClick={() => onRerunFrom(stepIndex)}
-              title="Uses the original workflow snapshot."
-            >
-              Re-run from here
-            </button>
-          )}
-        </div>
+        {status === "error" && error && (
+          <div style={styles.errorBox}>{error}</div>
+        )}
       </div>
-      {status === "error" && error && (
-        <div style={styles.errorBox}>{error}</div>
+      {showConnector && (
+        <div style={styles.connector}>
+          <div style={styles.connectorLine} />
+          <div style={styles.connectorArrow}>▸</div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -105,6 +120,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "0.9rem",
     fontWeight: 500,
     color: "var(--color-text)",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  modelText: {
+    fontSize: "0.65rem",
+    fontFamily: "var(--font-mono)",
+    color: "var(--color-text-dim)",
+    opacity: 0.7,
+    fontWeight: 400,
   },
   statusText: {
     fontSize: "0.75rem",
@@ -150,5 +176,27 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-error)",
     fontSize: "0.8rem",
     lineHeight: 1.4,
+  },
+  connector: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    height: "24px",
+    justifyContent: "flex-start",
+    padding: "2px 0",
+  },
+  connectorLine: {
+    width: "2px",
+    height: "14px",
+    backgroundColor: "var(--color-accent)",
+    opacity: 0.35,
+    borderRadius: "1px",
+  },
+  connectorArrow: {
+    fontSize: "0.55rem",
+    color: "var(--color-accent)",
+    opacity: 0.45,
+    lineHeight: 1,
+    marginTop: "1px",
   },
 };

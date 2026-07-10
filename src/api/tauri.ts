@@ -36,12 +36,36 @@ export async function runWorkflow(
 
 export async function rerunFromStep(
   runDir: string,
-  stepIndex: number
+  stepIndex: number,
+  variableOverrides?: Record<string, string>
 ): Promise<void> {
   return invoke<void>("rerun_from_step", {
     runDir,
     stepIndex,
+    variableOverrides: variableOverrides ?? {},
   });
+}
+
+/** Persistently saves a variable value to project_root/variables/<name>.md */
+export async function saveVariable(
+  projectRoot: string,
+  name: string,
+  content: string
+): Promise<void> {
+  return invoke<void>("save_variable", { projectRoot, name, content });
+}
+
+/** Cancels the currently running workflow. Returns true if a run was active. */
+export async function cancelWorkflow(): Promise<boolean> {
+  return invoke<boolean>("cancel_workflow");
+}
+
+/** Writes content to an arbitrary file path (for prompt editing). */
+export async function writeFileContent(
+  filePath: string,
+  content: string
+): Promise<void> {
+  return invoke<void>("write_file_content", { filePath, content });
 }
 
 export async function saveOutput(

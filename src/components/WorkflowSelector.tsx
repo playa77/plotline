@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from "react";
 import * as api from "../api/tauri";
 import type { WorkflowSummary, RunSummary } from "../types";
-import { scanWorkflowVariables, type VariableInfo } from "../utils/variables";
+import { scanWorkflowVariables, extractStepsFromYaml, type VariableInfo } from "../utils/variables";
 import { WorkflowRunDialog } from "./WorkflowRunDialog";
 
 interface WorkflowSelectorProps {
@@ -32,12 +32,19 @@ export function WorkflowSelector({
   const [errorWorkflows, setErrorWorkflows] = useState<string | null>(null);
   const [errorRuns, setErrorRuns] = useState<string | null>(null);
   const [runningPath, setRunningPath] = useState<string | null>(null);
+  // Set of workflow file paths that have validation issues (e.g. missing prompt files).
+  const [workflowIssues, setWorkflowIssues] = useState<Set<string>>(new Set());
 
   // --- WorkflowRunDialog state ---
   // When non-null, the dialog is open. Holds the workflow being configured
   // and the variables detected in its prompt files.
   const [runDialogWorkflow, setRunDialogWorkflow] = useState<WorkflowSummary | null>(null);
   const [runDialogVariables, setRunDialogVariables] = useState<VariableInfo[]>([]);
+  // Step names, models and prompt files extracted from the workflow YAML
+  // for the dialog preview and prompt editing.
+  const [runDialogSteps, setRunDialogSteps] = useState<
+    { name: string; model: string; promptFile: string }[]
+  >([]);
   // True while variable files are being written and the run is starting.
   // Disables dialog inputs and shows "Starting…" on the Run button.
   const [isStartingRun, setIsStartingRun] = useState(false);
@@ -50,6 +57,28 @@ export function WorkflowSelector({
     try {
       const wfs = await api.listWorkflows(projectRoot);
       setWorkflows(wfs);
+
+      // Validate each workflow — check that referenced prompt files exist.
+      const issues = new Set<string>();
+      await Promise.allSettled(
+        wfs.map(async (wf) => {
+          try {
+            const yaml = await api.readFileContent(wf.file_path);
+            const steps = extractStepsFromYaml(yaml);
+            const results = await Promise.allSettled(
+              steps.map((step) => api.readFileContent(`${projectRoot}/${step.prompt_file}`))
+            );
+            const anyMissing = results.some((r) => r.status === "rejected");
+            if (anyMissing) {
+              issues.add(wf.file_path);
+            }
+          } catch {
+            // Can't even read the YAML — mark as having issues.
+            issues.add(wf.file_path);
+          }
+        })
+      );
+      setWorkflowIssues(issues);
     } catch (err) {
       setErrorWorkflows(String(err));
     } finally {
@@ -85,6 +114,21 @@ export function WorkflowSelector({
       try {
         const variables = await scanWorkflowVariables(wf.file_path, projectRoot);
 
+        // Extract step names, models and prompt_files from the workflow YAML
+        // for the dialog preview and prompt editing.
+        let steps: { name: string; model: string; promptFile: string }[] = [];
+        try {
+          const yaml = await api.readFileContent(wf.file_path);
+          const parsed = extractStepsFromYaml(yaml);
+          steps = parsed.map((s) => ({
+            name: s.name,
+            model: s.model ?? "",
+            promptFile: s.prompt_file,
+          }));
+        } catch {
+          // Non-critical — preview will just be empty.
+        }
+
         if (variables.length === 0) {
           // No variables — skip the dialog and run immediately.
           const runDir = await api.runWorkflow(wf.file_path, projectRoot);
@@ -93,6 +137,7 @@ export function WorkflowSelector({
           // Variables detected — open the dialog for the user to fill in.
           setRunDialogWorkflow(wf);
           setRunDialogVariables(variables);
+          setRunDialogSteps(steps);
           setRunDialogError(null);
         }
       } catch (err) {
@@ -128,6 +173,7 @@ export function WorkflowSelector({
         // Close the dialog and switch to the run monitor.
         setRunDialogWorkflow(null);
         setRunDialogVariables([]);
+        setRunDialogSteps([]);
         onStartRun(runDir);
       } catch (err) {
         // Keep the dialog open so the user can see the error and retry.
@@ -144,6 +190,7 @@ export function WorkflowSelector({
     if (isStartingRun) return; // Don't allow canceling mid-write.
     setRunDialogWorkflow(null);
     setRunDialogVariables([]);
+    setRunDialogSteps([]);
     setRunDialogError(null);
   }, [isStartingRun]);
 
@@ -190,7 +237,17 @@ export function WorkflowSelector({
         workflows.map((wf) => (
           <div key={wf.file_path} style={styles.card}>
             <div style={styles.cardContent}>
-              <div style={styles.cardName}>{wf.name}</div>
+              <div style={styles.cardNameRow}>
+                <span style={styles.cardName}>{wf.name}</span>
+                {workflowIssues.has(wf.file_path) && (
+                  <span
+                    style={styles.warningIcon}
+                    title="Some prompt files are missing"
+                  >
+                    ⚠
+                  </span>
+                )}
+              </div>
               <div style={styles.cardMeta}>
                 {wf.step_count} step{wf.step_count !== 1 ? "s" : ""}
               </div>
@@ -247,7 +304,9 @@ export function WorkflowSelector({
       <WorkflowRunDialog
         workflowName={runDialogWorkflow?.name ?? ""}
         variables={runDialogVariables}
+        steps={runDialogSteps}
         isOpen={runDialogWorkflow !== null}
+        projectRoot={projectRoot}
         isStarting={isStartingRun}
         error={runDialogError}
         onRun={handleDialogRun}
@@ -321,6 +380,17 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  cardNameRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  },
+  warningIcon: {
+    fontSize: "0.85rem",
+    cursor: "help",
+    flexShrink: 0,
+    lineHeight: 1,
   },
   cardMeta: {
     fontSize: "0.68rem",

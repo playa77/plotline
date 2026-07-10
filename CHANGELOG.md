@@ -4,6 +4,39 @@ All notable changes to the Plotline project.
 
 ## [1.0.0] — 2026-07-10 (in progress)
 
+### Feature — ChapterPicker combobox in WorkflowRunDialog (2026-07-10)
+- `WorkflowRunDialog` now detects chapter-like variables (name matching
+  `/^chapter/i`, e.g. `chapter_spec`, `chapter_number`) and renders them as a
+  `ChapterPickerField` combobox instead of a plain textarea.
+- The combobox offers a dropdown of chapters parsed from the `book_outline`
+  variable via `parseChaptersFromOutline()` (from `src/utils/chapters.ts`).
+  Chapters are parsed live from the dialog's `values` state, so editing the
+  outline textarea reactively updates the picker's dropdown options.
+- Selecting a chapter from the dropdown sends the chapter number (e.g. "3")
+  as the variable value, but the input displays the full label (e.g.
+  "Chapter 3: The Method"). This display/value divergence is managed with a
+  `skipSyncRef` that prevents the value-sync effect from overwriting the
+  label with the raw number after a dropdown selection.
+- Free-text entry is always available: typing a custom value sends that raw
+  text as both the display and the value.
+- Keyboard navigation: ArrowDown/Up navigate chapters, Enter selects,
+  Escape/Tab close the dropdown. Cmd/Ctrl+Enter passes through to the
+  dialog's global Run handler.
+- Edge cases handled: if `book_outline` exists with content but no parseable
+  chapters, shows a "No chapters detected in outline" hint and falls back to
+  a text input. If no `book_outline` variable exists, silently falls back to
+  a text input with placeholder "e.g., 3 or Chapter 3".
+- Visual prominence: the chapter picker card has a coral-tinted background,
+  an inset accent left bar (via box-shadow to avoid box-model shift), a
+  "chapter picker" badge, and a larger sans-serif input (15px vs 13px mono
+  textarea) to signal it as the primary action target.
+- New CSS classes added to `WorkflowRunDialog.module.css`: `.chapterCard`,
+  `.chapterBadge`, `.pickerContainer`, `.pickerInputWrap`, `.pickerInput`,
+  `.pickerToggle`, `.pickerHint`, `.pickerDropdown`, `.pickerOption`,
+  `.pickerOptionActive`, `.pickerOptionNum`, `.pickerOptionLabel`, plus
+  `dropdownIn` keyframe animation. No separate CSS file created.
+- `WorkflowRunDialog.tsx` version bumped to 1.1.0.
+
 ### Feature — OpenRouter retry with exponential backoff (2026-07-10)
 - Added retry logic to `openrouter::complete()` per global AGENTS.md "Respectful API usage"
   requirement. Up to 3 retries with exponential backoff (1s, 2s, 4s) for transient failures.

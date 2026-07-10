@@ -96,6 +96,7 @@ pub async fn run_workflow(
 pub async fn rerun_from_step(
     run_dir: String,
     step_index: usize,
+    variable_overrides: HashMap<String, String>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
     let run_dir = PathBuf::from(&run_dir);
@@ -106,9 +107,10 @@ pub async fn rerun_from_step(
 
     let app_clone = app_handle.clone();
     let rd_clone = run_dir.clone();
+    let vo_clone = variable_overrides.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = engine::rerun_from_step(&app_clone, &rd_clone, step_index).await {
+        if let Err(e) = engine::rerun_from_step(&app_clone, &rd_clone, step_index, vo_clone).await {
             eprintln!(
                 "[{}] Re-run failed: {}",
                 chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
@@ -134,6 +136,34 @@ pub async fn save_output(
     let run_dir = PathBuf::from(&run_dir);
     run_manager::write_step_output(&run_dir, step_index, &step_name, &content)
         .map_err(map_err)
+}
+
+// ---------------------------------------------------------------------------
+// save_variable — persistently saves a variable value to project_root/variables/
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn save_variable(
+    project_root: String,
+    name: String,
+    content: String,
+) -> Result<(), String> {
+    let pr = resolve_project_root(&project_root)?;
+    let var_path = pr.join("variables").join(format!("{}.md", name));
+    std::fs::write(&var_path, &content).map_err(|e| {
+        PlotlineError::FilesystemError(format!("Failed to write variable {}: {}", name, e))
+            .to_string()
+    })?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// cancel_workflow — aborts a running workflow by setting the cancel flag
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn cancel_workflow() -> Result<bool, String> {
+    Ok(crate::engine::cancel_run())
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +369,34 @@ pub async fn read_file_content(
         ))
         .to_string()
     })
+}
+
+// ---------------------------------------------------------------------------
+// write_file_content — generic file write (counterpart to read_file_content)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn write_file_content(
+    file_path: String,
+    content: String,
+) -> Result<(), String> {
+    let path = std::path::PathBuf::from(&file_path)
+        .canonicalize()
+        .map_err(|e| {
+            PlotlineError::FilesystemError(format!(
+                "Invalid file path '{}': {}",
+                file_path, e
+            ))
+            .to_string()
+        })?;
+    std::fs::write(&path, &content).map_err(|e| {
+        PlotlineError::FilesystemError(format!(
+            "Failed to write file '{}': {}",
+            file_path, e
+        ))
+        .to_string()
+    })?;
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
