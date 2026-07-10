@@ -23,7 +23,5 @@
       "csp": "default-src 'self'; connect-src 'self' https://openrouter.ai; style-src 'self' 'unsafe-inline'"
     }
   },
-  "plugins": {
-    "store": {}
-  }
+  "plugins": {}
 }
