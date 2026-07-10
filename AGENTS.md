@@ -4,7 +4,7 @@
 
 ## Current state
 
-The full MVP backend is implemented and tested: workflow parsing/validation, variable substitution, OpenRouter client, execution engine, run manager, config/keyring, and all 12 IPC commands. The frontend is fully built: typed API wrappers, all hooks (useTauriEvent, useRunState, useProjectRoot), and all components (WorkflowSelector, RunMonitor, StepCard, OutputEditor with CodeMirror, SettingsModal, Toast, ErrorBoundary). Build and test pipelines pass with 86 Rust tests and 35 frontend tests. Remaining work tracked in `docs/roadmap.md`: WP15 (Testing & QA) and WP16 (Build & Package).
+The full MVP backend is implemented and tested: workflow parsing/validation, variable substitution, OpenRouter client, execution engine, run manager, config/keyring, and all 15 IPC commands. The frontend is fully built: typed API wrappers, all hooks (useTauriEvent, useRunState, useProjectRoot), and all components (WorkflowSelector, RunMonitor, StepCard, OutputEditor with CodeMirror, PromptEditorModal, WorkflowRunDialog, SettingsModal, Toast, ErrorBoundary). Build and test pipelines pass with 86 Rust tests and 35 frontend tests.
 
 ## Architecture
 
@@ -74,7 +74,7 @@ The engine appends previous output with exactly: `\n\n---\n\nPrevious Step Outpu
 
 ### CSP restricts connections
 
-`tauri.conf.json` CSP: `connect-src 'self' https://openrouter.ai`. All HTTP goes through Rust backend, but CSP is defense-in-depth.
+`tauri.conf.json` CSP: `default-src 'self'; connect-src 'self' https://openrouter.ai; style-src 'self' 'unsafe-inline'`. All HTTP goes through Rust backend, but CSP is defense-in-depth.
 
 ### Vite port is locked
 
@@ -95,7 +95,7 @@ All requests must include headers: `HTTP-Referer: https://plotline.app` and `X-T
 ### Tauri config
 
 - App window: 1200×800, min 800×600
-- Store plugin configured in `tauri.conf.json` plugins section
+- Store plugin configured via Rust builder in `src-tauri/src/lib.rs` (`.plugin(tauri_plugin_store::Builder::new().build())`)
 - `beforeDevCommand: "npm run dev"` — Vite starts before Tauri
 - `beforeBuildCommand: "npm run build"` — frontend built before Tauri bundles
 

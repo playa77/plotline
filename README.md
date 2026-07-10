@@ -15,6 +15,10 @@ It is not a chatbot. It is an execution engine for human-directed cognitive work
 - **Reproducibility**: Every run creates a snapshot of the workflow and prompts, ensuring results are always traceable.
 - **BYOK**: Bring your own OpenRouter API key. Stored securely in your OS keyring.
 - **Per-Step Model Selection**: Each workflow step declares its own OpenRouter model — mix and match models within a single workflow.
+- **Pre-flight Variable Editor**: When a workflow uses `{{variables.*}}`, a dialog appears before execution letting you override variable values without editing files on disk.
+- **Chapter Picker**: Chapter-like variables get an intelligent combobox that parses chapter lists from your book outline, making it fast to pick chapters by number.
+- **Run Cancellation**: Cancel a running workflow at any time — the cancel button in the footer safely aborts execution.
+- **Retry with Backoff**: OpenRouter API calls automatically retry up to 3 times with exponential backoff (1s, 2s, 4s) for transient failures like network timeouts and HTTP 5xx errors.
 
 ## Quick Start
 
@@ -114,8 +118,9 @@ Plotline validates workflows before execution:
    a. Read the prompt from the snapshot (_prompts/)
    b. Substitute {{variables.*}} placeholders with live file contents
    c. If this is not the first step, append previous step's output as context
-   d. Send to OpenRouter API (non-streaming, 30-second timeout)
-   e. Write the response to step_XX_name.md
+    d. Send to OpenRouter API (non-streaming, 30-second timeout)
+    e. If request fails with a transient error (network timeout, 5xx), retry up to 3 times with exponential backoff (1s, 2s, 4s)
+    f. Write the response to step_XX_name.md
 5. Emit completion events to the UI
 ```
 
@@ -271,7 +276,7 @@ Paste source material into `variables/source.md`, run a "Summarize" workflow tha
 │  ├─ 07-09... │                                                        │
 │  └─ 07-08... │                                                        │
 ├──────────────┴───────────────────────────────────────────────────────┤
-│  Project: /home/user/my-writing-project           Running...  Completed│
+│  Project: /home/user/my-writing-project           Running...  Cancel  Completed│
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -312,9 +317,9 @@ Accessible via the gear icon (&#9881;) in the header. Contains two settings:
 - **No parallel step execution** — steps always run sequentially
 - **No workflow chaining** — you must run workflows one at a time and manually pipe results via variables
 - **No branching or conditional steps** — linear sequences only
-- **OpenRouter only** — no direct provider integrations (OpenAI, Anthropic, etc.)
 - **No cost tracking or usage dashboards**
-- **No prompt editor** — write prompts in your text editor of choice
+- **No integrated prompt editor** — a CodeMirror-based prompt editor component (`PromptEditorModal.tsx`) exists but is not yet wired into the main UI. Write prompts in your text editor of choice for now.
+- **OpenRouter only** — no direct provider integrations (OpenAI, Anthropic, etc.)
 - **No workflow editor** — write YAML by hand
 
 ## Build Instructions
@@ -378,9 +383,9 @@ The installer/binary will be located in `src-tauri/target/release/bundle/`.
 │  │                      │ IPC  │                       │ │
 │  │  - Workflow Selector │◄────►│  - Workflow Parser    │ │
 │  │  - Run Monitor       │      │  - Variable Substitutor│ │
-│  │  - Markdown Editor   │      │  - Execution Loop     │ │
+│  │  - Output Editor     │      │  - Execution Loop     │ │
 │  │  - Settings (API Key)│      │  - OpenRouter Client  │ │
-│  │                      │      │  - Run Manager        │ │
+│  │  - Toast/Error Bounds│      │  - Run Manager        │ │
 │  └──────────────────────┘      └──────────┬───────────┘ │
 │                                           │             │
 └───────────────────────────────────────────┼─────────────┘

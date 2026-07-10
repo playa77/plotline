@@ -71,10 +71,14 @@ The system is a Tauri 2.0 desktop application. The architecture strictly separat
 5. **Run Manager**: Creates run directories, copies workflow snapshots, and writes step outputs to disk.
 
 ### React Frontend (Webview)
-1. **Project Context**: Displays available workflows from the loaded project directory.
-2. **Run Monitor**: Listens to Tauri events to display real-time step status (`pending`, `running`, `completed`, `error`).
-3. **Output Editor**: Renders Markdown outputs. Allows user editing and saves changes back to the Rust core via IPC.
-4. **Settings**: Captures and stores the OpenRouter API key.
+1. **Workflow Selector**: Lists available workflows and past runs from the project directory.
+2. **Workflow Run Dialog**: Pre-flight variable editor — appears before execution when the workflow uses `{{variables.*}}`, allowing users to override variable values for the current run without modifying files on disk.
+3. **Run Monitor**: Listens to Tauri events to display real-time step status (`pending`, `running`, `completed`, `error`) with step cards, elapsed time counter, and error summaries.
+4. **Output Editor**: Dual-mode CodeMirror editor for viewing (Markdown render) and editing step outputs. Supports save, re-run from step, and unsaved changes warnings.
+5. **Settings Modal**: Captures project root path (via directory picker) and OpenRouter API key (stored in OS keyring).
+6. **Error Boundary**: Class-based React error boundary with fallback UI for unhandled render crashes.
+7. **Toast Notifications**: Dependency-free notification system with success/error variants and 4-second auto-dismiss.
+8. **Prompt Editor**: CodeMirror-based modal for editing prompt Markdown files (component exists; not yet wired into the main UI).
 
 ## 5. Data Model
 
@@ -88,6 +92,7 @@ project_root/
 │   └── draft.md
 └── variables/
     └── style.md
+└── runs/                     # Auto-generated run histories
 ```
 
 ### Workflow Definition (`workflow.yaml`)
@@ -118,11 +123,21 @@ runs/
 ## 6. API & Interface Design
 
 ### Tauri IPC Commands (Frontend → Backend)
-- `invoke('run_workflow', { workflowPath: string })`: Starts a new run.
-- `invoke('rerun_from_step', { runDir: string, stepIndex: number })`: Resumes an existing run from a specific step.
-- `invoke('save_output', { runDir: string, stepIndex: number, content: string })`: Saves user edits to a step output file.
-- `invoke('set_api_key', { key: string })`: Stores the API key.
-- `invoke('get_run_status', { runDir: string })`: Returns the current state of a run based on file existence.
+- `invoke('run_workflow', { workflowPath, projectRoot, variableOverrides? })`: Starts a new run with optional pre-flight variable overrides.
+- `invoke('rerun_from_step', { runDir, stepIndex })`: Resumes an existing run from a specific step.
+- `invoke('save_output', { runDir, stepIndex, stepName, content })`: Saves user edits to a step output file.
+- `invoke('save_variable', { projectRoot, name, content })`: Persists a variable value to `<project_root>/variables/<name>.md`.
+- `invoke('cancel_workflow')`: Cancels the currently running workflow.
+- `invoke('write_file_content', { filePath, content })`: Writes arbitrary file content (used for prompt editing).
+- `invoke('get_run_status', { runDir })`: Returns the current state of a run based on file existence.
+- `invoke('list_workflows', { projectRoot })`: Lists available workflow YAML files.
+- `invoke('list_runs', { projectRoot })`: Lists past runs sorted by started_at descending.
+- `invoke('read_file_content', { filePath })`: Reads file content from disk.
+- `invoke('set_api_key', { key })`: Stores the API key in the OS keyring.
+- `invoke('get_api_key')`: Retrieves the API key from the OS keyring.
+- `invoke('has_api_key')`: Checks whether an API key exists in the OS keyring.
+- `invoke('set_project_root', { path })`: Sets the project root directory.
+- `invoke('get_project_root')`: Gets the current project root directory.
 
 ### Tauri Events (Backend → Frontend)
 - `run_started`: Payload `{ runDir: string }`

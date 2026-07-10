@@ -16,7 +16,7 @@
 - GUI for workflow selection, run monitoring, and output editing
 - OS keyring API key storage
 
-**Out of Scope**: Streaming, parallel execution, branching, multiple providers, prompt versioning, cost tracking, auto-retries, visual DAG editor.
+**Out of Scope**: Streaming, parallel execution, branching, multiple providers, prompt versioning, cost tracking, visual DAG editor.
 
 ---
 
@@ -50,7 +50,13 @@ plotline/
 │   │   ├── OutputEditor.tsx
 │   │   ├── SettingsModal.tsx
 │   │   ├── Toast.tsx
-│   │   └── ErrorBoundary.tsx
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── PromptEditorModal.tsx
+│   │   ├── WorkflowRunDialog.tsx
+│   │   ├── ErrorBoundary.module.css
+│   │   ├── SettingsModal.module.css
+│   │   ├── Toast.module.css
+│   │   └── WorkflowRunDialog.module.css
 │   ├── hooks/
 │   │   ├── useTauriEvent.ts
 │   │   ├── useRunState.ts
@@ -59,8 +65,12 @@ plotline/
 │   │   └── index.ts
 │   ├── api/
 │   │   └── tauri.ts             # Typed wrappers around invoke()
+│   ├── utils/
+│   │   ├── variables.ts
+│   │   └── chapters.ts
 │   ├── styles/
 │   │   └── global.css
+│   ├── test-setup.ts
 │   └── __tests__/
 │       ├── api.test.ts
 │       ├── App.test.tsx
@@ -91,6 +101,8 @@ plotline/
 | `regex` | 1.0 | Variable substitution pattern matching |
 | `thiserror` | 2.0 | Ergonomic error types |
 | `chrono` | 0.4 | Timestamp generation for run dirs |
+| `tauri-plugin-dialog` | 2.0 | Native directory picker dialog |
+| `serde_json` | 1.0 | JSON serialization/deserialization |
 
 ### Frontend (`package.json`)
 
@@ -104,8 +116,13 @@ plotline/
 | `@uiw/codemirror-extensions-langs` | ^4.23 | Markdown language support |
 | `react-markdown` | ^9.0 | Markdown rendering (read-only view) |
 | `typescript` | ^5.5 | Type safety |
-| `vite` | ^5.4 | Build tooling |
-| `@vitejs/plugin-react` | ^4.3 | React fast refresh |
+| `vite` | ^6.4 | Build tooling |
+| `@vitejs/plugin-react` | ^5.2 | React fast refresh |
+| `@tauri-apps/plugin-dialog` | ^2.0 | Native file/directory picker dialog |
+| `vitest` | ^3.1 | Frontend test runner |
+| `@testing-library/react` | ^16.3 | React component testing utilities |
+| `@testing-library/jest-dom` | ^6.6 | DOM matchers for test assertions |
+| `jsdom` | ^26.1 | DOM environment for vitest |
 
 `[COMPLEXITY JUSTIFICATION]`: CodeMirror is chosen over simpler textarea-based editors because the MVP requires in-GUI editing of Markdown outputs. CodeMirror provides syntax highlighting, line numbers, and standard editing keybindings out of the box. It is the minimal viable editor that doesn't feel broken.
 
@@ -431,7 +448,8 @@ pub fn validate_workflow(workflow: &Workflow, project_root: &Path)
 /// Leaves unknown {{...}} patterns untouched (does not error).
 pub fn substitute_variables(
     prompt_content: &str, 
-    project_root: &Path
+    project_root: &Path,
+    variable_overrides: &HashMap<String, String>,
 ) -> Result<String, PlotlineError>;
 ```
 
@@ -465,6 +483,8 @@ pub async fn run_workflow(
     app_handle: &AppHandle,
     workflow_path: &Path,
     project_root: &Path,
+    variable_overrides: HashMap<String, String>,
+    run_dir: Option<&Path>,
 ) -> Result<(), PlotlineError>;
 
 /// Re-executes a workflow starting from a specific step index.
@@ -583,6 +603,9 @@ pub async fn complete(request: CompletionRequest)
 - Sets `HTTP-Referer` and `X-Title` headers as required by OpenRouter.
 - Extracts `choices[0].message.content` from the JSON response.
 - Token usage is parsed but discarded for MVP (no cost tracking). `[ASSUMPTION]` — parsing it now makes future cost tracking trivial to add.
+- Retry logic: up to 3 retries with exponential backoff (1s, 2s, 4s) for transient failures.
+  Retryable errors: network timeout, connection failure, HTTP 5xx, body decode glitch,
+  response parse errors. Non-retryable: 401 (auth), 429 (rate limit), API key not set.
 
 ### `run_manager.rs` — Run Manager
 
@@ -653,6 +676,7 @@ pub fn infer_run_status(
 pub async fn run_workflow(
     workflow_path: String,
     project_root: String,
+    variable_overrides: Option<HashMap<String, String>>,
     app_handle: AppHandle,
 ) -> Result<String, String>;  // Returns run_dir path
 
@@ -668,6 +692,22 @@ pub async fn save_output(
     run_dir: String,
     step_index: usize,
     step_name: String,
+    content: String,
+) -> Result<(), String>;
+
+#[tauri::command]
+pub async fn save_variable(
+    project_root: String,
+    name: String,
+    content: String,
+) -> Result<(), String>;
+
+#[tauri::command]
+pub async fn cancel_workflow() -> Result<(), String>;
+
+#[tauri::command]
+pub async fn write_file_content(
+    file_path: String,
     content: String,
 ) -> Result<(), String>;
 
@@ -842,7 +882,9 @@ src-tauri/tests/fixtures/
 │   │   ├── step1.md
 │   │   └── step2.md
 │   └── variables/
-│       └── context.md
+│       ├── style.md
+│       ├── protagonist.md
+│       └── my-var_name.md
 ```
 
 ### Frontend Tests
@@ -916,6 +958,11 @@ export default defineConfig({
     target: "es2021",
     minify: "esbuild",
     sourcemap: false,
+  },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/test-setup.ts"],
   },
 });
 ```

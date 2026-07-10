@@ -120,7 +120,7 @@ All notable changes to the Plotline project.
 - `snapshot_workflow()`: copies workflow YAML + prompt files (preserving subdirectory structure)
 - `step_output_path()`: 1-indexed zero-padded `step_01_<name>.md`
 - `read_step_output()`, `write_step_output()`, `infer_run_status()`
-- 20 unit tests (slugify edge cases, collision handling, snapshot subdirs, read/write/infer)
+- 19 unit tests (slugify edge cases, collision handling, snapshot subdirs, read/write/infer)
 
 ### WP5 — OpenRouter Client
 - `complete()`: POST to `https://openrouter.ai/api/v1/chat/completions` with 30s timeout
@@ -135,18 +135,19 @@ All notable changes to the Plotline project.
 - Context concatenation: `\n\n---\n\nPrevious Step Output:\n\n{content}`
 - Prompts from snapshot (`_prompts/`), variables from live project root
 - 5 event payload types with camelCase serde serialization
-- 19 unit tests (delete_subsequent_outputs, context format, re-run logic, event serialization)
+- 17 unit tests (delete_subsequent_outputs, context format, re-run logic, event serialization)
 
 ### WP7 — IPC Commands & Config
-- All 12 Tauri commands implemented and registered: `run_workflow`, `rerun_from_step`, `save_output`, `get_run_status`, `list_workflows`, `list_runs`, `read_file_content`, `set_api_key`, `get_api_key`, `has_api_key`, `set_project_root`, `get_project_root`
+- All 15 Tauri commands implemented and registered: `run_workflow`, `rerun_from_step`, `save_output`, `save_variable`, `cancel_workflow`, `write_file_content`, `get_run_status`, `list_workflows`, `list_runs`, `read_file_content`, `set_api_key`, `get_api_key`, `has_api_key`, `set_project_root`, `get_project_root`
 - `run_workflow` and `rerun_from_step` use `tauri::async_runtime::spawn` for background execution
 - `config.rs`: API key via OS keyring (service `plotline`, account `openrouter`)
 - `set_project_root`/`get_project_root` via `tauri-plugin-store`
 - `list_runs` sorts by `started_at` descending (newest first)
 - `list_workflows` filters for `.yaml`/`.yml` files, skips unparsable files with warning
+   - `save_variable`/`cancel_workflow`/`write_file_content` commands for variable persistence, run cancellation, and arbitrary file writes
 
 ### WP8 — Frontend Foundation
-- `src/api/tauri.ts`: typed IPC wrappers for all 12 commands
+- `src/api/tauri.ts`: typed IPC wrappers for all 15 commands
 - `useTauriEvent<T>` hook with stale-closure protection via refs
 - `useRunState` hook: manages `stepStatuses` Map, run lifecycle (isRunning, isComplete, hasError, isRerun)
 - `useProjectRoot` hook: load/save project root via `tauri-plugin-store`
