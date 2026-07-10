@@ -1,4 +1,4 @@
-// Version: 1.0.0 | 2026-07-09
+// Version: 1.1.0 | 2026-07-10
 // Hook for loading and managing the project root directory from persistent
 // settings (via tauri-plugin-store).
 
@@ -9,6 +9,24 @@ export function useProjectRoot() {
   const [projectRoot, setProjectRootState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Re-fetch the project root from persistent store. Call this after external
+   * changes (e.g. user saves a new directory in SettingsModal) since the hook
+   * only loads once on mount.
+   */
+  const refresh = useCallback(async () => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const root = await api.getProjectRoot();
+      setProjectRootState(root);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Load project root from persistent store on mount
   useEffect(() => {
@@ -54,6 +72,7 @@ export function useProjectRoot() {
   return {
     projectRoot,
     setProjectRoot,
+    refresh,
     isLoading,
     error,
   };

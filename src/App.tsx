@@ -1,4 +1,4 @@
-// Version: 1.0.0 | 2026-07-09
+// Version: 1.1.0 | 2026-07-10
 // Root application component — orchestrates views and manages app-level state.
 // Three-panel layout: sidebar (workflows + runs), main content, footer status bar.
 
@@ -18,7 +18,7 @@ type AppView =
   | { type: "output"; runDir: string; stepIndex: number; stepName: string; outputPath: string };
 
 function App() {
-  const { projectRoot, isLoading: isProjectLoading } =
+  const { projectRoot, refresh: refreshProjectRoot, isLoading: isProjectLoading } =
     useProjectRoot();
   const {
     isRunning,
@@ -111,8 +111,11 @@ function App() {
   const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false);
     setShowSettingsPrompt(false);
+    // Re-read project root from store — the user may have changed it in settings,
+    // and useProjectRoot only loads once on mount.
+    refreshProjectRoot();
     triggerRefresh();
-  }, [triggerRefresh]);
+  }, [triggerRefresh, refreshProjectRoot]);
 
   // Handle missing project root
   if (isProjectLoading) {

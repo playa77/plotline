@@ -4,6 +4,14 @@ All notable changes to the Plotline project.
 
 ## [1.0.0] — 2026-07-10 (in progress)
 
+### Bugfix — Run directory race condition (2026-07-10)
+- Fixed double directory creation: `commands::run_workflow` now snapshots `_workflow.yaml`
+  into the pre-created run dir before returning to the frontend, so `getRunStatus`
+  can immediately find steps instead of showing "No steps found for this run."
+- Changed `engine::run_workflow` to accept a pre-created `run_dir: &Path` parameter
+  instead of creating its own directory (which previously collided and created a -2
+  suffixed clone, leaving the original empty).
+
 ### WP0 — Project Scaffolding
 - Tauri 2.0 + React 18 / TypeScript + Vite project initialized
 - All Rust module placeholders created and declared in `lib.rs`
@@ -105,3 +113,10 @@ All notable changes to the Plotline project.
 - Toast notifications for save errors, run errors, API key errors
 - Settings prompt button when project root is not set
 - Graceful handling of missing `workflows/` directory, corrupted run directories, unparsable workflow files
+
+### WP14.1 — Settings Fixes (2026-07-10)
+- Fixed directory picker: switched from dynamic `import(@vite-ignore)` to static `import { open } from "@tauri-apps/plugin-dialog"`. The dynamic import failed at runtime in the Tauri WebView because bare module specifiers can't resolve as URLs after Vite ignores them.
+- Fixed project root not updating after Settings save: added `refresh()` to `useProjectRoot` hook and call it in `App.handleCloseSettings`. Previously the hook only loaded once on mount, so closing Settings left the main UI showing stale state (empty sidebar, "No project root set" footer).
+
+### Documentation
+- Rewrote `README.md` as a comprehensive user guide: quick start, project structure, workflow YAML format with field reference, model selection table, execution flow, context chaining, variable substitution, run directory anatomy, re-run from step, typical use cases (serial pipeline, iterative editing, parameterized generation, A/B testing), UI reference diagram, key design decisions, and MVP limitations.

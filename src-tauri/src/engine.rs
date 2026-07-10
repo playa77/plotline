@@ -113,16 +113,16 @@ pub async fn run_workflow(
     app_handle: &tauri::AppHandle,
     workflow_path: &Path,
     project_root: &Path,
+    run_dir: &Path,
 ) -> Result<(), PlotlineError> {
     // Step 1: Parse and validate the workflow
     let workflow = workflow::parse_workflow(workflow_path, project_root)?;
     workflow::validate_workflow(&workflow, project_root)?;
 
-    // Step 2: Create run directory
-    let run_dir = run_manager::create_run_directory(project_root, &workflow.name)?;
-
-    // Step 3: Snapshot workflow and prompts
-    run_manager::snapshot_workflow(&run_dir, workflow_path, &workflow, project_root)?;
+    // Step 2: Snapshot workflow and prompts into the pre-created run directory
+    // (created by commands::run_workflow before spawning us, so the frontend
+    // can immediately read _workflow.yaml via get_run_status)
+    run_manager::snapshot_workflow(run_dir, workflow_path, &workflow, project_root)?;
 
     // Emit run_started
     let _ = app_handle.emit(
@@ -132,10 +132,10 @@ pub async fn run_workflow(
         },
     );
 
-    // Step 4: Execute each step sequentially
+    // Step 3: Execute each step sequentially
     let runner = EngineRunner {
         app_handle,
-        run_dir: &run_dir,
+        run_dir,
         project_root,
     };
     runner.execute_steps(&workflow, None).await

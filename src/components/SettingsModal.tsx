@@ -1,28 +1,10 @@
-// Version: 1.0.0 | 2026-07-09
+// Version: 1.1.0 | 2026-07-10
 // SettingsModal — project root + OpenRouter API key management.
-//
-// Design note on the directory picker: the task specifies
-// @tauri-apps/plugin-dialog, but that plugin is not yet declared in
-// package.json and we are constrained to only modify files under
-// src/components/. A static `import { open } from "..."` would therefore
-// break both the typecheck and the Vite build. Instead we load the plugin
-// dynamically:
-//   - The specifier is held in a `string`-typed variable so TypeScript does
-//     NOT try to statically resolve the module (it treats the import as
-//     Promise<any>), keeping `tsc --noEmit` green.
-//   - `/* @vite-ignore *\/` keeps Vite from trying to bundle it at build.
-//   - At runtime the real plugin loads if installed; otherwise we surface a
-//     clear, actionable error in the inline feedback area.
-// To enable the native picker: `npm install @tauri-apps/plugin-dialog` and
-// register it in src-tauri (Cargo.toml + tauri.conf.json plugins + init()).
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import * as api from "../api/tauri";
 import styles from "./SettingsModal.module.css";
-
-// Variable specifier (typed as `string`) so TS treats import() as Promise<any>
-// and does not attempt static resolution of a possibly-uninstalled package.
-const DIALOG_PLUGIN: string = "@tauri-apps/plugin-dialog";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -92,8 +74,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setFeedback(null);
     setPickingDir(true);
     try {
-      const mod = await import(/* @vite-ignore */ DIALOG_PLUGIN);
-      const selected = await mod.open({
+      const selected = await open({
         directory: true,
         multiple: false,
         title: "Select Project Directory",

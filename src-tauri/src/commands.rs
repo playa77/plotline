@@ -49,6 +49,11 @@ pub async fn run_workflow(
         .map_err(map_err)?;
     workflow::validate_workflow(&workflow, &project_root).map_err(map_err)?;
 
+    // Create the run directory and snapshot the workflow into it *before*
+    // returning to the frontend, so get_run_status can immediately find
+    // _workflow.yaml and show the correct step list instead of "No steps
+    // found for this run." The engine receives this same run_dir and
+    // completes the snapshot (copies prompt files, etc.).
     let run_dir = run_manager::create_run_directory(&project_root, &workflow.name)
         .map_err(map_err)?;
 
@@ -59,9 +64,10 @@ pub async fn run_workflow(
     let app_clone = app_handle.clone();
     let wf_path_clone = workflow_path.clone();
     let pr_clone = project_root.clone();
+    let run_dir_clone = run_dir.clone();
 
     tauri::async_runtime::spawn(async move {
-        if let Err(e) = engine::run_workflow(&app_clone, &wf_path_clone, &pr_clone).await {
+        if let Err(e) = engine::run_workflow(&app_clone, &wf_path_clone, &pr_clone, &run_dir_clone).await {
             // The engine already emits run_error events internally.
             // We log here for server-side visibility.
             eprintln!(
