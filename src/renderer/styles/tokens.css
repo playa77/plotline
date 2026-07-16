@@ -1,0 +1,83 @@
+/**
+ * Plotline design tokens — CSS custom properties.
+ *
+ * Single source of truth for colors, typography, spacing, and transitions.
+ * Every component stylesheet must reference these variables rather than
+ * hardcoding values.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+:root {
+  /* ── Colors ─────────────────────────────────────────────────────── */
+
+  --color-bg-primary: #1a1a2e;
+  --color-bg-secondary: #16162a;
+  --color-bg-tertiary: #12121e;
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-active: rgba(255, 255, 255, 0.08);
+  --color-bg-selected: rgba(90, 158, 255, 0.12);
+
+  --color-text-primary: #e0e0e0;
+  --color-text-secondary: #8b8b9e;
+  --color-text-muted: #5c5c7a;
+
+  --color-accent: #5a9eff;
+  --color-accent-hover: #7ab4ff;
+  --color-accent-muted: rgba(90, 158, 255, 0.15);
+
+  --color-stale: #d4a017;
+  --color-stale-muted: rgba(212, 160, 23, 0.15);
+
+  --color-danger: #e05555;
+  --color-danger-muted: rgba(224, 85, 85, 0.15);
+
+  --color-on-target: #69db7c;
+  --color-under-target: #ffa94d;
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Stage dots */
+  --color-stage-dot-empty: rgba(255, 255, 255, 0.18);
+  --color-stage-dot-filled: var(--color-accent);
+  --color-stage-dot-stale: var(--color-stale);
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+
+  --font-chrome: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+  --font-content: 'Charter', 'Georgia', 'Times New Roman', serif;
+
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-lg: 13px;
+  --font-size-xl: 14px;
+
+  /* ── Spacing ────────────────────────────────────────────────────── */
+
+  --space-xs: 2px;
+  --space-sm: 4px;
+  --space-md: 8px;
+  --space-lg: 12px;
+  --space-xl: 16px;
+  --space-2xl: 24px;
+
+  /* ── Panels ─────────────────────────────────────────────────────── */
+
+  --panel-min-width: 180px;
+  --panel-default-left: 240px;
+  --panel-default-right: 260px;
+  --panel-resize-handle-width: 3px;
+
+  /* ── Tree ───────────────────────────────────────────────────────── */
+
+  --tree-indent: 16px;
+  --tree-row-height: 28px;
+  --tree-part-height: 30px;
+
+  /* ── Transitions ────────────────────────────────────────────────── */
+
+  --transition-fast: 100ms ease;
+  --transition-normal: 150ms ease;
+}

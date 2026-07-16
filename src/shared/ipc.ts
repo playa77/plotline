@@ -5,11 +5,14 @@
  * main process and renderer. It is imported by both sides and must never
  * import Electron-specific or renderer-specific modules.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-16
  */
 
 // ── Error envelope ────────────────────────────────────────────────
 // Never throw across IPC — always return structured errors via IpcResult.
+
+import type { Project, ProjectSummary } from './schemas/project';
+import type { ParsePreview, Outline, OutlineMutation } from './schemas/outline';
 
 export interface IpcError {
   code: string; // e.g. 'INVALID_PAYLOAD', 'UNKNOWN_COMMAND', 'HANDLER_ERROR'
@@ -31,7 +34,38 @@ export interface IpcCommandMap {
     request: { timestamp: number };
     response: { pong: boolean; receivedTimestamp: number; serverTimestamp: number };
   };
-  // future commands added here
+  'project:create': {
+    request: { title: string };
+    response: Project;
+  };
+  'project:open': {
+    request: { projectId: string };
+    response: Project;
+  };
+  'project:list': {
+    request: {};
+    response: ProjectSummary[];
+  };
+  'project:close': {
+    request: { projectId?: string };
+    response: { ok: true };
+  };
+  'project:importOutline': {
+    request: { projectId: string; markdown: string };
+    response: ParsePreview;
+  };
+  'project:confirmImport': {
+    request: { projectId: string; preview: ParsePreview };
+    response: { ok: true };
+  };
+  'outline:get': {
+    request: { projectId: string };
+    response: Outline;
+  };
+  'outline:mutate': {
+    request: { projectId: string; mutations: OutlineMutation[] };
+    response: Outline;
+  };
 }
 
 // ── Event registry ────────────────────────────────────────────────
@@ -40,6 +74,7 @@ export interface IpcCommandMap {
 
 export interface IpcEventMap {
   pong: { message: string; timestamp: number };
+  'project:changed': { projectId: string; action: 'opened' | 'closed' };
   // future events added here
 }
 

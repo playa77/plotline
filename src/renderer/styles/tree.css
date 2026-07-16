@@ -1,0 +1,213 @@
+/**
+ * Manuscript tree styles.
+ *
+ * Renders the book outline hierarchy: parts → chapters → sections.
+ * Uses monospace font, small sizing, and stage dots for status.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+/* ── Tree root ────────────────────────────────────────────────────── */
+
+.manuscript-tree {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+/* ── Part header ──────────────────────────────────────────────────── */
+
+.tree-part {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tree-part__header {
+  display: flex;
+  align-items: center;
+  height: var(--tree-part-height);
+  padding: 0 var(--space-lg);
+  padding-left: var(--space-md);
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.tree-part__header:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.tree-part__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.tree-part__toggle--collapsed {
+  transform: rotate(-90deg);
+}
+
+.tree-part__chapters {
+  overflow: hidden;
+}
+
+/* ── Chapter row ──────────────────────────────────────────────────── */
+
+.tree-chapter {
+  display: flex;
+  align-items: center;
+  height: var(--tree-row-height);
+  padding: 0 var(--space-lg);
+  padding-left: calc(var(--space-xl) + var(--tree-indent));
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+
+.tree-chapter:hover {
+  background: var(--color-bg-hover);
+}
+
+.tree-chapter--selected {
+  background: var(--color-bg-selected);
+  color: var(--color-text-primary);
+}
+
+.tree-chapter--selected:hover {
+  background: var(--color-bg-selected);
+}
+
+.tree-chapter__expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+  border-radius: 2px;
+}
+
+.tree-chapter__expand:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-active);
+}
+
+.tree-chapter__expand--expanded {
+  transform: rotate(90deg);
+}
+
+.tree-chapter__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-md);
+}
+
+/* ── Stage dots ───────────────────────────────────────────────────── */
+
+.tree-stage-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.tree-stage-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-stage-dot-empty);
+  transition: background var(--transition-fast);
+}
+
+.tree-stage-dot--filled {
+  background: var(--color-stage-dot-filled);
+}
+
+.tree-stage-dot--stale {
+  background: var(--color-stage-dot-stale);
+}
+
+/* ── Word target ──────────────────────────────────────────────────── */
+
+.tree-word-target {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-left: var(--space-md);
+}
+
+/* ── Sections sub-tree ────────────────────────────────────────────── */
+
+.tree-sections {
+  overflow: hidden;
+}
+
+.tree-section {
+  display: flex;
+  align-items: center;
+  height: var(--tree-row-height);
+  padding: 0 var(--space-lg);
+  padding-left: calc(var(--space-xl) + var(--tree-indent) + var(--tree-indent));
+  gap: var(--space-sm);
+  cursor: default;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.tree-section:hover {
+  color: var(--color-text-secondary);
+  background: var(--color-bg-hover);
+}
+
+.tree-section__number {
+  flex-shrink: 0;
+  width: 28px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.tree-section__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+
+.tree-empty {
+  padding: var(--space-2xl) var(--space-xl);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.6;
+}

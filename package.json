@@ -12,7 +12,13 @@
     "build": "electron-forge make"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^3.28.0",
+    "@tiptap/extension-link": "^3.28.0",
+    "@tiptap/pm": "^3.28.0",
+    "@tiptap/react": "^3.28.0",
+    "@tiptap/starter-kit": "^3.28.0",
     "isomorphic-git": "^1.38.7",
+    "linkedom": "^0.18.13",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "ulid": "^3.0.2",
@@ -26,6 +32,7 @@
     "@types/react-dom": "^18.3.0",
     "electron": "^31.0.0",
     "eslint": "^9.0.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.3.0",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.0.0",

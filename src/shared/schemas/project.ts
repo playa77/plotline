@@ -70,6 +70,8 @@ const StructureItemSchema = z.discriminatedUnion('kind', [
   ChapterItemSchema,
 ]);
 
+export type StructureItem = z.infer<typeof StructureItemSchema>;
+
 // ── Project settings ──────────────────────────────────────────────────────────
 
 const ProjectSettingsSchema = z.object({
@@ -100,3 +102,14 @@ export const ProjectSchema = z.object({
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
+
+/**
+ * Lightweight project summary returned by `project:list`.
+ * Contains enough data for a project picker UI without loading the full manifest.
+ */
+export interface ProjectSummary {
+  projectId: string;
+  title: string;
+  updatedAt: string;
+  chapterCount: number;
+}

@@ -143,3 +143,39 @@ npx vitest run src/__tests__/debug/m0-gate-demo.test.ts  # 11-step interactive d
 - T3 (isomorphic-git) resolved — D008.
 - Editor library deferred to WP-09 — D009.
 - All other library decisions (bundler, test runner, validation, state management) recorded in D001–D007. All R1.
+
+---
+
+## WP-05: Project Lifecycle Service
+
+### D010 — `ui-state.json` location — inside project directory but never tracked (R1)
+
+**Context:** The tech spec (§5.2) requires an "ephemeral per-project ui-state.json
+outside the repo". The options were: (a) inside the project dir (`<projectId>/ui-state.json`),
+(b) alongside the project dir (`<projectId>.ui.json`), or (c) in a sibling `state/`
+directory.
+
+**Chosen:** `<projectsDir>/<projectId>/ui-state.json` — inside the project directory
+on disk but never committed to Git. Rationale: (1) simplest mental model — one
+project = one directory = everything for that project. (2) Since isomorphic-git
+stores objects in `.git/objects/` and never uses a working tree, a file on disk in
+the repo directory has no interaction with the Git object database. (3) The
+`commit()` method only writes what we pass it — `ui-state.json` is never passed.
+(4) No additional directory hierarchy to manage.
+
+**Rejected:** `<projectsDir>/<projectId>.ui.json` (noisy sibling files at the
+collection level); dedicated `<projectsDir>/state/` dir (adds indirection without
+benefit).
+
+---
+
+### D011 — `reconcileManifest` commits only when changes are made (R1)
+
+**Context:** The startup reconciliation pass (TS §5.5) validates manifest ↔ refs
+and may repair drift. If no repair is needed, an unnecessary commit on `main`
+would bump `updatedAt` and create noise in history.
+
+**Chosen:** Reconciliation only calls `service.commit()` when at least one repair
+was made (invalid `selectedVersion` reset, orphan ref adoption). Otherwise the
+manifest is returned as-is. The `updatedAt` timestamp is only updated on actual
+changes.

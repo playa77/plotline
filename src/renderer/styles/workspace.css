@@ -1,0 +1,52 @@
+/**
+ * Workspace pane styles.
+ *
+ * Center content area that shows chapter editor, outline view,
+ * or empty state depending on selection.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+/* ── Workspace empty state ────────────────────────────────────────── */
+
+.workspace-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-2xl);
+}
+
+.workspace-empty__content {
+  max-width: 360px;
+}
+
+.workspace-empty__heading {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.workspace-empty__text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+/* ── Workspace placeholder (for views not yet built) ──────────────── */
+
+.workspace-placeholder {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  text-align: center;
+}

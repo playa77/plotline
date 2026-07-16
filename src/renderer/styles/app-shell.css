@@ -1,0 +1,138 @@
+/**
+ * App shell — three-pane layout with resizable panels.
+ *
+ * Layout:
+ *   ┌──────────┬────────────────────────┬──────────────┐
+ *   │ Library  │ Workspace              │ Context Rail │
+ *   │ (left)   │ (center, flex:1)       │ (right)      │
+ *   └──────────┴────────────────────────┴──────────────┘
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+}
+
+/* ── Library pane (left) ──────────────────────────────────────────── */
+
+.library-pane {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.library-pane__tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-lg) 0;
+}
+
+.library-pane__tree::-webkit-scrollbar {
+  width: 4px;
+}
+
+.library-pane__tree::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+.library-pane__actions {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-sm);
+  gap: var(--space-xs);
+}
+
+/* ── Workspace pane (center) ──────────────────────────────────────── */
+
+.workspace-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+/* ── Context rail (right) ─────────────────────────────────────────── */
+
+.context-rail {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  border-left: 1px solid var(--color-border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Resize handles ───────────────────────────────────────────────── */
+
+.resize-handle {
+  flex-shrink: 0;
+  width: var(--panel-resize-handle-width);
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--transition-fast);
+  position: relative;
+  z-index: 10;
+}
+
+.resize-handle:hover,
+.resize-handle--active {
+  background: var(--color-accent);
+}
+
+/* Prevent text selection while resizing */
+.app-shell--resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app-shell--resizing * {
+  cursor: col-resize !important;
+}
+
+/* ── Library action buttons (bottom of left pane) ───────────────────── */
+
+.library-action-btn {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-md);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.library-action-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.library-action-btn:active {
+  background: var(--color-bg-active);
+}
