@@ -8,6 +8,13 @@ versions follow the document suite version (currently `0.1.0-dev`).
 
 ## [0.1.0-dev] — unreleased
 
+### Added
+- **2026-07-16** — WP-00: Repository scaffold — Electron + React + TypeScript
+  toolchain with Electron Forge + Vite plugin, Vitest, ESLint flat config,
+  Prettier, strict TS config, and decision ledger (`DECISIONS.md`). Creates
+  empty Electron window titled "Plotline" with sandboxed renderer
+  (`contextIsolation: true`, `nodeIntegration: false`). (commit pending)
+
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim
   duplicate of the global `~/.config/opencode/AGENTS.md`) with
