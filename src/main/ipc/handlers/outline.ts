@@ -14,14 +14,19 @@ import {
   OutlineMutateRequestSchema,
 } from '../schemas';
 import type { ProjectService } from '../../services/ProjectService';
+import type { StalenessService } from '../../services/StalenessService';
 
 /**
  * Register all outline import handlers.
  * Call once during app startup after initIpcRegistry().
  *
- * @param projectService - The shared ProjectService singleton.
+ * @param projectService   - The shared ProjectService singleton.
+ * @param stalenessService - Optional StalenessService for cache invalidation.
  */
-export function registerOutlineHandlers(projectService: ProjectService): void {
+export function registerOutlineHandlers(
+  projectService: ProjectService,
+  stalenessService?: StalenessService,
+): void {
   // ── project:importOutline ──────────────────────────────────────────
   registerCommand(
     'project:importOutline',
@@ -44,6 +49,8 @@ export function registerOutlineHandlers(projectService: ProjectService): void {
         payload.projectId,
         payload.preview,
       );
+      // Outline import changes outline.json → invalidate all staleness
+      stalenessService?.invalidateAll();
       return { ok: true };
     },
   );
@@ -62,10 +69,13 @@ export function registerOutlineHandlers(projectService: ProjectService): void {
     'outline:mutate',
     OutlineMutateRequestSchema,
     async (payload) => {
-      return await projectService.outlineMutate(
+      const result = await projectService.outlineMutate(
         payload.projectId,
         payload.mutations,
       );
+      // Outline mutations change chapter slices → invalidate all staleness
+      stalenessService?.invalidateAll();
+      return result;
     },
   );
 }

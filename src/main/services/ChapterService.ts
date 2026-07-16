@@ -15,6 +15,7 @@
 
 import { StorageService } from '../storage/StorageService';
 import type { ProjectService } from './ProjectService';
+import type { StalenessService } from './StalenessService';
 import { GenRecordSchema } from '../../shared/schemas/meta';
 import type { GenRecord } from '../../shared/schemas/meta';
 import type { Outline, OutlineChapter } from '../../shared/schemas/outline';
@@ -22,7 +23,10 @@ import type { Outline, OutlineChapter } from '../../shared/schemas/outline';
 // ── ChapterService ──────────────────────────────────────────────────────────
 
 export class ChapterService {
-  constructor(private projectService: ProjectService) {}
+  constructor(
+    private projectService: ProjectService,
+    private stalenessService?: StalenessService,
+  ) {}
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
@@ -126,6 +130,9 @@ export class ChapterService {
       { kind: 'autosave' as const, label: 'Save artifact' },
     );
 
+    // Invalidate staleness cache — inputs may have changed
+    this.stalenessService?.invalidateAll();
+
     return { sha };
   }
 
@@ -181,11 +188,24 @@ export class ChapterService {
       // Ref doesn't exist — no artifacts
     }
 
+    // Compute staleness if service is available
+    let staleExpanded = false;
+    let staleChapter = false;
+    if (this.stalenessService) {
+      try {
+        const staleness = await this.stalenessService.computeStaleness(projectId, chapterId);
+        staleExpanded = staleness.expanded === 'stale';
+        staleChapter = staleness.chapter === 'stale';
+      } catch {
+        // Staleness computation unavailable — leave defaults
+      }
+    }
+
     return {
       stageDots: {
         outline,
-        expanded,
-        chapter,
+        expanded: staleExpanded ? 'stale' : expanded,
+        chapter: staleChapter ? 'stale' : chapter,
       },
       selectedVersion: 'main',
       versionNames: [

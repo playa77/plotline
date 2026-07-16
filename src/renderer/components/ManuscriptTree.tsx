@@ -8,14 +8,20 @@
  * Version: 0.1.0 | 2026-07-16
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ParsedPart, ParsedChapter } from '../../shared/schemas/outline';
+
+import { invoke } from '../ipc/client';
+import { useIpcEvent } from '../ipc/useEvent';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface ManuscriptTreeProps {
   /** Outline parts with their chapters and sections. */
   parts: ParsedPart[];
+
+  /** Project ID for fetching chapter status. */
+  projectId?: string;
 
   /** Currently selected chapter ID, or null if nothing selected. */
   selectedChapterId: string | null;
@@ -33,10 +39,40 @@ function formatWordTarget(target: { min: number; max: number }): string {
   return `${fmt(target.min)}-${fmt(target.max)}`;
 }
 
+type DotStatus = 'empty' | 'filled' | 'stale';
+
+interface ChapterStageDots {
+  outline: DotStatus;
+  expanded: DotStatus;
+  chapter: DotStatus;
+}
+
+/** Compute a single aggregate dot status for a chapter. */
+function aggregateDotStatus(dots: ChapterStageDots | undefined): DotStatus {
+  if (!dots) return 'empty';
+  // Stale wins
+  if (dots.outline === 'stale' || dots.expanded === 'stale' || dots.chapter === 'stale') {
+    return 'stale';
+  }
+  // Filled wins over empty
+  if (dots.outline === 'filled' || dots.expanded === 'filled' || dots.chapter === 'filled') {
+    return 'filled';
+  }
+  return 'empty';
+}
+
+/** CSS class for the aggregate dot. */
+const DOT_CLASS_MAP: Record<DotStatus, string> = {
+  empty: 'tree-stage-dot--empty',
+  filled: 'tree-stage-dot--filled',
+  stale: 'tree-stage-dot--stale',
+};
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function ManuscriptTree({
   parts,
+  projectId = 'demo',
   selectedChapterId,
   onSelectChapter,
 }: ManuscriptTreeProps): JSX.Element {
@@ -44,6 +80,8 @@ export function ManuscriptTree({
   const [collapsedParts, setCollapsedParts] = useState<Set<string>>(new Set());
   // Track which chapters have their sections expanded (none by default)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  // Per-chapter stage dot statuses, keyed by chapterId
+  const [chapterStatuses, setChapterStatuses] = useState<Map<string, ChapterStageDots>>(new Map());
 
   const togglePart = useCallback((partId: string) => {
     setCollapsedParts((prev) => {
@@ -76,6 +114,62 @@ export function ManuscriptTree({
     },
     [onSelectChapter],
   );
+
+  // Fetch chapter status dots for all chapters in the outline
+  useEffect(() => {
+    const chapterIds = parts.flatMap((p) => p.chapters.map((c) => c.chapterId));
+    if (chapterIds.length === 0) return;
+
+    let cancelled = false;
+
+    async function fetchAllStatuses() {
+      const next = new Map<string, ChapterStageDots>();
+      for (const id of chapterIds) {
+        try {
+          const status = await invoke('chapter:getStatus', { projectId, chapterId: id });
+          if (!cancelled) next.set(id, status.stageDots);
+        } catch {
+          // IPC may not be wired yet — keep existing status for this chapter
+        }
+      }
+      if (!cancelled) setChapterStatuses(next);
+    }
+
+    fetchAllStatuses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, parts]);
+
+  // Listen for staleness changes and refresh affected chapters
+  const handleStalenessChanged = useCallback(
+    (payload: { chapterIds: string[] }) => {
+      const treeChapterIds = new Set(
+        parts.flatMap((p) => p.chapters.map((c) => c.chapterId)),
+      );
+      const relevant = payload.chapterIds.filter((id) => treeChapterIds.has(id));
+      if (relevant.length === 0) return;
+
+      // Re-fetch the changed chapters
+      relevant.forEach((id) => {
+        invoke('chapter:getStatus', { projectId, chapterId: id })
+          .then((status) => {
+            setChapterStatuses((prev) => {
+              const next = new Map(prev);
+              next.set(id, status.stageDots);
+              return next;
+            });
+          })
+          .catch(() => {
+            // swallow — keep last known status
+          });
+      });
+    },
+    [projectId, parts],
+  );
+
+  useIpcEvent('staleness:changed', handleStalenessChanged);
 
   if (parts.length === 0) {
     return (
@@ -159,13 +253,13 @@ export function ManuscriptTree({
                           {chapter.title}
                         </span>
 
-                        {/* Stage dots */}
-                        {chapter.wordTarget && (
-                          <span className="tree-stage-dots" aria-label="Stage indicators">
-                            <span className="tree-stage-dot" title="Expand" />
-                            <span className="tree-stage-dot" title="Write" />
-                          </span>
-                        )}
+                        {/* Aggregate staleness dot */}
+                        <span className="tree-stage-dots" aria-label="Chapter status">
+                          <span
+                            className={`tree-stage-dot ${DOT_CLASS_MAP[aggregateDotStatus(chapterStatuses.get(chapter.chapterId))]}`}
+                            title="Chapter status"
+                          />
+                        </span>
 
                         {/* Word target */}
                         {chapter.wordTarget && (

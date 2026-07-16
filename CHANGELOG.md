@@ -70,6 +70,20 @@ versions follow the document suite version (currently `0.1.0-dev`).
   (expand-v1, write-v1, iterate-v1) with system and user prompt files,
   placeholder lint tests, and snapshot tests for resolved template output.
   9 new test cases. Total: 344 tests, 20 test files.
+- **2026-07-16** — WP-17: HistoryService with IPC handlers — `HistoryService`
+  backend (listHistory, preview, restore) with Zod schemas, IPC handlers,
+  and Electron entrypoint wiring. 20 new tests. Total: 364 tests, 22 test files.
+- **2026-07-16** — WP-20: StalenessService — `StalenessService` with lazy-cached
+  fingerprint recomputation for chapter artifacts (`expanded-outline.html` and
+  `chapter.html`), including per-chapter canonicalized-JSON outline slice
+  fingerprints, scope-filtered variable content hashing, upstream artifact
+  tracking, and continuity-context staleness detection. Integrates with
+  `ChapterService.getStatus` to surface stale/fresh stage dots. Cache
+  invalidation hooks in all write IPC handlers (outline mutations, variable
+  mutations, chapter save, generation completion). `staleness:changed` event
+  emission wired through `GenerationService` and IPC handlers. Consistent
+  fingerprint computation updated in `GenerationService.buildFingerprints`.
+  25 new tests. Total: 444 tests, 26 test files. (this commit)
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim
@@ -79,3 +93,14 @@ versions follow the document suite version (currently `0.1.0-dev`).
   keychain API keys, Substack-safe HTML, one-click pipeline contract),
   work-package workflow, and build/runtime gotchas (Tectonic, AppImage).
   Global rules are no longer duplicated. (commit `0879167`)
+- **2026-07-16** — `GenerationService.buildFingerprints`: Updated to compute
+  per-chapter canonicalized-JSON SHA for `outlineSlice` and plain-content SHA
+  for variable fingerprints (matching `StalenessService`). Upstream SHA now
+  computed from content rather than raw tree OID. (this commit)
+- **2026-07-16** — `src/main/index.ts`: Instantiated previously-unbound
+  `historyService` variable required by WP-17 `registerHistoryHandlers`.
+  (this commit)
+- **2026-07-16** — `GenerationService.buildFingerprints`: Updated to compute
+  per-chapter canonicalized-JSON SHA for `outlineSlice` and plain-content SHA
+  for variable fingerprints (matching `StalenessService`). Upstream SHA now
+  computed from content rather than raw tree OID. (this commit)

@@ -21,6 +21,7 @@ import {
 import type { SecretsService } from './SecretsService';
 import type { ProjectService } from './ProjectService';
 import type { VariableService } from './VariableService';
+import type { StalenessService } from './StalenessService';
 import type { TemplateEngine, AssembledPrompt } from './TemplateEngine';
 import type { StorageService } from '../storage/StorageService';
 import type { Project } from '../../shared/schemas/project';
@@ -65,6 +66,7 @@ export class GenerationService {
     private readonly variableService: VariableService,
     private readonly templateEngine: TemplateEngine,
     private readonly secretsService: SecretsService,
+    private readonly stalenessService?: StalenessService,
   ) {}
 
   // ── Public API ──────────────────────────────────────────────────────────
@@ -138,7 +140,7 @@ export class GenerationService {
 
     // Build GenRecord fingerprints
     const fingerprints = await this.buildFingerprints(
-      service, projectId, null, 'expand',
+      service, projectId, chapterId, null, 'expand',
     );
 
     // Create job
@@ -203,9 +205,10 @@ export class GenerationService {
       const tree = await service.readTree(refPath);
       const upstreamPath = 'expanded-outline.html';
       if (tree[upstreamPath]) {
-        upstreamSha = tree[upstreamPath]!;
         const buf = await service.readBlob(refPath, upstreamPath);
         upstreamArtifact = buf.toString('utf-8');
+        const { computeBlobSha } = await import('./StalenessService');
+        upstreamSha = computeBlobSha(upstreamArtifact);
       }
     } catch {
       upstreamArtifact = '';
@@ -264,7 +267,7 @@ export class GenerationService {
     });
 
     const fingerprints = await this.buildFingerprints(
-      service, projectId, upstreamSha, 'write',
+      service, projectId, chapterId, upstreamSha, 'write',
     );
 
     const jobId = generateULID();
@@ -472,6 +475,9 @@ export class GenerationService {
         label: `Generated — ${job.step === 'expand' ? 'Expand' : 'Write'}`,
         kind: job.step,
       });
+
+      // Invalidate staleness cache for this chapter
+      this.stalenessService?.invalidateAll();
 
       job.status = 'done';
       job.completedAt = new Date().toISOString();
@@ -779,41 +785,106 @@ export class GenerationService {
 
   /**
    * Build GenRecord fingerprints from the current state of the repo.
+   *
+   * Uses per-chapter section canonicalised JSON for outlineSlice (matching
+   * StalenessService.fingerprintsMatch comparison), plain content SHA for
+   * variable content and upstream artifacts, and null continuity (T1 — not
+   * yet captured at generation time for the write step).
    */
   private async buildFingerprints(
     service: StorageService,
     projectId: string,
+    chapterId: string,
     upstreamSha: string | null,
     _kind: 'expand' | 'write',
   ): Promise<GenRecord['fingerprints']> {
-    let tree: Record<string, string>;
+    // Import helpers from StalenessService
+    const { computeCanonicalJsonSha, computeBlobSha } = await import('./StalenessService');
 
+    // Outline slice fingerprint (per-chapter sections)
+    let outlineSlice = '';
     try {
-      tree = await service.readTree('refs/heads/main');
+      const outlineBuf = await service.readBlob('refs/heads/main', 'outline/outline.json');
+      const { OutlineSchema } = await import('../../shared/schemas/outline');
+      const outline = OutlineSchema.parse(JSON.parse(outlineBuf.toString('utf-8')));
+      const chapter = findChapterInOutline(outline, chapterId);
+      if (chapter) {
+        const sections = chapter.sections.map((s) => ({
+          id: s.id,
+          number: s.number,
+          title: s.title,
+          wordTarget: s.wordTarget,
+          beats: s.beats,
+        }));
+        outlineSlice = computeCanonicalJsonSha(sections);
+      }
     } catch {
-      tree = {};
+      // No outline yet
     }
-
-    // Outline slice fingerprint
-    const outlineSha = tree['outline/outline.json'] ?? '';
 
     // Variable fingerprints
     const variables: Array<{ variableId: string; contentSha: string }> = [];
-    for (const [filepath, sha] of Object.entries(tree)) {
-      const match = filepath.match(/^variables\/([^/]+)\/content\.html$/);
-      if (match) {
-        variables.push({ variableId: match[1]!, contentSha: sha });
+    try {
+      const tree = await service.readTree('refs/heads/main');
+      for (const [filepath] of Object.entries(tree)) {
+        const match = filepath.match(/^variables\/([^/]+)\/content\.html$/);
+        if (match) {
+          const varId = match[1]!;
+          // Check the variable is active and matches the generation scope
+          try {
+            const varBuf = await service.readBlob(
+              'refs/heads/main',
+              `variables/${varId}/variable.json`,
+            );
+            const variable = JSON.parse(varBuf.toString('utf-8'));
+            const scope = variable.scope;
+            const active = variable.active !== false;
+            if (active && (scope === 'always' || scope === _kind)) {
+              const contentBuf = await service.readBlob(
+                'refs/heads/main',
+                `variables/${varId}/content.html`,
+              );
+              variables.push({
+                variableId: varId,
+                contentSha: computeBlobSha(contentBuf.toString('utf-8')),
+              });
+            }
+          } catch {
+            // Skip unreadable variable
+          }
+        }
       }
+    } catch {
+      // No tree yet
     }
 
-    // Continuity fingerprint (T1 placeholder — not yet implemented)
-    const continuity: GenRecord['fingerprints']['continuity'] = null;
+    // Sort for deterministic comparison
+    variables.sort((a, b) => a.variableId.localeCompare(b.variableId));
 
     return {
-      outlineSlice: outlineSha,
+      outlineSlice,
       variables,
       upstream: upstreamSha,
-      continuity,
+      continuity: null,
     };
   }
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Find a chapter in the outline by its chapterId.
+ */
+function findChapterInOutline(
+  outline: import('../../shared/schemas/outline').Outline,
+  chapterId: string,
+): import('../../shared/schemas/outline').OutlineChapter | null {
+  for (const part of outline.parts) {
+    for (const chapter of part.chapters) {
+      if (chapter.chapterId === chapterId) {
+        return chapter;
+      }
+    }
+  }
+  return null;
 }

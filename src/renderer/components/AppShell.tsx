@@ -191,6 +191,7 @@ export function AppShell(): JSX.Element {
         <div className="library-pane__tree">
           <ManuscriptTree
             parts={demoParts}
+            projectId="demo"
             selectedChapterId={selectedChapterId}
             onSelectChapter={handleSelectChapter}
           />
@@ -249,6 +250,8 @@ export function AppShell(): JSX.Element {
         <ContextRail
           collapsed={railCollapsed}
           onToggleCollapse={handleToggleRail}
+          projectId="demo"
+          chapterId={selectedChapterId ?? undefined}
         />
       </aside>
     </div>

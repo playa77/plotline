@@ -199,6 +199,24 @@ export function ChapterWorkspace({
 
   useIpcEvent('generation:error', handleError);
 
+  // staleness:changed — refresh dots when upstream changes (outline mutations, variable edits)
+  const handleStalenessChanged = useCallback(
+    (payload: { chapterIds: string[] }) => {
+      if (payload.chapterIds.includes(chapterId)) {
+        invoke('chapter:getStatus', { projectId, chapterId })
+          .then((status) => {
+            setDots(status.stageDots);
+          })
+          .catch((err) => {
+            console.warn('[ChapterWorkspace] staleness refresh failed:', err);
+          });
+      }
+    },
+    [projectId, chapterId],
+  );
+
+  useIpcEvent('staleness:changed', handleStalenessChanged);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Tab handlers
   // ═══════════════════════════════════════════════════════════════════════════
@@ -381,6 +399,21 @@ export function ChapterWorkspace({
     if (artifactHtml && artifactHtml.trim() !== '') {
       return (
         <div className="chapter-workspace__stage">
+          {dots.expanded === 'stale' && (
+            <div className="chapter-workspace__upstream-badge">
+              <span className="chapter-workspace__upstream-badge-label">
+                {'\u26A0'} Upstream changed
+              </span>
+              <button
+                type="button"
+                className="chapter-workspace__upstream-badge-btn"
+                onClick={() => handleExpand()}
+                disabled={genStatus === 'streaming'}
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
           <Editor
             content={artifactHtml}
             readOnly={true}
@@ -481,6 +514,21 @@ export function ChapterWorkspace({
 
       return (
         <div className="chapter-workspace__stage">
+          {dots.chapter === 'stale' && (
+            <div className="chapter-workspace__upstream-badge">
+              <span className="chapter-workspace__upstream-badge-label">
+                {'\u26A0'} Upstream changed
+              </span>
+              <button
+                type="button"
+                className="chapter-workspace__upstream-badge-btn"
+                onClick={() => handleWrite()}
+                disabled={genStatus === 'streaming'}
+              >
+                Regenerate
+              </button>
+            </div>
+          )}
           <Editor
             content={artifactHtml}
             readOnly={true}

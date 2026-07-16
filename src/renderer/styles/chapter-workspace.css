@@ -109,6 +109,16 @@
 
 .chapter-workspace__dot--stale {
   background-color: var(--color-stage-dot-stale);
+  animation: chapter-workspace-pulse-stale 2.4s ease-in-out infinite;
+}
+
+@keyframes chapter-workspace-pulse-stale {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -569,4 +579,51 @@
   font-family: var(--font-chrome);
   font-size: var(--font-size-md);
   color: var(--color-text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Upstream changed badge (stale artifact warning)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__upstream-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 8px var(--space-xl);
+  border-left: 3px solid var(--color-stale);
+  background: rgba(245, 158, 11, 0.1);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chapter-workspace__upstream-badge-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.chapter-workspace__upstream-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px var(--space-lg);
+  border: 1px solid var(--color-stale);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-stale);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.chapter-workspace__upstream-badge-btn:hover {
+  background: var(--color-stale);
+  color: var(--color-bg-primary);
 }

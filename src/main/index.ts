@@ -17,11 +17,14 @@ import { registerVariableHandlers } from './ipc/handlers/variables';
 import { registerSecretsHandlers } from './ipc/handlers/secrets';
 import { registerGenerationHandlers } from './ipc/handlers/generation';
 import { registerChapterHandlers } from './ipc/handlers/chapter';
+import { registerHistoryHandlers } from './ipc/handlers/history';
 import { ProjectService } from './services/ProjectService';
 import { VariableService } from './services/VariableService';
 import { SecretsService } from './services/SecretsService';
 import { GenerationService } from './services/GenerationService';
 import { ChapterService } from './services/ChapterService';
+import { StalenessService } from './services/StalenessService';
+import { HistoryService } from './services/HistoryService';
 import { TemplateEngine } from './services/TemplateEngine';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
@@ -35,12 +38,14 @@ function createWindow(): void {
   const variableService = new VariableService(projectService);
   const secretsService = new SecretsService(app.getPath('userData'));
   const templateEngine = new TemplateEngine();
-  const chapterService = new ChapterService(projectService);
+  const stalenessService = new StalenessService(projectService, variableService);
+  const chapterService = new ChapterService(projectService, stalenessService);
   const generationService = new GenerationService(
     projectService,
     variableService,
     templateEngine,
     secretsService,
+    stalenessService,
   );
 
   mainWindow = new BrowserWindow({
@@ -57,12 +62,15 @@ function createWindow(): void {
   // Initialize IPC after window creation so handlers have a window context
   initIpcRegistry();
   registerPingHandler();
+  const window = mainWindow;
   registerProjectHandlers(projectService);
-  registerOutlineHandlers(projectService);
-  registerVariableHandlers(variableService);
+  registerOutlineHandlers(projectService, stalenessService);
+  registerVariableHandlers(variableService, stalenessService);
   registerSecretsHandlers(secretsService);
   registerGenerationHandlers(generationService);
   registerChapterHandlers(chapterService);
+  const historyService = new HistoryService(projectService);
+  registerHistoryHandlers(historyService);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

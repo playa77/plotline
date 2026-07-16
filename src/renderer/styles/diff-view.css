@@ -1,0 +1,220 @@
+/**
+ * DiffView styles — side-by-side HTML diff comparison.
+ *
+ * BEM convention, referencing Plotline design tokens from tokens.css.
+ * Green tones for additions, red tones for deletions, accessible on dark
+ * backgrounds. Unchanged rows are muted so changed blocks stand out.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+/* ── Container ─────────────────────────────────────────────────────────────── */
+
+.diff-view {
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.diff-view__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+}
+
+.diff-view__title {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* ── Stats bar ─────────────────────────────────────────────────────────────── */
+
+.diff-view__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.diff-view__stat {
+  display: inline-flex;
+  align-items: center;
+}
+
+.diff-view__stat--changed {
+  color: var(--color-stale);
+}
+
+.diff-view__stat--inserted {
+  color: #22c55e;
+}
+
+.diff-view__stat--deleted {
+  color: #ef4444;
+}
+
+.diff-view__stat--unchanged {
+  color: var(--color-text-muted);
+}
+
+/* ── Body / scrollable area ────────────────────────────────────────────────── */
+
+.diff-view__body {
+  overflow: auto;
+  flex: 1 1 auto;
+  /* maxHeight is applied inline based on the prop */
+}
+
+/* ── Column headers ────────────────────────────────────────────────────────── */
+
+.diff-view__column-headers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border-strong);
+}
+
+.diff-view__column-header {
+  padding: var(--space-sm) var(--space-lg);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  user-select: none;
+}
+
+.diff-view__column-header:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+/* ── Diff rows ─────────────────────────────────────────────────────────────── */
+
+.diff-view__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  /* Prevent rows from collapsing when both cells are empty */
+}
+
+.diff-view__row:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* ── Column cells ──────────────────────────────────────────────────────────── */
+
+.diff-view__column {
+  padding: var(--space-sm) var(--space-lg);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.55;
+  min-height: 24px;
+  /* Match GapStyle-compatible HTML block rendering */
+}
+
+.diff-view__column:first-child {
+  border-right: 1px solid var(--color-border);
+}
+
+/* ── Row states ────────────────────────────────────────────────────────────── */
+
+/* Unchanged: muted so changed rows stand out */
+.diff-view__row--unchanged .diff-view__column {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+/* Inserted: right side has green tint, left side empty and transparent */
+.diff-view__row--inserted .diff-view__column:first-child {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.diff-view__row--inserted .diff-view__column:last-child {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--color-text-primary);
+}
+
+/* Deleted: left side has red tint, right side empty and transparent */
+.diff-view__row--deleted .diff-view__column:first-child {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--color-text-primary);
+}
+
+.diff-view__row--deleted .diff-view__column:last-child {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* Changed: both sides with a subtle background shift */
+.diff-view__row--changed .diff-view__column {
+  background: rgba(90, 158, 255, 0.04);
+  color: var(--color-text-primary);
+}
+
+/* ── Inline segments (word-level diff inside changed blocks) ────────────────── */
+
+.diff-view__segment {
+  /* All segments inherit the surrounding text styling by default */
+}
+
+.diff-view__segment--unchanged {
+  color: inherit;
+}
+
+.diff-view__segment--inserted {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.diff-view__segment--deleted {
+  color: #ef4444;
+  text-decoration: line-through;
+  background: rgba(239, 68, 68, 0.08);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── Empty markers ─────────────────────────────────────────────────────────── */
+
+.diff-view__empty-marker {
+  color: var(--color-text-muted);
+  user-select: none;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+.diff-view__footer {
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}

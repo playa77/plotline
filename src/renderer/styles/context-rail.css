@@ -220,3 +220,246 @@
   padding: var(--space-lg) var(--space-sm);
   border-bottom: none;
 }
+
+/* ── History section (WP-17) ──────────────────────────────────────── */
+
+.rail-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.rail-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rail-history__item {
+  /* Wrapper so preview slots between items naturally */
+}
+
+/* ── Empty / loading / error states ────────────────────────────────── */
+
+.rail-history__empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  padding: var(--space-sm) 0;
+}
+
+.rail-history__loading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.rail-history__spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: rail-history-spin 600ms linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rail-history-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rail-history__error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  line-height: 1.6;
+  padding: var(--space-sm) 0;
+}
+
+.rail-history__error--banner {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: 3px;
+  background: var(--color-danger-muted);
+  margin-bottom: var(--space-xs);
+}
+
+/* ── Commit row ───────────────────────────────────────────────────── */
+
+.rail-history__commit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 3px;
+  transition: background var(--transition-fast);
+}
+
+.rail-history__commit:hover {
+  background: var(--color-bg-hover);
+}
+
+.rail-history__commit--expanded {
+  background: var(--color-bg-active);
+}
+
+.rail-history__commit-label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-history__commit--expanded .rail-history__commit-label {
+  color: var(--color-text-primary);
+}
+
+/* ── Commit meta row (kind badge + time + word delta) ──────────────── */
+
+.rail-history__commit-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ── Kind badge ───────────────────────────────────────────────────── */
+
+.rail-history__kind {
+  display: inline-block;
+  padding: 0 var(--space-xs);
+  border-radius: 2px;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 16px;
+}
+
+.rail-history__kind--auto {
+  color: var(--color-text-muted);
+  background: rgba(92, 92, 122, 0.15);
+}
+
+.rail-history__kind--manual {
+  color: var(--color-accent);
+  background: var(--color-accent-muted);
+}
+
+.rail-history__kind--restore {
+  color: var(--color-stale);
+  background: var(--color-stale-muted);
+}
+
+/* ── Relative timestamp ────────────────────────────────────────────── */
+
+.rail-history__time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ── Word delta ───────────────────────────────────────────────────── */
+
+.rail-history__delta {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rail-history__delta--positive {
+  color: var(--color-on-target);
+}
+
+.rail-history__delta--negative {
+  color: var(--color-danger);
+}
+
+/* ── Preview panel ────────────────────────────────────────────────── */
+
+.rail-history__commit-preview {
+  margin: 0 var(--space-sm) var(--space-sm);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.rail-history__preview-content {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: var(--space-md);
+  font-family: var(--font-content);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  line-height: 1.7;
+}
+
+.rail-history__preview-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.rail-history__preview-content::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+/* ── Restore button ───────────────────────────────────────────────── */
+
+.rail-history__commit-restore {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-hover);
+  color: var(--color-text-muted);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.rail-history__commit-restore:hover {
+  background: var(--color-danger-muted);
+  color: var(--color-danger);
+}
+
+/* ── Load more button ─────────────────────────────────────────────── */
+
+.rail-history__load-more {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.rail-history__load-more:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
+}
+
+.rail-history__load-more:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

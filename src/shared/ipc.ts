@@ -157,6 +157,19 @@ export interface IpcCommandMap {
       versionNames: Array<{ slug: string; name: string; selected: boolean }>;
     };
   };
+  // ── History (§7.1) ──────────────────────────────────────────
+  'history:list': {
+    request: { projectId: string; ref: string; limit?: number; before?: string };
+    response: { commits: Array<{ sha: string; label: string; kind: string; timestamp: string; wordDelta?: number | null }> };
+  };
+  'history:preview': {
+    request: { projectId: string; ref: string; sha: string };
+    response: { html: string; label: string; timestamp: string };
+  };
+  'history:restore': {
+    request: { projectId: string; ref: string; sha: string };
+    response: { sha: string };
+  };
 }
 
 // ── Event registry ────────────────────────────────────────────────
@@ -170,6 +183,8 @@ export interface IpcEventMap {
   'generation:token': { jobId: string; delta: string };
   'generation:done': { jobId: string; chapterId: string; stage: string; html?: string; genRecord?: GenRecord };
   'generation:error': { jobId: string; code: string; message: string };
+  // ── Staleness events (§7.6) ──────────────────────────
+  'staleness:changed': { chapterIds: string[] };
 }
 
 // ── IPC channels ──────────────────────────────────────────────────

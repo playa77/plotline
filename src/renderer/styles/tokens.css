@@ -26,8 +26,8 @@
   --color-accent-hover: #7ab4ff;
   --color-accent-muted: rgba(90, 158, 255, 0.15);
 
-  --color-stale: #d4a017;
-  --color-stale-muted: rgba(212, 160, 23, 0.15);
+  --color-stale: #f59e0b;
+  --color-stale-muted: rgba(245, 158, 11, 0.15);
 
   --color-danger: #e05555;
   --color-danger-muted: rgba(224, 85, 85, 0.15);

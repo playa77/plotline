@@ -142,6 +142,30 @@ export const SecretsSetApiKeyRequestSchema = z.object({
 
 export const SecretsHasApiKeyRequestSchema = z.object({});
 
+// ── History schemas (WP-17) ──────────────────────────────────────────────────────
+
+/** Validates history:list request. */
+export const HistoryListRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  ref: z.string().min(1, 'Ref is required'),
+  limit: z.number().int().positive().optional(),
+  before: z.string().optional(),
+});
+
+/** Validates history:preview request. */
+export const HistoryPreviewRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  ref: z.string().min(1, 'Ref is required'),
+  sha: z.string().min(1, 'SHA is required'),
+});
+
+/** Validates history:restore request. */
+export const HistoryRestoreRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  ref: z.string().min(1, 'Ref is required'),
+  sha: z.string().min(1, 'SHA is required'),
+});
+
 // ── Generation schemas ─────────────────────────────────────────────────────────
 
 const GenerateOptionsSchema = z.object({

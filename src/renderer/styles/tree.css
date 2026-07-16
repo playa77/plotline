@@ -146,6 +146,10 @@
   transition: background var(--transition-fast);
 }
 
+.tree-stage-dot--empty {
+  background: var(--color-stage-dot-empty);
+}
+
 .tree-stage-dot--filled {
   background: var(--color-stage-dot-filled);
 }
