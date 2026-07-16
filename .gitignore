@@ -1,0 +1,79 @@
+# Plotline — application source repo .gitignore
+# Note: this ignores artifacts of *building Plotline*. The Git repos Plotline
+# creates for the user's book projects live outside this repo entirely and are
+# managed by the app (StorageService), not by this file.
+
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- Build output ---
+dist/
+out/
+build/
+release/
+*.tsbuildinfo
+.vite/
+.parcel-cache/
+
+# --- Electron packaging ---
+# electron-builder / forge outputs
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.exe
+*.msi
+*.blockmap
+app-builds/
+
+# --- Bundled third-party binaries (fetched at build time, never committed) ---
+vendor/tectonic/
+.tectonic-cache/
+
+# --- Tests & coverage ---
+coverage/
+.nyc_output/
+# throwaway Git repo fixtures created by the StorageService test harness (WP-02/03)
+tmp/
+test-repos/
+*.log.test
+
+# --- Benchmarks (WP-29 synthetic projects) ---
+bench-projects/
+bench-results/
+
+# --- Secrets & local config ---
+# API keys live in the OS keychain (TS §9); nothing secret should exist on disk.
+# These patterns are defense-in-depth for local experimentation only.
+.env
+.env.*
+!.env.example
+*.local.json
+
+# --- Logs & debug ---
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# --- OS junk ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
+
+# --- Editors & tools ---
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# --- Ephemeral app state during development ---
+# per-project UI state lives next to book projects, but dev runs may scatter it
+ui-state.json
