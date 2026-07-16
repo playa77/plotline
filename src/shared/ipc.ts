@@ -140,6 +140,19 @@ export interface IpcCommandMap {
     request: { jobId: string };
     response: { ok: true };
   };
+  // ── Iterate acceptance (§WP-19) ──────────────────────────────
+  'iterate:accept': {
+    request: { projectId: string; jobId: string };
+    response: { sha: string };
+  };
+  'iterate:discard': {
+    request: { jobId: string };
+    response: { ok: true };
+  };
+  'iterate:acceptAsVersion': {
+    request: { projectId: string; jobId: string; versionName: string };
+    response: { sha: string; versionSlug: string };
+  };
   // ── Chapter (§7.1) ──────────────────────────────────────────
   'chapter:getArtifact': {
     request: { projectId: string; chapterId: string; versionSlug?: string; stage: 'outline' | 'expanded' | 'chapter' };
@@ -169,6 +182,37 @@ export interface IpcCommandMap {
   'history:restore': {
     request: { projectId: string; ref: string; sha: string };
     response: { sha: string };
+  };
+  // ── Versions (WP-21) ──────────────────────────────────────────────
+  'versions:list': {
+    request: { projectId: string; chapterId: string };
+    response: {
+      versions: Array<{
+        slug: string;
+        name: string;
+        selected: boolean;
+        createdAt: string;
+        commitCount: number;
+        hasExpanded: boolean;
+        hasChapter: boolean;
+      }>;
+    };
+  };
+  'versions:create': {
+    request: { projectId: string; chapterId: string; name: string; fromVersion?: string };
+    response: { slug: string; name: string };
+  };
+  'versions:select': {
+    request: { projectId: string; chapterId: string; slug: string };
+    response: { ok: true };
+  };
+  'versions:rename': {
+    request: { projectId: string; chapterId: string; slug: string; newName: string };
+    response: { slug: string; name: string };
+  };
+  'versions:archive': {
+    request: { projectId: string; chapterId: string; slug: string };
+    response: { ok: true };
   };
 }
 

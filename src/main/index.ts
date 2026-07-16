@@ -17,12 +17,14 @@ import { registerVariableHandlers } from './ipc/handlers/variables';
 import { registerSecretsHandlers } from './ipc/handlers/secrets';
 import { registerGenerationHandlers } from './ipc/handlers/generation';
 import { registerChapterHandlers } from './ipc/handlers/chapter';
+import { registerVersionHandlers } from './ipc/handlers/versions';
 import { registerHistoryHandlers } from './ipc/handlers/history';
 import { ProjectService } from './services/ProjectService';
 import { VariableService } from './services/VariableService';
 import { SecretsService } from './services/SecretsService';
 import { GenerationService } from './services/GenerationService';
 import { ChapterService } from './services/ChapterService';
+import { VersionService } from './services/VersionService';
 import { StalenessService } from './services/StalenessService';
 import { HistoryService } from './services/HistoryService';
 import { TemplateEngine } from './services/TemplateEngine';
@@ -71,6 +73,8 @@ function createWindow(): void {
   registerChapterHandlers(chapterService);
   const historyService = new HistoryService(projectService);
   registerHistoryHandlers(historyService);
+  const versionService = new VersionService(projectService);
+  registerVersionHandlers(versionService);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

@@ -41,8 +41,14 @@ export interface GenerationJob {
   error?: { code: string; message: string };
   /** For iterate: proposal held in memory, not committed. */
   proposal?: string;
+  /** For iterate: which stage artifact is being revised. */
+  targetStage?: 'expanded' | 'chapter';
+  /** The version slug for the chapter ref (resolved at job start). */
+  versionSlug?: string;
   /** Internal abort controller for mid-stream cancellation. */
   abortController?: AbortController;
+  /** Reference to the window that initiated the job, for event emission. */
+  windowRef?: BrowserWindow;
 }
 
 interface JobOptions {
@@ -370,6 +376,9 @@ export class GenerationService {
       partialOutput: '',
       startedAt: new Date().toISOString(),
       abortController: new AbortController(),
+      targetStage: stage,
+      versionSlug: versionSlugResolved,
+      windowRef: window,
     };
     this.jobs.set(chapterId, job);
 
@@ -402,6 +411,139 @@ export class GenerationService {
       }
     }
     throw new Error(`No job found with ID: ${jobId}`);
+  }
+
+  // ── Iterate acceptance ───────────────────────────────────────────────────
+
+  /**
+   * Accept an iterate proposal and commit it to the current version ref.
+   *
+   * 1. Validates the job is done, step is 'iterate', and a proposal exists.
+   * 2. Commits the proposal as a replacement for the current artifact file
+   *    on the chapter's version ref (`refs/plotline/chapters/<chapterId>/<versionSlug>`).
+   * 3. Invalidates staleness cache and emits `generation:done` event.
+   * 4. Removes the job from the active map.
+   *
+   * @returns The commit SHA.
+   * @throws If the job is missing, not done, not an iterate job, or has no proposal.
+   */
+  async accept(projectId: string, jobId: string): Promise<string> {
+    const job = this.findJobById(jobId);
+    if (!job) throw new Error(`No job found with ID: ${jobId}`);
+    if (job.step !== 'iterate') throw new Error(`Job ${jobId} is not an iterate job (step: ${job.step})`);
+    if (job.status !== 'done') throw new Error(`Job ${jobId} is not done yet (status: ${job.status})`);
+    if (!job.proposal) throw new Error(`Job ${jobId} has no proposal to accept`);
+
+    const service = this.getService(projectId);
+    const refPath = this.chapterRef(job.chapterId, job.versionSlug ?? 'main');
+    const fileName = job.targetStage === 'expanded' ? 'expanded-outline.html' : 'chapter.html';
+
+    const sha = await service.commit(refPath, {
+      [fileName]: Buffer.from(job.proposal, 'utf-8'),
+    }, {
+      label: 'Iterate revision',
+      kind: 'manual',
+    });
+
+    this.stalenessService?.invalidateAll();
+    this.jobs.delete(job.chapterId);
+
+    // Emit completion with the proposal content so the renderer can refresh
+    if (job.windowRef) {
+      emitEvent(job.windowRef, 'generation:done', {
+        jobId: job.id,
+        chapterId: job.chapterId,
+        stage: job.targetStage ?? 'iterate',
+        html: job.proposal,
+      });
+    }
+
+    return sha;
+  }
+
+  /**
+   * Discard an iterate proposal without committing it.
+   *
+   * Removes the job from the active map. If the job doesn't exist,
+   * a warning is logged and `{ ok: true }` is returned (lenient).
+   *
+   * @throws If the job exists but its step is not 'iterate'.
+   */
+  async discard(jobId: string): Promise<{ ok: true }> {
+    const job = this.findJobById(jobId);
+    if (!job) {
+      console.warn(`[GenerationService] discard: no job found with ID ${jobId}, skipping`);
+      return { ok: true };
+    }
+    if (job.step !== 'iterate') {
+      throw new Error(`Job ${jobId} is not an iterate job (step: ${job.step})`);
+    }
+
+    this.jobs.delete(job.chapterId);
+    return { ok: true };
+  }
+
+  /**
+   * Accept an iterate proposal as a new named version.
+   *
+   * 1. Validates the job (same as `accept`).
+   * 2. Creates a new version ref pointing at the current ref's parent commit.
+   * 3. Commits the proposal on the new ref.
+   * 4. Removes the job from the active map.
+   *
+   * @returns The commit SHA and the version slug used.
+   * @throws If the job is missing, not done, not an iterate job, or has no proposal.
+   */
+  async acceptAsVersion(projectId: string, jobId: string, versionName: string): Promise<{ sha: string; versionSlug: string }> {
+    const job = this.findJobById(jobId);
+    if (!job) throw new Error(`No job found with ID: ${jobId}`);
+    if (job.step !== 'iterate') throw new Error(`Job ${jobId} is not an iterate job (step: ${job.step})`);
+    if (job.status !== 'done') throw new Error(`Job ${jobId} is not done yet (status: ${job.status})`);
+    if (!job.proposal) throw new Error(`Job ${jobId} has no proposal to accept`);
+
+    const service = this.getService(projectId);
+    const currentRef = this.chapterRef(job.chapterId, job.versionSlug ?? 'main');
+    const newRef = this.chapterRef(job.chapterId, versionName);
+    const fileName = job.targetStage === 'expanded' ? 'expanded-outline.html' : 'chapter.html';
+
+    // Resolve the current ref's commit and point the new ref at its parent (or itself if root)
+    const fs_ = await import('node:fs');
+    const git = await import('isomorphic-git');
+    const currentSha = await git.resolveRef({
+      fs: fs_.default as any,
+      dir: service.directory,
+      ref: currentRef,
+    });
+    const { commit: currentCommit } = await git.readCommit({
+      fs: fs_.default as any,
+      dir: service.directory,
+      oid: currentSha,
+    });
+    const parentSha = currentCommit.parent[0] ?? currentSha;
+    await service.createRef(newRef, parentSha);
+
+    // Commit the proposal on the new ref
+    const sha = await service.commit(newRef, {
+      [fileName]: Buffer.from(job.proposal, 'utf-8'),
+    }, {
+      label: 'Iterate revision',
+      kind: 'manual',
+    });
+
+    this.stalenessService?.invalidateAll();
+    this.jobs.delete(job.chapterId);
+
+    // Emit completion with the proposal content
+    if (job.windowRef) {
+      emitEvent(job.windowRef, 'generation:done', {
+        jobId: job.id,
+        chapterId: job.chapterId,
+        stage: job.targetStage ?? 'iterate',
+        html: job.proposal,
+      });
+    }
+
+    return { sha, versionSlug: versionName };
   }
 
   // ── Private: Run generation (expand / write) ───────────────────────────
@@ -531,12 +673,14 @@ export class GenerationService {
           code: 'CANCELLED',
           message: 'Generation cancelled by user',
         });
+        this.jobs.delete(job.chapterId);
         return;
       }
 
       const sanitized = sanitize(job.partialOutput);
 
-      // Hold proposal in memory — no commit
+      // Hold proposal in memory — no commit.
+      // Job stays in the map for later accept / discard.
       job.proposal = sanitized;
       job.status = 'done';
       job.completedAt = new Date().toISOString();
@@ -565,7 +709,7 @@ export class GenerationService {
           message,
         });
       }
-    } finally {
+      // Clean up errored / cancelled jobs
       this.jobs.delete(job.chapterId);
     }
   }
@@ -594,6 +738,16 @@ export class GenerationService {
   }
 
   // ── Private helpers ─────────────────────────────────────────────────────
+
+  /**
+   * Find a job by its ID across all chapter entries.
+   */
+  private findJobById(jobId: string): GenerationJob | undefined {
+    for (const job of this.jobs.values()) {
+      if (job.id === jobId) return job;
+    }
+    return undefined;
+  }
 
   /**
    * Assert that no generation job is currently running for the given chapter.

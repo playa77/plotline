@@ -193,6 +193,23 @@ export const GenerateCancelRequestSchema = z.object({
   jobId: z.string().min(1, 'Job ID is required'),
 });
 
+// ── Iterate acceptance schemas (WP-19) ──────────────────────────────────────────
+
+export const IterateAcceptRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  jobId: z.string().min(1, 'Job ID is required'),
+});
+
+export const IterateDiscardRequestSchema = z.object({
+  jobId: z.string().min(1, 'Job ID is required'),
+});
+
+export const IterateAcceptAsVersionRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  jobId: z.string().min(1, 'Job ID is required'),
+  versionName: z.string().min(1, 'Version name is required'),
+});
+
 // ── Chapter schemas (WP-15) ────────────────────────────────────────────────────
 
 export const ChapterGetArtifactRequestSchema = z.object({
@@ -213,4 +230,37 @@ export const ChapterSaveArtifactRequestSchema = z.object({
 export const ChapterGetStatusRequestSchema = z.object({
   projectId: z.string().min(1, 'Project ID is required'),
   chapterId: z.string().min(1, 'Chapter ID is required'),
+});
+
+// ── Version schemas (WP-21) ──────────────────────────────────────────────────
+
+export const VersionsListRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+});
+
+export const VersionsCreateRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  name: z.string().min(1, 'Version name is required'),
+  fromVersion: z.string().optional(),
+});
+
+export const VersionsSelectRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  slug: z.string().min(1, 'Version slug is required'),
+});
+
+export const VersionsRenameRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  slug: z.string().min(1, 'Version slug is required'),
+  newName: z.string().min(1, 'New name is required'),
+});
+
+export const VersionsArchiveRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  slug: z.string().min(1, 'Version slug is required'),
 });

@@ -14,6 +14,9 @@ import {
   GenerateWriteRequestSchema,
   GenerateIterateRequestSchema,
   GenerateCancelRequestSchema,
+  IterateAcceptRequestSchema,
+  IterateDiscardRequestSchema,
+  IterateAcceptAsVersionRequestSchema,
 } from '../schemas';
 import type { GenerationService } from '../../services/GenerationService';
 
@@ -87,6 +90,33 @@ export function registerGenerationHandlers(
     async (payload) => {
       await generationService.cancel(payload.jobId);
       return { ok: true };
+    },
+  );
+
+  // ── Iterate acceptance handlers (WP-19) ─────────────────────────
+
+  registerCommand(
+    'iterate:accept',
+    IterateAcceptRequestSchema,
+    async (payload) => {
+      const sha = await generationService.accept(payload.projectId, payload.jobId);
+      return { sha };
+    },
+  );
+
+  registerCommand(
+    'iterate:discard',
+    IterateDiscardRequestSchema,
+    async (payload) => {
+      return generationService.discard(payload.jobId);
+    },
+  );
+
+  registerCommand(
+    'iterate:acceptAsVersion',
+    IterateAcceptAsVersionRequestSchema,
+    async (payload) => {
+      return generationService.acceptAsVersion(payload.projectId, payload.jobId, payload.versionName);
     },
   );
 }

@@ -793,6 +793,240 @@ describe('GenerationService', () => {
     ).rejects.toThrow(/No job found/);
   });
 
+  // ── Iterate accept: basic flow ─────────────────────────────────────────
+
+  it('iterate:accept commits proposal to the chapter ref and returns SHA', async () => {
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+
+    // Seed expanded output
+    await seedExpandedOutput(projectService, projectId, chapterId);
+
+    mockState.chunks = ['<p>Revised expanded content</p>'];
+
+    const jobId = await generationService.startIterate(
+      projectId,
+      chapterId,
+      'expanded',
+      'Make it more engaging',
+      {},
+      window,
+    );
+
+    await waitForDone(window);
+
+    // Verify proposal is not yet committed
+    const service = projectService.getOpenProject(projectId)!;
+    const refPath = `refs/plotline/chapters/${chapterId}/main`;
+    let contentBefore = await service.readBlob(refPath, 'expanded-outline.html');
+    expect(contentBefore.toString('utf-8')).toBe('<p>Expanded outline content</p>');
+
+    // Accept the proposal
+    const sha = await generationService.accept(projectId, jobId);
+    expect(sha).toBeTruthy();
+    expect(typeof sha).toBe('string');
+
+    // Verify proposal was committed
+    const contentAfter = await service.readBlob(refPath, 'expanded-outline.html');
+    expect(contentAfter.toString('utf-8')).toBe('<p>Revised expanded content</p>');
+
+    // Verify job was removed — accepting again throws
+    await expect(
+      generationService.accept(projectId, jobId),
+    ).rejects.toThrow(/No job found/);
+  });
+
+  it('iterate:accept throws if job does not exist', async () => {
+    await expect(
+      generationService.accept('test-project', 'nonexistent-job'),
+    ).rejects.toThrow(/No job found/);
+  });
+
+  it('iterate:accept throws if job step is not iterate', async () => {
+    mockState.stallOnStream = true;
+
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+
+    // Start an expand job that's still running (stalled)
+    const jobId = await generationService.startExpand(projectId, chapterId, {}, window);
+
+    // Expand job is still in the map with step 'expand'
+    await expect(
+      generationService.accept(projectId, jobId),
+    ).rejects.toThrow(/not an iterate job/);
+
+    // Clean up
+    await generationService.cancel(jobId);
+  });
+
+  it('iterate:accept throws if job status is not done', async () => {
+    mockState.stallOnStream = true;
+
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+    await seedExpandedOutput(projectService, projectId, chapterId);
+
+    const jobId = await generationService.startIterate(
+      projectId,
+      chapterId,
+      'expanded',
+      'Revise',
+      {},
+      window,
+    );
+
+    // Job is still running — accept should fail
+    await expect(
+      generationService.accept(projectId, jobId),
+    ).rejects.toThrow(/not done yet/);
+
+    // Cancel to clean up
+    await generationService.cancel(jobId);
+  });
+
+  // ── Iterate discard: basic flow ────────────────────────────────────────
+
+  it('iterate:discard removes job without committing', async () => {
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+    await seedExpandedOutput(projectService, projectId, chapterId);
+
+    const jobId = await generationService.startIterate(
+      projectId,
+      chapterId,
+      'expanded',
+      'Discard this',
+      {},
+      window,
+    );
+
+    await waitForDone(window);
+
+    // Discard the proposal
+    const result = await generationService.discard(jobId);
+    expect(result).toEqual({ ok: true });
+
+    // Verify no new commit was made — artifact is unchanged
+    const service = projectService.getOpenProject(projectId)!;
+    const refPath = `refs/plotline/chapters/${chapterId}/main`;
+    const content = await service.readBlob(refPath, 'expanded-outline.html');
+    expect(content.toString('utf-8')).toBe('<p>Expanded outline content</p>');
+
+    // Verify job is removed — discarding again is a no-op
+    const result2 = await generationService.discard(jobId);
+    expect(result2).toEqual({ ok: true });
+  });
+
+  it('iterate:discard is lenient with nonexistent job', async () => {
+    const result = await generationService.discard('nonexistent-job');
+    expect(result).toEqual({ ok: true });
+  });
+
+  it('iterate:discard throws if job step is not iterate', async () => {
+    mockState.stallOnStream = true;
+
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+
+    const jobId = await generationService.startExpand(projectId, chapterId, {}, window);
+
+    // Job is in the map with step 'expand'
+    await expect(
+      generationService.discard(jobId),
+    ).rejects.toThrow(/not an iterate job/);
+
+    // Clean up
+    await generationService.cancel(jobId);
+  });
+
+  // ── Iterate acceptAsVersion: basic flow ────────────────────────────────
+
+  it('iterate:acceptAsVersion creates new version ref and commits proposal', async () => {
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+    await seedExpandedOutput(projectService, projectId, chapterId);
+
+    mockState.chunks = ['<p>Version 2 content</p>'];
+
+    const jobId = await generationService.startIterate(
+      projectId,
+      chapterId,
+      'expanded',
+      'Create as version 2',
+      {},
+      window,
+    );
+
+    await waitForDone(window);
+
+    // Accept as new version
+    const result = await generationService.acceptAsVersion(projectId, jobId, 'v2');
+    expect(result.sha).toBeTruthy();
+    expect(typeof result.sha).toBe('string');
+    expect(result.versionSlug).toBe('v2');
+
+    // Verify new ref exists with the proposal content
+    const service = projectService.getOpenProject(projectId)!;
+    const newRefPath = `refs/plotline/chapters/${chapterId}/v2`;
+    const content = await service.readBlob(newRefPath, 'expanded-outline.html');
+    expect(content.toString('utf-8')).toBe('<p>Version 2 content</p>');
+
+    // Verify the original ref was not modified (iteration was to v2)
+    const originalRefPath = `refs/plotline/chapters/${chapterId}/main`;
+    const originalContent = await service.readBlob(originalRefPath, 'expanded-outline.html');
+    expect(originalContent.toString('utf-8')).toBe('<p>Expanded outline content</p>');
+
+    // Verify job was removed
+    await expect(
+      generationService.acceptAsVersion(projectId, jobId, 'v2'),
+    ).rejects.toThrow(/No job found/);
+  });
+
+  it('iterate:acceptAsVersion accepts chapter-stage proposal', async () => {
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+    await seedExpandedOutput(projectService, projectId, chapterId);
+    await seedChapterOutput(projectService, projectId, chapterId, '<p>Original chapter text</p>');
+
+    mockState.chunks = ['<p>Revised chapter text</p>'];
+
+    const jobId = await generationService.startIterate(
+      projectId,
+      chapterId,
+      'chapter',
+      'Revise chapter',
+      {},
+      window,
+    );
+
+    await waitForDone(window);
+
+    // Accept as new version
+    const result = await generationService.acceptAsVersion(projectId, jobId, 'chapter-v2');
+    expect(result.sha).toBeTruthy();
+    expect(result.versionSlug).toBe('chapter-v2');
+
+    // Verify chapter.html was committed to the new ref
+    const service = projectService.getOpenProject(projectId)!;
+    const newRefPath = `refs/plotline/chapters/${chapterId}/chapter-v2`;
+    const content = await service.readBlob(newRefPath, 'chapter.html');
+    expect(content.toString('utf-8')).toBe('<p>Revised chapter text</p>');
+  });
+
+  it('iterate:acceptAsVersion throws if job does not exist', async () => {
+    await expect(
+      generationService.acceptAsVersion('test-project', 'nonexistent-job', 'v2'),
+    ).rejects.toThrow(/No job found/);
+  });
+
+  it('iterate:acceptAsVersion throws if job step is not iterate', async () => {
+    mockState.stallOnStream = true;
+
+    const { projectId, chapterId } = await createTestProject(projectService, variableService);
+
+    const jobId = await generationService.startExpand(projectId, chapterId, {}, window);
+
+    await expect(
+      generationService.acceptAsVersion(projectId, jobId, 'v2'),
+    ).rejects.toThrow(/not an iterate job/);
+
+    await generationService.cancel(jobId);
+  });
+
   // ── No API key ─────────────────────────────────────────────────────────
 
   it('throws descriptive error when no API key is configured', async () => {

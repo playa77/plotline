@@ -94,6 +94,17 @@ versions follow the document suite version (currently `0.1.0-dev`).
   emission wired through `GenerationService` and IPC handlers. Consistent
   fingerprint computation updated in `GenerationService.buildFingerprints`.
   25 new tests. Total: 444 tests, 26 test files. (this commit)
+- **2026-07-16** — WP-21: VersionService backend — `VersionService` with 5
+  CRUD operations (listVersions, createVersion, selectVersion, renameVersion,
+  archiveVersion) managing chapter versions as Git refs under
+  `refs/plotline/chapters/<chapterId>/<slug>` (active) and
+  `refs/plotline/archived/<chapterId>/<slug>` (archived). Version metadata
+  synced to `project.json` on `refs/heads/main`. IPC command types
+  (`versions:list`, `versions:create`, `versions:select`, `versions:rename`,
+  `versions:archive`) added to `IpcCommandMap` with Zod schemas, IPC handlers
+  wired via `registerVersionHandlers`, and entrypoint integration in
+  `src/main/index.ts`. 21 new tests. Total: 506 tests, 27 test files.
+  (this commit)
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim
