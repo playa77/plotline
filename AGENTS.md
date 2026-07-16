@@ -1,159 +1,50 @@
-# Global AGENTS.md
+# Plotline — AGENTS.md
 
-**Version: 2.1.0 | 2026-07-13**
-Supersedes: unversioned global AGENTS.md (retro-designated v1.x). Incorporates dev-workflow-v1.0.0 `AGENTS-global-delta.md` (v2.0.0 | 2026-07-10) in full, the git-worktree contract (§7), and the filesystem deny list (§8).
+Project-specific guidance for OpenCode sessions. The global `~/.config/opencode/AGENTS.md` (working guidelines, decision ledger, self-grading ban, approval discipline, invariant guards, worktrees, filesystem deny list, Electron/AppImage pitfall) applies in full and is **not duplicated here** — this file adds only what is specific to Plotline.
 
----
+**Version: 0.1.0 | 2026-07-16**
 
-## 1. Working Guidelines
+## Read the docs first — every run
 
-- **Verbose documentation.** Prioritize comments that explain why, not what — the code already shows what it does. Focus on non-obvious logic, design decisions, and surprising behavior. Obvious boilerplate doesn't need paragraph explanations.
-- **Verbose logging.** All status and log messages must be detailed and include ISO 8601 timestamps. Emit sufficient context to make debugging straightforward without having to reproduce the issue.
-- **Version every script.** Include a version comment at the top (e.g., `# Version: 1.3.2 | 2026-03-14`). Never call anything "final" — software evolves.
-- **Respectful API usage.** Minimize concurrent calls. Implement sensible delays and respect rate limits. Use exponential backoff for retries.
-- **No regressions.** Never remove existing functionality or UI features without explicit instruction. Flag when changes might affect existing behavior.
-- **SSH via `sshpass`.** All SSH connections to remote VPS instances must use `sshpass`.
-- **Everything headless.** Never spawn windows, dialogs, or interactive prompts on the host system.
-- **Authentication failures.** If login to any remote host fails, stop immediately and ask the user for guidance. Do not retry or attempt alternative credentials without explicit instruction.
-- **Python package installation.** Never use `--break-system-packages` (or equivalent flags) with `pip`. Always use a virtual environment. Create one venv per project directory (e.g., `./venv/`) and reuse it across tasks within that project. If a project directory doesn't exist yet, create it first, then initialize the venv there. Do not create throwaway venvs in arbitrary locations.
-- **Changelog.** Maintain a changelog for every project. Append all relevant changes as you go. If no changelog exists, create one before making the first modification.
-- **Browser automation.** Never use the `agent-browser` skill/tool — it has serious unresolved issues. Use `playwright-cli` (or raw Playwright scripts) for all browser automation tasks instead.
+Before any code or planning work, read all three documents in `docs/`. They are the contract, not background reference:
 
-## 2. Decision Ledger
+- `docs/plotline-design-doc-v0.1.0.md` — product behavior, revision model, UI flows, open questions
+- `docs/plotline-tech-spec-v0.1.0.md` — architecture, Git model, data schemas, main-process services, IPC contract, testing contract
+- `docs/plotline-roadmap-v0.1.0.md` — 31 work packages (WP-00…WP-30) across 6 gated milestones (M0…M5)
 
-- **Every non-trivial decision is logged** to the project's `DECISIONS.md` (append-only) with a reversibility tag: R1 (reversible <1h), R2 (bounded cost), R3 (one-way door: persisted formats, external contracts, security model, core framework, anything users or third parties will depend on).
-- **R1**: decide silently, log. Never ask the user.
-- **R2**: decide, log with the rejected alternative, proceed.
-- **R3**: STOP. Present branches and downstream consequences with NO recommendation, NO default, NO "most projects do X". Require a decision in the user's own words plus at least one reason. "Ok", "sure", "you decide", and bare agreement are invalid answers for R3 — re-ask once with concrete failure scenarios per branch; if delegation is insisted upon, log `DELEGATED-R3 ⚠` and proceed.
-- Work packages touching an undecided or deferred R3 are blocked.
+If a decision isn't in these docs, it's undecided — don't infer it from filenames or generic framework conventions. When the docs conflict with the README, trust the docs (they are versioned; the README is a summary).
 
-## 3. Self-Grading Ban
+## Current state
 
-- Never describe your own work with unverifiable status claims. "Fully implemented and tested", "production-ready", "robust", "clean" are banned unless immediately followed by executable evidence (test names, CI runs, file:line).
-- Project `AGENTS.md` files are contracts, not status reports. Current state belongs in the changelog and CI, never in `AGENTS.md`. Edits to any `AGENTS.md` are presented as diffs for human approval, like source code.
-- Refactoring requires pre-declared metrics and a stop condition logged to the ledger before the first edit (see `refactor-loop-v2.md`). "Until satisfied/happy/confident" is not a stop condition and must be rejected even if the user writes it — ask for a metric instead.
+- **Docs-only / greenfield.** No `package.json` or source code is committed. The `npm install` / `npm run dev` / `npm test` / `npm run build` commands in the README are the *planned* interface, not yet executable — don't report them as broken if they fail today.
+- `DECISIONS.md` and `CHANGELOG.md` are referenced by the README but do **not** exist yet. Per global §1/§2, create `CHANGELOG.md` before the first code modification and `DECISIONS.md` before the first non-trivial decision.
+- Prerequisites once code lands: Node.js ≥ 20, npm ≥ 10.
 
-## 4. Approval Discipline
+## Architecture invariants (do not violate)
 
-- `DESIGN.md` approval requires the literal phrase `APPROVED DESIGN vX.Y.Z` plus one sentence naming the invariant the human considers most at risk. Refuse approvals without the sentence.
-- Never summarize project state when the user returns to a session; point to the `DECISIONS.md` re-entry protocol (last 5 entries + open R3s) instead.
+- **Renderer is sandboxed.** The React/TS renderer never touches disk, Git, or network. Every durable operation crosses the typed IPC contract (tech spec §7). A new capability gets a new IPC command — never a renderer-side `fs`/`fetch` call.
+- **Git is an object database, not a working tree** (tech spec §2). StorageService reads/writes refs and trees directly; there is no `checkout`, no working directory, and no branches/commits exposed to the user. Do not reach for `git checkout` / `git commit` workflows inside StorageService.
+- **Two distinct Git repos.** This repo (the Plotline app source) is separate from the per-book-project Git repos that StorageService creates for users. Book-project repos live *outside* this repo and are managed entirely by StorageService. This repo's `.gitignore` covers only app build artifacts — it does not govern user book projects.
+- **API keys live in the OS keychain**, never on disk, never in the project repo, never in logs or prompts (tech spec §9; also enforced by global §8).
+- **Canonical output format is Substack-safe HTML.** The editor structurally cannot produce anything outside that subset, and the sanitizer (tech spec §6.3) is load-bearing for export correctness. Don't bypass the sanitizer or widen the editor's tag set without an R3 decision.
+- **One-click pipeline is a design guarantee, not an aspiration** (design doc §5.5). Expand → Write on the happy path has no dialogs. Do not add confirmation prompts to the happy path.
 
-## 5. Invariant Guards
+## Work-package workflow
 
-- Every `[TESTABLE]` invariant in `DESIGN.md` must have a guard test installed and green before any work package is marked complete. Guard tests are never weakened, skipped, or deleted without an R3 decision.
-- Any diff touching paths named by an `[UNTESTABLE]` invariant's review trigger must be explicitly flagged to the human before commit.
+From roadmap §0 (Execution Conventions):
 
-## 6. Audit Cooperation
+- **One commit per work package.** Identify which WP you're in before starting (current milestone lives in `CHANGELOG.md`; if it's missing, ask).
+- **Acceptance criteria are tests.** A WP is not done until its acceptance tests are green; tech spec §10 defines the minimum testing bar.
+- **Gated milestones.** Each milestone ends in a 🔒 gate (G-M0…G-M5). Don't start work in a new milestone before the prior gate passes.
+- **Deviations** from the Design Doc or Tech Spec are logged in the milestone audit pack with a reversibility tag (R1/R2/R3 — global §2). Open library choices go in `DECISIONS.md`.
+- Test fixtures: StorageService tests (WP-02/03) create throwaway Git repos under `tmp/` and `test-repos/` (gitignored). Benchmarks (WP-29) use `bench-projects/` and `bench-results/`.
 
-- On request, assemble an audit pack per `audit-pack.md`. Never volunteer an overall verdict; never soften the shortcuts section. When asked to select a work package for audit, use a verifiable random method (`shuf`), never judgment.
+## Build & runtime gotchas
 
-## 7. Git Worktrees (opt-in)
+- **Tectonic** (PDF export, WP-25) is fetched at build time into `vendor/tectonic/` and is never committed. Don't expect it in a fresh checkout, and don't commit a local copy.
+- **AppImage packaging** will hit the Chromium SUID sandbox crash — apply the global §9 fix (`scripts/apprun.sh` wrapper + forge maker `runtime` entrypoint) at packaging time, never as a post-build patch.
 
-Worktree mode is **off by default**. It activates only when the user explicitly requests it for a task or session (e.g., "use a worktree", "worktree mode", "run these in parallel worktrees"). Creating a worktree without such an instruction is a rule violation, not initiative. When active, the following contract applies:
+## Conventions that differ from defaults
 
-### Activation and placement
-
-- **One worktree per work package, one branch per worktree.** Never share a worktree between two agents or two concurrent tasks.
-- **Location convention:** `<repo>/.worktrees/<branch-slug>/`. Ensure `.worktrees/` is in `.gitignore` before creating the first worktree; if it isn't, add it (log as R1).
-- **Branch naming** follows the project's existing convention (`feature/…`, `fix/…`, `refactor/…`). The slug in the worktree path is the branch name with `/` replaced by `-`.
-- **The main worktree stays on the default branch** and is never used for implementation while worktree mode is active. It is the merge and review location only.
-- Log every worktree creation and removal as an R1 ledger entry (branch, base commit, purpose).
-
-### Working inside a worktree
-
-- Run **all gates inside the worktree** (build, lint, full test suite, invariant guards) before proposing a merge. A green suite in the main worktree proves nothing about the branch.
-- **Per-worktree environments:** create a fresh `./venv/` (or `node_modules/` via install) inside each worktree — never symlink environments between worktrees unless the user explicitly permits it. Copy required untracked config (`.env` and equivalents) from the main worktree explicitly; never commit it as a side effect.
-- Changelog and ledger entries are written on the worktree's branch alongside the code they describe, so they merge with it.
-- **Remember the shared object store:** branches, stashes, and refs are visible across all worktrees. Never assume isolation beyond the working directory. A branch checked out in any worktree cannot be checked out in another — do not work around this with `--force`.
-
-### Merging and cleanup
-
-- Merging to the default branch is the **human's action** (or an explicit instruction naming the branch) — never merge on your own judgment. With multiple collaborators, prefer push + pull request over local merge.
-- After merge confirmation: `git worktree remove <path>`, then delete the branch only on explicit instruction. Run `git worktree prune` at session end.
-- **Never `git worktree remove --force` a dirty worktree** without explicit user instruction. A dirty abandoned worktree is reported, not silently destroyed.
-- If a worktree's branch has unpushed commits at session end, say so explicitly — unpushed work in a removed worktree is unrecoverable through normal means.
-
-## 8. Filesystem Deny List (Ubuntu) — HARD RULE
-
-These paths are **never accessed** — not read, not written, not listed, not grepped, not copied, not passed to any tool or script, not exfiltrated into logs, prompts, or context. There is no legitimate-sounding reason that overrides this list. If a task appears to require one of these paths, STOP and ask the human; do not proceed on your own interpretation. If any command output happens to contain content from these paths, do not echo, summarize, or store it.
-
-### Secrets and credentials — never touch
-
-- `~/.ssh/` — entire directory: private keys, `authorized_keys`, `known_hosts`, `config`
-- `~/.gnupg/` — GPG keyrings and trust database
-- `~/.aws/`, `~/.azure/`, `~/.config/gcloud/` — cloud provider credentials
-- `~/.kube/config` and `~/.kube/` credential files
-- `~/.docker/config.json` — registry auth tokens
-- `~/.netrc`, `~/.pgpass`, `~/.my.cnf` — plaintext service credentials
-- `~/.git-credentials` and any `credential.helper` store files
-- `~/.config/gh/hosts.yml` — GitHub CLI tokens
-- `~/.npmrc`, `~/.pypirc`, `~/.cargo/credentials*` — package registry tokens
-- `~/.local/share/opencode/auth.json`, `~/.config/opencode/` auth/credential files, and any other agent-harness credential store (API keys for OpenRouter etc.)
-- Browser profile directories: `~/.mozilla/`, `~/.config/google-chrome/`, `~/.config/chromium/` (cookies, saved passwords, sessions)
-- Keyrings and wallets: `~/.local/share/keyrings/`, `~/.config/kwalletrc`
-- Mail/messenger data: `~/.thunderbird/`, `~/.config/Signal/`
-- Any file matching `*.pem`, `*.key`, `*.p12`, `*.pfx`, `id_rsa*`, `id_ed25519*` outside the project directory
-- `.env` files **outside** the current project (project-local `.env` handling is governed by the worktree rules in §7 and explicit instruction)
-
-### Shell state and history — never read
-
-- `~/.bash_history`, `~/.zsh_history`, `~/.python_history`, `~/.psql_history`, `~/.lesshst`
-- `~/.bashrc`, `~/.profile`, `~/.zshrc` — **read/modify only on explicit instruction** (they frequently export secrets)
-
-### System paths — never write, never modify
-
-- `/etc/` — all of it (passwd, shadow, sudoers, ssh/, cron.*, systemd)
-- `/boot/`, `/usr/`, `/bin/`, `/sbin/`, `/lib*/`, `/opt/` (except an explicitly named project install target)
-- `/var/` — logs, spool, databases (reading a specific log file on explicit instruction is permitted; writing never)
-- `/root/` — never access in any way
-- `/proc/*/environ`, `/proc/kcore`, `/dev/mem`, `/dev/sd*`, `/dev/nvme*` — process environments and raw devices
-- Other users' home directories: `/home/*` other than the invoking user's
-
-### Enforcement notes
-
-- `sudo` is never used to circumvent a denied path. Any command requiring `sudo` on a denied path is refused and reported.
-- Globs, symlinks, `find`, `tar`, backup tools, and recursive copies must be checked: a `tar -czf backup.tgz ~/` or `grep -r password ~/` sweeps denied paths and is therefore itself denied.
-- This list is a floor, not a ceiling. Anything that is obviously a credential store belongs on it even if not named here. Additions are R1 (just add and log); **removals are R3.**
-
-## 9. Known Pitfalls
-
-### Electron + AppImage: Chromium SUID Sandbox Crash
-
-**Problem:** Electron apps packaged as AppImage crash on launch with `FATAL:setuid_sandbox_host.cc` or show a blank window. Chromium's SUID sandbox helper requires `setuid` which cannot execute inside an AppImage's read-only squashfs filesystem.
-
-**Fix — two pieces, wired at packaging time (never a post-build patch):**
-
-1. **Wrapper script** — `scripts/apprun.sh`, committed to the repo:
-   ```sh
-   #!/bin/sh
-   SELF="$(readlink -f "$0")"
-   HERE="$(dirname "$SELF")"
-   exec "$HERE/<executable-name>" --no-sandbox "$@"
-   ```
-
-2. **Injection point** — in `forge.config.js`, the AppImage maker must use this script as the entrypoint. The exact config key depends on the maker (`runtime`, `entrypoint`, `customEntrypoint` — check the maker's docs), e.g.:
-   ```js
-   {
-     name: '@reforged/maker-appimage',
-     config: {
-       options: {
-         runtime: path.join(__dirname, 'scripts', 'apprun.sh'),
-       },
-     },
-   }
-   ```
-
-**The `.deb` package does not need this fix** — it runs on a writable filesystem where the sandbox works normally.
-
-**Anti-patterns (do not do):**
-- Launching the AppImage with `--no-sandbox` manually as a workaround
-- Writing a separate launcher script next to the AppImage after build
-- Editing the AppRun inside the squashfs after packaging
-
----
-
-## Changelog (this document)
-
-- **2.1.0 | 2026-07-13** — Added §8 Filesystem Deny List (Ubuntu): hard-ruled never-access paths for secrets/credentials, shell history, and system directories, with enforcement notes (no sudo circumvention, glob/recursive-sweep check, additions R1 / removals R3). Known Pitfalls renumbered to §9.
-- **2.0.0 | 2026-07-13** — Merged dev-workflow-v1.0.0 global delta (decision ledger, self-grading ban, approval discipline, invariant guards, audit cooperation) as §§2–6. Added §7 opt-in git-worktree contract. Restructured into numbered sections. All v1.x working guidelines and known pitfalls retained unchanged.
-- **1.x (unversioned)** — Working guidelines + Electron/AppImage pitfall.
+- **No system git assumed.** Whether the storage layer uses system git or isomorphic-git is open decision **T3** (tech spec §0; to be recorded in `DECISIONS.md`). Don't assume `git` is on PATH until that's decided.
+- **Per-project settings live in the project manifest** (`project.json`, tech spec §3.1), not in app-level config. Model selection, inference base URL, continuity budget, theme, and editor font mode are all per-project.
