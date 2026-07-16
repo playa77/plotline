@@ -19,6 +19,9 @@ import { useHistoryStore } from '../stores/historyStore';
 import type { CommitInfo } from '../stores/historyStore';
 import type { VariableScope } from '../../shared/schemas/variable';
 
+import { IteratePanel } from './IteratePanel';
+import { VersionPanel } from './VersionPanel';
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface ContextRailProps {
@@ -217,11 +220,9 @@ export function ContextRail({
               {isExpanded && (
                 <div className="rail-section__body">
                   {section.id === 'iterate' && (
-                    <textarea
-                      className="rail-placeholder"
-                      disabled
-                      rows={3}
-                      defaultValue="Enter your iteration prompt here..."
+                    <IteratePanel
+                      projectId={projectId ?? 'demo'}
+                      chapterId={chapterId}
                     />
                   )}
                   {section.id === 'variables' && (
@@ -316,9 +317,10 @@ export function ContextRail({
                     />
                   )}
                   {section.id === 'versions' && (
-                    <div className="rail-placeholder-text">
-                      Chapter versions will appear here.
-                    </div>
+                    <VersionPanel
+                      projectId={projectId ?? 'demo'}
+                      chapterId={chapterId}
+                    />
                   )}
                 </div>
               )}
