@@ -1,6 +1,19 @@
 // Version: 1.0.0 | 2026-07-09
-// Run directory creation, workflow snapshots, and step output file I/O.
+// Run directory creation, workflow snapshots, step output file I/O, and
+// run metadata management.
 // See docs/technical_specification.md Section 8 for the interface contract.
+//
+// Public interface:
+//   create_run_directory(project_root, workflow_name) -> Result<PathBuf>
+//   snapshot_workflow(run_dir, workflow_path, workflow, project_root) -> Result<()>
+//   step_output_path(run_dir, step_index, step_name) -> PathBuf
+//   read_step_output(run_dir, step_index, step_name) -> Option<String>
+//   write_step_output(run_dir, step_index, step_name, content) -> Result<()>
+//   infer_run_status(run_dir, workflow) -> RunInfo
+//   write_meta_json(run_dir, meta) -> Result<()>
+//   read_meta_json(run_dir) -> Option<RunMeta>
+//   update_meta_status(run_dir, status) -> Result<()>
+//   list_run_files(run_dir) -> Result<Vec<RunFileEntry>>
 //
 // Design decisions:
 //   - Step output paths are 1-indexed (step 0 produces step_01_<name>.md)
@@ -9,12 +22,41 @@
 //     consecutive hyphens, strip leading/trailing, truncate to 50, fallback "unnamed"
 //   - Workflow snapshots preserve subdirectory structure in _prompts/
 //   - infer_run_status infers completion from file existence on disk
+//   - _meta.json uses camelCase keys, stores run lifecycle state
+//   - list_run_files skips hidden files and the _prompts/ directory entry itself
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::PlotlineError;
 use crate::workflow::{RunInfo, RunStepStatus, StepStatus, Workflow};
+
+// ---------------------------------------------------------------------------
+// RunMeta — serialized to _meta.json for run lifecycle tracking
+// ---------------------------------------------------------------------------
+
+/// Metadata about a run, persisted as `_meta.json` inside the run directory.
+/// Uses camelCase keys in the JSON file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunMeta {
+    pub run_id: String,
+    pub timestamp: String,
+    pub workflow_name: String,
+    pub status: String, // "running" | "completed" | "failed" | "cancelled"
+    pub parent_run_id: Option<String>,
+}
+
+/// A single entry in a run directory listing, returned by list_run_files.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunFileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
 
 // ---------------------------------------------------------------------------
 // slugify — converts a workflow name into a filesystem-safe directory slug
@@ -307,6 +349,148 @@ pub fn infer_run_status(run_dir: &Path, workflow: &Workflow) -> RunInfo {
         started_at,
         steps,
     }
+}
+
+// ---------------------------------------------------------------------------
+// write_meta_json — persist RunMeta to _meta.json inside the run directory
+// ---------------------------------------------------------------------------
+
+/// Writes a `_meta.json` file into the run directory with the given `RunMeta`.
+/// Serializes with `serde_json::to_string_pretty`. Overwrites any existing file.
+pub fn write_meta_json(run_dir: &Path, meta: &RunMeta) -> Result<(), PlotlineError> {
+    let meta_path = run_dir.join("_meta.json");
+    let json = serde_json::to_string_pretty(meta).map_err(|e| {
+        PlotlineError::FilesystemError(format!("Failed to serialize _meta.json: {}", e))
+    })?;
+    fs::write(&meta_path, &json).map_err(|e| {
+        PlotlineError::FilesystemError(format!("Failed to write _meta.json: {}", e))
+    })?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// read_meta_json — read RunMeta from _meta.json
+// ---------------------------------------------------------------------------
+
+/// Reads `_meta.json` from a run directory.
+/// Returns `None` if the file doesn't exist or can't be parsed.
+pub fn read_meta_json(run_dir: &Path) -> Option<RunMeta> {
+    let meta_path = run_dir.join("_meta.json");
+    let content = fs::read_to_string(&meta_path).ok()?;
+    serde_json::from_str(&content).ok()
+}
+
+// ---------------------------------------------------------------------------
+// update_meta_status — read _meta.json, update status, write back
+// ---------------------------------------------------------------------------
+
+/// Reads the existing `_meta.json`, updates the `status` field, and writes it
+/// back. If the file doesn't exist or can't be parsed, this is a no-op.
+pub fn update_meta_status(run_dir: &Path, status: &str) -> Result<(), PlotlineError> {
+    let meta_path = run_dir.join("_meta.json");
+    let content = match fs::read_to_string(&meta_path) {
+        Ok(c) => c,
+        Err(_) => return Ok(()), // no-op if file doesn't exist
+    };
+    let mut meta: RunMeta = match serde_json::from_str(&content) {
+        Ok(m) => m,
+        Err(_) => return Ok(()), // no-op if can't parse
+    };
+    meta.status = status.to_string();
+    let json = serde_json::to_string_pretty(&meta).map_err(|e| {
+        PlotlineError::FilesystemError(format!("Failed to serialize updated _meta.json: {}", e))
+    })?;
+    fs::write(&meta_path, &json).map_err(|e| {
+        PlotlineError::FilesystemError(format!("Failed to write updated _meta.json: {}", e))
+    })?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// list_run_files — recursive listing of a run directory
+// ---------------------------------------------------------------------------
+
+/// Recursively lists all files and subdirectories inside a run directory.
+///
+/// Returns `Vec<RunFileEntry>` where:
+/// - `name` is just the file/directory name
+/// - `path` is the relative path from `run_dir` root
+/// - `is_dir` indicates if the entry is a directory
+/// - `size` is the file size in bytes (0 for directories)
+///
+/// Skips:
+/// - Hidden files (names starting with `.`)
+/// - The `_prompts/` directory itself (but includes all files within it)
+///
+/// Sorted with directories first, then files, alphabetically within each group.
+pub fn list_run_files(run_dir: &Path) -> Result<Vec<RunFileEntry>, PlotlineError> {
+    let mut entries = Vec::new();
+    list_run_files_recursive(run_dir, run_dir, &mut entries).map_err(|e| {
+        PlotlineError::FilesystemError(format!(
+            "Failed to list run directory {}: {}",
+            run_dir.display(),
+            e
+        ))
+    })?;
+
+    // Sort: directories first, then files; alphabetically within each group
+    entries.sort_by(|a, b| {
+        if a.is_dir != b.is_dir {
+            // `true > false` sorts directories before files when b.is_dir is true and a.is_dir is false
+            b.is_dir.cmp(&a.is_dir)
+        } else {
+            a.name.cmp(&b.name)
+        }
+    });
+
+    Ok(entries)
+}
+
+/// Recursive helper for list_run_files.
+fn list_run_files_recursive(
+    base: &Path,
+    current: &Path,
+    entries: &mut Vec<RunFileEntry>,
+) -> std::io::Result<()> {
+    for entry in fs::read_dir(current)? {
+        let entry = entry?;
+        let path = entry.path();
+        let file_name = entry.file_name();
+        let name = file_name.to_string_lossy().to_string();
+
+        // Skip hidden files (starting with .)
+        if name.starts_with('.') {
+            continue;
+        }
+
+        // Compute relative path from the run_dir root
+        let rel_path = path.strip_prefix(base).unwrap_or(&path);
+        let rel_str = rel_path.to_string_lossy().to_string();
+
+        if path.is_dir() {
+            if name == "_prompts" {
+                // Skip _prompts/ directory entry itself but recurse into it
+                list_run_files_recursive(base, &path, entries)?;
+            } else {
+                entries.push(RunFileEntry {
+                    name,
+                    path: rel_str,
+                    is_dir: true,
+                    size: 0,
+                });
+                list_run_files_recursive(base, &path, entries)?;
+            }
+        } else {
+            let metadata = entry.metadata()?;
+            entries.push(RunFileEntry {
+                name,
+                path: rel_str,
+                is_dir: false,
+                size: metadata.len(),
+            });
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

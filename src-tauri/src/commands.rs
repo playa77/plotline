@@ -316,12 +316,29 @@ pub async fn list_runs(
                     .filter(|s| matches!(s.status, crate::workflow::StepStatus::Completed))
                     .count();
 
+                // Read _meta.json for enhanced status and parent_run_id
+                let meta = run_manager::read_meta_json(&run_dir);
+                let status = meta
+                    .as_ref()
+                    .map(|m| m.status.clone())
+                    .unwrap_or_else(|| {
+                        // Backward compat: infer from files
+                        if completed_steps == wf.steps.len() {
+                            "completed".to_string()
+                        } else {
+                            "unknown".to_string()
+                        }
+                    });
+                let parent_run_id = meta.and_then(|m| m.parent_run_id);
+
                 results.push(RunSummary {
                     run_dir: run_dir.display().to_string(),
                     workflow_name: wf.name,
                     started_at: info.started_at,
                     completed_steps,
                     total_steps: wf.steps.len(),
+                    status,
+                    parent_run_id,
                 });
             }
             Err(_) => {
@@ -338,6 +355,35 @@ pub async fn list_runs(
     results.sort_by(|a, b| b.started_at.cmp(&a.started_at));
 
     Ok(results)
+}
+
+// ---------------------------------------------------------------------------
+// list_run_files — returns all files and directories in a run directory
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_run_files(
+    run_dir: String,
+) -> Result<Vec<crate::run_manager::RunFileEntry>, String> {
+    let run_dir = PathBuf::from(&run_dir);
+
+    if !run_dir.exists() {
+        return Err(PlotlineError::RunNotFound(run_dir.display().to_string()).to_string());
+    }
+
+    run_manager::list_run_files(&run_dir).map_err(map_err)
+}
+
+// ---------------------------------------------------------------------------
+// read_run_meta — reads _meta.json from a run directory
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn read_run_meta(
+    run_dir: String,
+) -> Result<Option<crate::run_manager::RunMeta>, String> {
+    let run_dir = PathBuf::from(&run_dir);
+    Ok(run_manager::read_meta_json(&run_dir))
 }
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,16 @@ interface WorkflowSelectorProps {
   isRunning: boolean;
 }
 
+function getStatusBadge(status?: string): { label: string; color: string; bg: string } {
+  switch (status) {
+    case "running":   return { label: "Running", color: "var(--color-warning)", bg: "rgba(255,152,0,0.15)" };
+    case "completed": return { label: "Completed", color: "var(--color-success)", bg: "rgba(76,175,80,0.15)" };
+    case "failed":    return { label: "Failed", color: "var(--color-error)", bg: "rgba(244,67,54,0.15)" };
+    case "cancelled": return { label: "Cancelled", color: "var(--color-text-dim)", bg: "rgba(136,136,170,0.15)" };
+    default:          return { label: "", color: "", bg: "" };
+  }
+}
+
 export function WorkflowSelector({
   projectRoot,
   onStartRun,
@@ -292,9 +302,29 @@ export function WorkflowSelector({
               <div style={styles.cardMeta}>
                 {formatDate(run.started_at)}
               </div>
-              <div style={styles.runProgress}>
+              <div style={{
+                ...styles.runProgress,
+                color: !run.status || run.status === "unknown"
+                  ? "var(--color-text-dim)"
+                  : run.status === "failed"
+                  ? "var(--color-error)"
+                  : run.status === "cancelled"
+                  ? "var(--color-text-dim)"
+                  : run.status === "running"
+                  ? "var(--color-warning)"
+                  : "var(--color-success)",
+              }}>
                 {run.completed_steps}/{run.total_steps} steps
               </div>
+              {run.status && run.status !== "unknown" && (
+                <div style={{
+                  ...styles.statusBadge,
+                  color: getStatusBadge(run.status).color,
+                  backgroundColor: getStatusBadge(run.status).bg,
+                }}>
+                  {getStatusBadge(run.status).label}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -420,4 +450,14 @@ const styles: Record<string, React.CSSProperties> = {
     color: "var(--color-success)",
     marginTop: "2px",
   },
+  statusBadge: {
+    display: "inline-block",
+    padding: "1px 8px",
+    borderRadius: "3px",
+    fontSize: "0.65rem",
+    fontWeight: 600,
+    marginTop: "4px",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.3px",
+  } as React.CSSProperties,
 };

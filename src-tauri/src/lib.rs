@@ -25,6 +25,8 @@ pub fn run() {
             commands::get_run_status,
             commands::list_workflows,
             commands::list_runs,
+            commands::list_run_files,
+            commands::read_run_meta,
             commands::read_file_content,
             commands::set_api_key,
             commands::get_api_key,

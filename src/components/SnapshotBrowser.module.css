@@ -1,0 +1,290 @@
+/* SnapshotBrowser — GitHub-style file browser for run snapshots.
+ * Left panel = collapsible file tree; right panel = read-only CodeMirror viewer.
+ * Compact, monospace-driven, dark. */
+
+/* ---------- Layout ---------- */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg);
+}
+
+/* ---------- Header bar ---------- */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-accent);
+  background: var(--color-panel);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breadcrumbRoot {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.breadcrumbSep {
+  color: var(--color-text-dim);
+  opacity: 0.5;
+  margin: 0 2px;
+}
+
+.breadcrumbPath {
+  color: var(--color-text-dim);
+  opacity: 0.7;
+}
+
+.closeBtn {
+  padding: 5px 12px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  transition: background 120ms ease;
+}
+
+.closeBtn:hover {
+  background: #ff5577;
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ---------- Body: two-panel layout ---------- */
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---------- Left: file tree panel ---------- */
+
+.treePanel {
+  width: 220px;
+  min-width: 160px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--color-accent);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.treeScroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+/* ---------- Tree items ---------- */
+
+.treeItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 100ms ease;
+  gap: 4px;
+  position: relative;
+}
+
+.treeItem:hover {
+  background: rgba(15, 52, 96, 0.3);
+}
+
+.treeItem:focus-visible {
+  outline: 1px solid var(--color-primary);
+  outline-offset: -1px;
+}
+
+.treeItemActive {
+  background: var(--color-accent);
+  color: var(--color-text);
+}
+
+.treeItemActive:hover {
+  background: var(--color-accent);
+}
+
+/* Arrow toggle for directories */
+.treeArrow {
+  display: inline-block;
+  width: 12px;
+  font-size: 0.7rem;
+  color: var(--color-text-dim);
+  transition: transform 140ms ease;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.treeArrowOpen {
+  transform: rotate(90deg);
+}
+
+.treeArrowPlaceholder {
+  display: inline-block;
+  width: 12px;
+  flex-shrink: 0;
+}
+
+.treeIcon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.treeName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.treeSize {
+  font-size: 0.62rem;
+  color: var(--color-text-dim);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+/* Empty directory placeholder */
+.treeEmpty {
+  font-size: 0.65rem;
+  color: var(--color-text-dim);
+  font-style: italic;
+  padding: 3px 12px;
+  font-family: var(--font-mono);
+}
+
+/* ---------- Right: content viewer panel ---------- */
+
+.viewerPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.viewerHeader {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-bottom: 1px solid rgba(136, 136, 170, 0.15);
+  background: var(--color-panel);
+  flex-shrink: 0;
+}
+
+.viewerFileName {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text);
+}
+
+.viewerEditor {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Override CodeMirror background to blend with our dark theme */
+.viewerEditor :global(.cm-editor) {
+  height: 100%;
+}
+
+.viewerEditor :global(.cm-editor .cm-scroller) {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+}
+
+/* ---------- Placeholder ---------- */
+
+.viewerPlaceholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-dim);
+  font-size: 0.85rem;
+  gap: 8px;
+  text-align: center;
+  padding: 24px;
+}
+
+.placeholderIcon {
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+/* ---------- Loading / Error / Empty states ---------- */
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 16px;
+  color: var(--color-text-dim);
+  font-size: 0.8rem;
+}
+
+.errorState {
+  padding: 12px;
+  color: var(--color-error);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.emptyState {
+  padding: 16px 12px;
+  color: var(--color-text-dim);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  text-align: center;
+}

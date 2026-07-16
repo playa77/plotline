@@ -83,6 +83,8 @@ pub struct RunSummary {
     pub started_at: String,
     pub completed_steps: usize,
     pub total_steps: usize,
+    pub status: String,
+    pub parent_run_id: Option<String>,
 }
 
 /// Parses a workflow YAML file from the given path.

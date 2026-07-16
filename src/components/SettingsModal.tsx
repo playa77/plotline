@@ -13,10 +13,29 @@ interface SettingsModalProps {
 
 type Feedback = { type: "success" | "error"; message: string } | null;
 
+/** Masks an OpenRouter API key, showing prefix + first 2 chars after prefix + "..." + last 3 chars.
+ *  Example: "sk-or-v1-abcd1234...xyz" → "sk-or-v1-ab.................xyz" */
+function maskApiKey(key: string): string {
+  const prefix = "sk-or-v1-";
+  if (!key.startsWith(prefix)) {
+    // Not a recognizable OpenRouter key — show first 5 + ellipsis + last 3
+    if (key.length <= 8) return key;
+    return key.slice(0, 5) + "..." + key.slice(-3);
+  }
+  const afterPrefix = key.slice(prefix.length);
+  if (afterPrefix.length <= 5) return key; // too short to mask meaningfully
+  const visibleStart = afterPrefix.slice(0, 2);
+  const visibleEnd = afterPrefix.slice(-3);
+  const maskedMiddle = ".".repeat(17); // 17 dots for the ellipsis
+  return prefix + visibleStart + maskedMiddle + visibleEnd;
+}
+
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [projectRoot, setProjectRoot] = useState<string | null>(null);
   // null = "checking"; boolean = resolved presence. Drives the ✓/✕ indicator.
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  // null = "not yet loaded". Stores the raw key for masked display.
+  const [maskedKey, setMaskedKey] = useState<string | null>(null);
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pickingDir, setPickingDir] = useState(false);
@@ -34,13 +53,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
     async function load() {
       try {
-        const [root, has] = await Promise.all([
+        const [root, has, key] = await Promise.all([
           api.getProjectRoot(),
           api.hasApiKey(),
+          api.getApiKey().catch(() => null),
         ]);
         if (cancelled) return;
         setProjectRoot(root);
         setHasKey(has);
+        setMaskedKey(key);
       } catch (err) {
         if (cancelled) return;
         setFeedback({
@@ -111,6 +132,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       // Re-read presence from the keyring rather than trusting the write, so
       // the indicator reflects the actual persisted state.
       setHasKey(await api.hasApiKey());
+      setMaskedKey(await api.getApiKey().catch(() => null));
       setApiKeyInput("");
       setFeedback({ type: "success", message: "API key saved to keyring." });
     } catch (err) {
@@ -204,6 +226,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <span className={styles.label}>OpenRouter API Key</span>
               <span className={`${styles.status} ${statusClass}`}>{statusText}</span>
             </div>
+            {hasKey && maskedKey && (
+              <div className={styles.maskedKey}>
+                <code>{maskApiKey(maskedKey)}</code>
+              </div>
+            )}
             <input
               className={styles.input}
               type="password"

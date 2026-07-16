@@ -156,11 +156,27 @@ pub async fn run_workflow(
     run_dir: &Path,
     variable_overrides: HashMap<String, String>,
 ) -> Result<(), PlotlineError> {
-    let cancel_flag = create_cancel_flag();
-
-    // Step 1: Parse and validate the workflow
+    // Step 1: Parse and validate the workflow (before cancel flag so we have
+    //         the workflow name for _meta.json)
     let workflow = workflow::parse_workflow(workflow_path, project_root)?;
     workflow::validate_workflow(&workflow, project_root)?;
+
+    let cancel_flag = create_cancel_flag();
+
+    // Write initial _meta.json with status "running"
+    let run_id = run_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let meta = run_manager::RunMeta {
+        run_id: run_id.clone(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        workflow_name: workflow.name.clone(),
+        status: "running".to_string(),
+        parent_run_id: None,
+    };
+    run_manager::write_meta_json(run_dir, &meta)?;
 
     // Step 2: Snapshot workflow and prompts into the pre-created run directory
     // (created by commands::run_workflow before spawning us, so the frontend
@@ -181,10 +197,26 @@ pub async fn run_workflow(
         run_dir,
         project_root,
         variable_overrides,
-        cancel_flag,
+        cancel_flag.clone(),
     );
     let result = runner.execute_steps(&workflow, None).await;
+
+    // Update _meta.json status based on result
+    let is_cancelled = cancel_flag.load(Ordering::SeqCst);
     clear_cancel_flag();
+
+    match &result {
+        Ok(()) => {
+            run_manager::update_meta_status(run_dir, "completed")?;
+        }
+        Err(_) if is_cancelled => {
+            // Already set to "cancelled" by execute_steps — no-op here
+        }
+        Err(_) => {
+            run_manager::update_meta_status(run_dir, "failed")?;
+        }
+    }
+
     result
 }
 
@@ -207,7 +239,37 @@ pub async fn rerun_from_step(
     step_index: usize,
     variable_overrides: HashMap<String, String>,
 ) -> Result<(), PlotlineError> {
+    // Read existing _meta.json to get parent_run_id for the new run
+    let existing_meta = run_manager::read_meta_json(run_dir);
+    let parent_run_id = existing_meta
+        .as_ref()
+        .map(|m| m.run_id.clone())
+        .or_else(|| {
+            run_dir
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        });
+
     let cancel_flag = create_cancel_flag();
+
+    // Write new _meta.json with parent_run_id and status "running"
+    let run_id = run_dir
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let meta = run_manager::RunMeta {
+        run_id: run_id.clone(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        workflow_name: existing_meta
+            .as_ref()
+            .map(|m| m.workflow_name.clone())
+            .unwrap_or_default(),
+        status: "running".to_string(),
+        parent_run_id,
+    };
+    run_manager::write_meta_json(run_dir, &meta)?;
 
     // Parse workflow from snapshot
     let snapshot_yaml = run_dir.join("_workflow.yaml");
@@ -257,10 +319,26 @@ pub async fn rerun_from_step(
         run_dir,
         run_dir, // For re-runs, use run_dir as project_root since prompts are snapshotted
         variable_overrides,
-        cancel_flag,
+        cancel_flag.clone(),
     );
     let result = runner.execute_steps(&workflow, Some((step_index, previous_output))).await;
+
+    // Update _meta.json status based on result
+    let is_cancelled = cancel_flag.load(Ordering::SeqCst);
     clear_cancel_flag();
+
+    match &result {
+        Ok(()) => {
+            run_manager::update_meta_status(run_dir, "completed")?;
+        }
+        Err(_) if is_cancelled => {
+            // Already set to "cancelled" by execute_steps — no-op here
+        }
+        Err(_) => {
+            run_manager::update_meta_status(run_dir, "failed")?;
+        }
+    }
+
     result
 }
 
@@ -307,6 +385,8 @@ impl<'a> EngineRunner<'a> {
         for (index, step) in workflow.steps.iter().enumerate().skip(start_index) {
             // Check cancellation before each step
             if self.cancel_flag.load(Ordering::SeqCst) {
+                // Write cancelled status to _meta.json before returning
+                let _ = run_manager::update_meta_status(self.run_dir, "cancelled");
                 let _ = self.app_handle.emit(
                     "run_error",
                     RunErrorPayload {

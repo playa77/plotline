@@ -4,6 +4,30 @@ All notable changes to the Plotline project.
 
 ## [1.0.0] — 2026-07-10 (in progress)
 
+### Feature — Run History Timeline + Snapshot Browser (2026-07-16)
+- New Rust commands: `list_run_files` and `read_run_meta` expose run snapshots
+  and metadata to the frontend. Registered in `lib.rs` and implemented in
+  `commands.rs`. Backend already had `run_manager::list_run_files` and
+  `read_meta_json` — these are now wired through to the IPC boundary.
+- New `RunHistoryPanel` component: vertically-connected timeline cards showing
+  all runs sorted chronologically. Each card displays status (color-coded dot +
+  left border accent), workflow name, timestamp, step progress, and a parent
+  indicator for re-runs. Lineage depth is computed from `parent_run_id`,
+  indenting child runs under their parent with a connector track.
+- New `SnapshotBrowser` component: GitHub-style two-panel file browser for run
+  snapshots. Left panel is a collapsible file tree built from flat
+  `RunFileEntry[]` entries (supports nested directories and a synthetic
+  `_prompts/` parent node). Right panel uses a read-only CodeMirror viewer
+  (markdown mode, dark theme, line numbers). Breadcrumb header shows the run
+  name and selected file path.
+- `App.tsx` updated with navigation tabs (Workflows / History) in the sidebar,
+  two new `AppView` states (`history`, `snapshot`), a `runList` state for
+  caching fetched runs, and rendering branches for both new views.
+- API layer: `listRunFiles` and `readRunMeta` added to `src/api/tauri.ts`.
+- Both new components use CSS Modules with the existing dark theme variables.
+  All existing tests (35 frontend, 86 Rust) continue to pass; `tsc --noEmit`
+  is clean.
+
 ### Feature — ChapterPicker combobox in WorkflowRunDialog (2026-07-10)
 - `WorkflowRunDialog` now detects chapter-like variables (name matching
   `/^chapter/i`, e.g. `chapter_spec`, `chapter_number`) and renders them as a
@@ -197,3 +221,42 @@ All notable changes to the Plotline project.
 
 ### Documentation
 - Rewrote `README.md` as a comprehensive user guide: quick start, project structure, workflow YAML format with field reference, model selection table, execution flow, context chaining, variable substitution, run directory anatomy, re-run from step, typical use cases (serial pipeline, iterative editing, parameterized generation, A/B testing), UI reference diagram, key design decisions, and MVP limitations.
+
+### WP15 — Run Status, History & Snapshot Browser (2026-07-16)
+
+#### Run status indicators (`_meta.json`)
+- Introduced `_meta.json` in each run directory with `{run_id, timestamp, workflow_name, status, parent_run_id}`. Status is one of `"running"`, `"completed"`, `"failed"`, `"cancelled"`.
+- Engine writes `_meta.json` at run start (`"running"`), updates on completion (`"completed"`), failure (`"failed"`), or cancellation (`"cancelled"`).
+- Re-runs store the original run's ID as `parent_run_id`.
+- `list_runs` reads `_meta.json` when available, falls back to file-existence inference for legacy run directories (backward compatible).
+- Sidebar run entries now show status badges: Running (orange), Completed (green), Failed (red), Cancelled (grey).
+- Run progress step count in sidebar is color-coded by status.
+- New Rust structs: `RunMeta` (camelCase JSON), `RunFileEntry`. New `run_manager` functions: `write_meta_json`, `read_meta_json`, `update_meta_status`, `list_run_files`.
+
+#### New IPC commands
+- `list_run_files` — recursively lists all files/dirs in a run directory (hidden files excluded).
+- `read_run_meta` — reads and deserializes `_meta.json` from a run directory.
+
+#### Run History panel
+- New `RunHistoryPanel` component: vertical timeline of all runs sorted chronologically.
+- Each run card shows: status-colored dot and left border accent, workflow name, timestamp, step progress (N/M), and parent indicator for re-runs ("Re-run of ...").
+- Lineage visualization: child runs (re-runs) are indented beneath their parent with a vertical connector line.
+- Runs are clickable to open the RunMonitor view.
+- New sidebar navigation tabs: "Workflows" and "History".
+
+#### Snapshot browser
+- New `SnapshotBrowser` component: GitHub-style two-panel file browser for past run snapshots.
+- Left panel (220px): collapsible file tree with directory expand/collapse toggle, file-type icons (📁, 📄, ⚙️, 📋), active selection highlighting.
+- Right panel: read-only CodeMirror viewer with markdown syntax highlighting, line numbers, and fold gutter. Dark theme.
+- Accessible from the History tab by selecting a run.
+
+#### API Key Masking
+- Settings modal now shows a masked preview of the stored API key after it is saved.
+- Format: `sk-or-v1-ab.................xyz` (prefix + first 2 chars after prefix + 17-dot ellipsis + last 3 chars).
+- Full key is never rendered or logged.
+- Masking helper `maskApiKey()` handles both OpenRouter-format keys and generic keys.
+
+#### Types & API updates
+- `RunSummary` now has `status` (`"running"|"completed"|"failed"|"cancelled"|"unknown"`) and `parent_run_id` (optional) fields.
+- New TypeScript interfaces: `RunFileEntry`, `RunMeta`, `RunLineageNode`.
+- New API wrappers: `listRunFiles`, `readRunMeta`.

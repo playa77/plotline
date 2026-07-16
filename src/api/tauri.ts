@@ -9,6 +9,8 @@ import type {
   WorkflowSummary,
   RunSummary,
   RunInfo,
+  RunFileEntry,
+  RunMeta,
 } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -96,8 +98,22 @@ export async function listRuns(projectRoot: string): Promise<RunSummary[]> {
   return invoke<RunSummary[]>("list_runs", { projectRoot });
 }
 
+/** Lists all files and directories recursively inside a run directory. */
+export async function listRunFiles(runDir: string): Promise<RunFileEntry[]> {
+  return invoke<RunFileEntry[]>("list_run_files", { runDir });
+}
+
 export async function readFileContent(filePath: string): Promise<string> {
   return invoke<string>("read_file_content", { filePath });
+}
+
+/** Reads a run's _meta.json and returns it. Returns null if the file doesn't exist. */
+export async function readRunMeta(runDir: string): Promise<RunMeta | null> {
+  try {
+    return await invoke<RunMeta>("read_run_meta", { runDir });
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

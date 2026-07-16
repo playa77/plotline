@@ -1,4 +1,4 @@
-// Version: 1.1.0 | 2026-07-10
+// Version: 1.2.0 | 2026-07-16
 // Root application component — orchestrates views and manages app-level state.
 // Three-panel layout: sidebar (workflows + runs), main content, footer status bar.
 
@@ -8,14 +8,20 @@ import { useRunState } from "./hooks/useRunState";
 import { WorkflowSelector } from "./components/WorkflowSelector";
 import { RunMonitor } from "./components/RunMonitor";
 import { OutputEditor } from "./components/OutputEditor";
+import { RunHistoryPanel } from "./components/RunHistoryPanel";
+import { SnapshotBrowser } from "./components/SnapshotBrowser";
 import { SettingsModal } from "./components/SettingsModal";
 import { ToastContainer, useToast } from "./components/Toast";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import * as api from "./api/tauri";
+import type { RunSummary } from "./types";
 
 type AppView =
   | { type: "selector" }
   | { type: "monitor"; runDir: string }
-  | { type: "output"; runDir: string; stepIndex: number; stepName: string; outputPath: string };
+  | { type: "output"; runDir: string; stepIndex: number; stepName: string; outputPath: string }
+  | { type: "history" }
+  | { type: "snapshot"; runDir: string };
 
 function App() {
   const { projectRoot, refresh: refreshProjectRoot, isLoading: isProjectLoading } =
@@ -33,6 +39,7 @@ function App() {
   const [view, setView] = useState<AppView>({ type: "selector" });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showSettingsPrompt, setShowSettingsPrompt] = useState(false);
+  const [runList, setRunList] = useState<RunSummary[]>([]);
 
   // Refresh flag to trigger re-fetches
   const [refreshKey, setRefreshKey] = useState(0);
@@ -156,6 +163,39 @@ function App() {
           <aside style={styles.sidebar}>
             {projectRoot ? (
               <>
+                {/* Navigation tabs */}
+                <nav style={styles.sidebarNav}>
+                  <button
+                    style={
+                      view.type === "selector" || view.type === "monitor" || view.type === "output"
+                        ? styles.navButtonActive
+                        : styles.navButton
+                    }
+                    onClick={() => setView({ type: "selector" })}
+                  >
+                    Workflows
+                  </button>
+                  <button
+                    style={
+                      view.type === "history" || view.type === "snapshot"
+                        ? styles.navButtonActive
+                        : styles.navButton
+                    }
+                    onClick={async () => {
+                      if (projectRoot) {
+                        try {
+                          setRunList(await api.listRuns(projectRoot));
+                        } catch {
+                          // Keep whatever runs we had before.
+                        }
+                      }
+                      setView({ type: "history" });
+                    }}
+                  >
+                    History
+                  </button>
+                </nav>
+
                 <WorkflowSelector
                   key={refreshKey}
                   projectRoot={projectRoot}
@@ -208,6 +248,21 @@ function App() {
                 outputPath={view.outputPath}
                 onClose={handleCloseOutput}
                 onSaved={() => showToast("Output saved successfully.", "success")}
+              />
+            )}
+
+            {view.type === "history" && (
+              <RunHistoryPanel
+                runs={runList}
+                onSelectRun={(runDir) => setView({ type: "monitor", runDir })}
+              />
+            )}
+
+            {view.type === "snapshot" && (
+              <SnapshotBrowser
+                runDir={view.runDir}
+                runName={view.runDir.split("/").pop() ?? view.runDir}
+                onClose={() => setView({ type: "history" })}
               />
             )}
           </main>
@@ -329,6 +384,35 @@ const styles: Record<string, React.CSSProperties> = {
     borderRight: "1px solid var(--color-accent)",
     overflow: "auto",
     flexShrink: 0,
+  },
+  sidebarNav: {
+    display: "flex",
+    borderBottom: "1px solid var(--color-accent)",
+  },
+  navButton: {
+    flex: 1,
+    padding: "8px 4px",
+    backgroundColor: "transparent",
+    color: "var(--color-text-dim)",
+    border: "none",
+    borderBottom: "2px solid transparent",
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    fontFamily: "var(--font-ui)",
+    transition: "color 120ms ease, border-color 120ms ease",
+  },
+  navButtonActive: {
+    flex: 1,
+    padding: "8px 4px",
+    backgroundColor: "transparent",
+    color: "var(--color-primary)",
+    border: "none",
+    borderBottom: "2px solid var(--color-primary)",
+    cursor: "pointer",
+    fontSize: "0.75rem",
+    fontWeight: 500,
+    fontFamily: "var(--font-ui)",
   },
   content: {
     flex: 1,
