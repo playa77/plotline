@@ -1,0 +1,6 @@
+{
+  "id": "iterate-v1",
+  "version": "1.0.0",
+  "step": "iterate",
+  "description": "Revise an existing artifact based on a specific instruction"
+}

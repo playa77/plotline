@@ -2,22 +2,24 @@
  * Workspace — center pane content router.
  *
  * Renders content based on selection state:
- *   - 'none'      → empty state prompting chapter selection
- *   - 'outline'   → OutlineWorkspace (WP-08b)
- *   - 'chapter'   → ChapterEditor (from WP-09)
+ *   - 'none'       → empty state prompting chapter selection
+ *   - 'outline'    → OutlineWorkspace (WP-08b)
+ *   - 'chapter'    → ChapterWorkspace (WP-15)
+ *   - 'variables'  → VariableWorkspace (WP-11)
  *
- * Version: 0.2.0 | 2026-07-16
+ * Version: 0.4.0 | 2026-07-16
  */
 
-import { ChapterEditor } from './ChapterEditor';
+import { ChapterWorkspace } from './ChapterWorkspace';
 import { OutlineWorkspace } from './OutlineWorkspace';
+import { VariableWorkspace } from './VariableWorkspace';
 import { demoParts } from '../data/demoOutline';
 import type { Outline } from '../../shared/schemas/outline';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface WorkspaceSelection {
-  type: 'none' | 'outline' | 'chapter';
+  type: 'none' | 'outline' | 'chapter' | 'variables';
   /** Only set when type === 'chapter'. */
   chapterId?: string;
   /** Only set when type === 'chapter'. */
@@ -107,15 +109,14 @@ export function Workspace({ selection }: WorkspaceProps): JSX.Element {
       );
     case 'chapter':
       return (
-        <ChapterEditor
-          initialContent={`<p>Start writing <em>${selection.chapterTitle ?? 'this chapter'}</em> here...</p>`}
+        <ChapterWorkspace
+          projectId="demo"
+          chapterId={selection.chapterId!}
+          chapterTitle={selection.chapterTitle!}
           wordTarget={{ min: 7000, max: 8000 }}
-          onSave={(html) =>
-            console.log(
-              `[Workspace] Autosaved ${selection.chapterId ?? 'unknown'}: ${html.substring(0, 60)}...`,
-            )
-          }
         />
       );
+    case 'variables':
+      return <VariableWorkspace projectId="demo" />;
   }
 }

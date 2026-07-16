@@ -1,0 +1,16 @@
+BOOK OUTLINE:
+{{book_outline}}
+
+THIS CHAPTER:
+{{chapter_slice}}
+
+{{#if story_variables}}
+STORY CONTEXT:
+{{story_variables}}
+{{/if}}
+
+CHAPTER TARGET: {{word_target}}
+
+{{output_format_contract}}
+
+Generate the expanded chapter outline now:

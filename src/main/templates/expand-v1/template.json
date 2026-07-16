@@ -1,0 +1,6 @@
+{
+  "id": "expand-v1",
+  "version": "1.0.0",
+  "step": "expand",
+  "description": "Expand a chapter outline entry into a detailed expanded outline with section-by-section development"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "write-v1",
+  "version": "1.0.0",
+  "step": "write",
+  "description": "Write a full chapter from an expanded outline, producing complete prose"
+}

@@ -1,0 +1,577 @@
+/**
+ * Variable workspace styles.
+ *
+ * Two-column layout within the workspace pane: a scrollable sidebar list
+ * of variables on the left (~280px) and the selected variable's content
+ * (editor, scope controls) on the right.
+ *
+ * Dense, tool-like, monospace chrome. Uses design tokens exclusively.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+/* ── Root container (fills workspace pane) ──────────────────────────── */
+
+.variable-workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+/* ── Scrollbar (shared across panels) ───────────────────────────────── */
+
+.variable-sidebar::-webkit-scrollbar,
+.variable-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.variable-sidebar::-webkit-scrollbar-thumb,
+.variable-content::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sidebar (left column)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.variable-sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-secondary);
+  border-right: 1px solid var(--color-border);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Sidebar scrollable list ────────────────────────────────────────── */
+
+.variable-sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-lg) 0;
+}
+
+/* ── Section header ─────────────────────────────────────────────────── */
+
+.variable-sidebar__section-header {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-lg);
+  margin-bottom: var(--space-xs);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ── Variable row ───────────────────────────────────────────────────── */
+
+.variable-row {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 var(--space-lg);
+  gap: var(--space-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-radius: 0;
+}
+
+.variable-row:hover {
+  background: var(--color-bg-hover);
+}
+
+.variable-row--selected {
+  background: var(--color-bg-selected);
+}
+
+.variable-row--selected:hover {
+  background: var(--color-bg-selected);
+}
+
+/* Dimmed state: placeholder core variable not yet created */
+.variable-row--dimmed {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.variable-row--dimmed:hover {
+  background: transparent;
+}
+
+/* ── Name within row ────────────────────────────────────────────────── */
+
+.variable-row__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.variable-row--dimmed .variable-row__name {
+  color: var(--color-text-secondary);
+}
+
+/* ── Scope badge (compact tag) ───────────────────────────────────────── */
+
+.variable-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 var(--space-sm);
+  flex-shrink: 0;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  border-radius: 2px;
+  line-height: 1;
+}
+
+.variable-scope-badge--always {
+  background: rgba(90, 158, 255, 0.15);
+  color: var(--color-accent);
+}
+
+.variable-scope-badge--expand {
+  background: rgba(105, 219, 124, 0.15);
+  color: var(--color-on-target);
+}
+
+.variable-scope-badge--write {
+  background: rgba(212, 160, 23, 0.15);
+  color: var(--color-stale);
+}
+
+.variable-scope-badge--manual {
+  background: var(--color-bg-active);
+  color: var(--color-text-muted);
+}
+
+/* ── Active indicator (dot) ──────────────────────────────────────────── */
+
+.variable-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.variable-active-dot--active {
+  background: var(--color-on-target);
+}
+
+.variable-active-dot--paused {
+  background: transparent;
+  border: 1px solid var(--color-text-muted);
+}
+
+/* ── Create button (dimmed core variable) ────────────────────────────── */
+
+.variable-row__create {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  color: var(--color-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color var(--transition-fast);
+  line-height: 1;
+}
+
+.variable-row__create:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ── Sidebar footer: New Variable button ─────────────────────────────── */
+
+.variable-sidebar__footer {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-sm);
+}
+
+.variable-new-btn {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-md);
+  gap: var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  width: 100%;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.variable-new-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.variable-new-btn__icon {
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Content area (right column)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.variable-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Content header bar ──────────────────────────────────────────────── */
+
+.variable-content__header {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 var(--space-xl);
+  gap: var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+}
+
+.variable-content__name {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.variable-content__spacer {
+  flex: 1;
+}
+
+/* ── Scope selector (dropdown) ───────────────────────────────────────── */
+
+.variable-scope-select {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 22px;
+  /* Custom dropdown arrow via background SVG */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%235c5c7a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+
+.variable-scope-select:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-active);
+}
+
+.variable-scope-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent-muted);
+}
+
+/* ── Active toggle ───────────────────────────────────────────────────── */
+
+.variable-active-toggle {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-md);
+  gap: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.variable-active-toggle:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+}
+
+.variable-active-toggle--active {
+  border-color: rgba(105, 219, 124, 0.3);
+  color: var(--color-on-target);
+}
+
+.variable-active-toggle--active:hover {
+  background: rgba(105, 219, 124, 0.08);
+}
+
+.variable-active-toggle__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: background var(--transition-fast);
+}
+
+.variable-active-toggle--active .variable-active-toggle__dot {
+  background: var(--color-on-target);
+}
+
+/* ── Content body (scrollable editor area) ───────────────────────────── */
+
+.variable-content__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Card list (for Character / Voice Sheet variables) ───────────────── */
+
+.variable-cards {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-md) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+  overflow-x: auto;
+  min-height: 40px;
+}
+
+.variable-cards::-webkit-scrollbar {
+  height: 3px;
+}
+
+.variable-cards::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+.variable-card-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.variable-card-chip:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.variable-card-chip--selected {
+  background: var(--color-bg-selected);
+  border-color: rgba(90, 158, 255, 0.25);
+  color: var(--color-accent);
+}
+
+.variable-card-chip__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: var(--space-sm);
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  padding: 0;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.variable-card-chip__delete:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-muted);
+}
+
+.variable-add-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px dashed var(--color-border);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  flex-shrink: 0;
+  padding: 0;
+  transition: border-color var(--transition-fast), color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.variable-add-card-btn:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+/* ── Card name inline input ──────────────────────────────────────────── */
+
+.variable-card-input {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-accent);
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  outline: none;
+  min-width: 100px;
+  flex-shrink: 0;
+}
+
+.variable-card-input:focus {
+  box-shadow: 0 0 0 1px var(--color-accent-muted);
+}
+
+/* ── Editor wrapper ──────────────────────────────────────────────────── */
+
+.variable-content__editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────── */
+
+.variable-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.variable-empty__content {
+  max-width: 360px;
+}
+
+.variable-empty__heading {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-md);
+}
+
+.variable-empty__text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+/* ── Delete confirmation (reuse pattern from outline) ────────────────── */
+
+.variable-delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  flex-shrink: 0;
+}
+
+.variable-delete-confirm__text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  white-space: nowrap;
+}
+
+.variable-delete-confirm__btn {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-sm);
+  border: none;
+  border-radius: 2px;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.variable-delete-confirm__btn--confirm {
+  background: var(--color-danger-muted);
+  color: var(--color-danger);
+}
+
+.variable-delete-confirm__btn--confirm:hover {
+  background: rgba(224, 85, 85, 0.3);
+}
+
+.variable-delete-confirm__btn--cancel {
+  background: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+.variable-delete-confirm__btn--cancel:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}

@@ -17,6 +17,7 @@ import './styles/tree.css';
 import './styles/workspace.css';
 import './styles/context-rail.css';
 import './styles/outline-workspace.css';
+import './styles/variable-workspace.css';
 
 function App(): JSX.Element {
   return <AppShell />;

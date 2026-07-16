@@ -21,6 +21,20 @@ versions follow the document suite version (currently `0.1.0-dev`).
   IPC commands (`project:create`, `project:open`, `project:list`,
   `project:close`) with `project:changed` events. 20 tests, all passing.
   (this commit)
+- **2026-07-16** — WP-07: App shell & manuscript tree — Three-pane layout
+  (Library / Workspace / Context Rail) with resizable mouse-drag panels,
+  manuscript tree rendering from parsed outline data (collapsible parts,
+  selectable chapters with stage dots and word targets, expandable
+  sections), workspace content router, collapsible context rail skeleton,
+  and design-token-based styling (IBM Plex Mono chrome, dark theme).
+  Panel widths persisted via localStorage. 0 new tests (renderer-only).
+- **2026-07-16** — WP-08: Book Outline workspace — `outline:get` and
+  `outline:mutate` IPC commands with `OutlineMutation` discriminated union
+  (15 mutation kinds: rename, reorder, delete, add for parts/chapters/
+  sections, plus beat operations). `OutlineWorkspace` renderer component
+  with expand/collapse, inline editing, drag-and-drop reorder, add/delete
+  flows, and optimistic local state via `OutlineMutation` dispatch. 21
+  new tests (backend). Total: 295 tests, 19 test files.
 - **2026-07-16** — WP-09: Rich-text editor component — TipTap-based editor
   with schema generated from the Substack allowlist constant (`ALLOWED_ELEMENTS`).
   Includes `Editor` (core TipTap with sanitizing paste handler), `EditorToolbar`
@@ -42,20 +56,20 @@ versions follow the document suite version (currently `0.1.0-dev`).
   and tables. IPC commands `project:importOutline` (preview) and
   `project:confirmImport` (commit). Uses `LKY_Book_Outline_v0_2.md` as
   golden fixture. 17 tests, all passing.
-- **2026-07-16** — WP-07: App shell & manuscript tree — Three-pane layout
-  (Library / Workspace / Context Rail) with resizable mouse-drag panels,
-  manuscript tree rendering from parsed outline data (collapsible parts,
-  selectable chapters with stage dots and word targets, expandable
-  sections), workspace content router, collapsible context rail skeleton,
-  and design-token-based styling (IBM Plex Mono chrome, dark theme).
-  Panel widths persisted via localStorage. 0 new tests (renderer-only).
-- **2026-07-16** — WP-08: Book Outline workspace — `outline:get` and
-  `outline:mutate` IPC commands with `OutlineMutation` discriminated union
-  (15 mutation kinds: rename, reorder, delete, add for parts/chapters/
-  sections, plus beat operations). `OutlineWorkspace` renderer component
-  with expand/collapse, inline editing, drag-and-drop reorder, add/delete
-  flows, and optimistic local state via `OutlineMutation` dispatch. 21
-  new tests (backend). Total: 271 tests, 18 test files.
+- **2026-07-16** — WP-11: VariableService backend — main-process CRUD service
+  for story variables against Git, 11 IPC handlers with Zod schemas, and
+  Electron entrypoint wiring. 24 tests, all passing.
+- **2026-07-16** — WP-12: Prompt template engine — `TemplateEngine` class with
+  placeholder substitution (`{{placeholder}}`), conditional blocks
+  (`{{#if}}...{{/if}}`), built-in + project-override template loading, and
+  full prompt assembly with default output format contract. Added
+  `VariableService.assemble(step)` for scope-filtered variable assembly.
+  Template directory structure at `src/main/templates/`. 40 new tests (29
+  TemplateEngine + 11 assemble), all passing. Total: 335 tests, 20 test files.
+- **2026-07-16** — WP-13: Built-in templates v1 — three prompt templates
+  (expand-v1, write-v1, iterate-v1) with system and user prompt files,
+  placeholder lint tests, and snapshot tests for resolved template output.
+  9 new test cases. Total: 344 tests, 20 test files.
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim

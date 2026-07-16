@@ -206,7 +206,7 @@ export function AppShell(): JSX.Element {
           <button
             type="button"
             className="library-action-btn"
-            onClick={() => setSelection({ type: 'none' })}
+            onClick={() => setSelection({ type: 'variables' })}
           >
             Variables
           </button>

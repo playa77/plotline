@@ -57,3 +57,136 @@ export const OutlineMutateRequestSchema: z.ZodType<{ projectId: string; mutation
     z.custom<OutlineMutation>((v) => v != null, { message: 'Each mutation must be a valid OutlineMutation' }),
   ).min(1, 'At least one mutation is required'),
 });
+
+// ── Variable schemas (WP-11) ─────────────────────────────────────────────
+
+/** Validates variables:list request. */
+export const VariablesListRequestSchema = z.object({
+  projectId: z.string().min(1),
+});
+
+/** Validates variables:get request. */
+export const VariablesGetRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+});
+
+/** Validates variables:save request. */
+export const VariablesSaveRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  content: z.string(),
+});
+
+/** Validates variables:create request. */
+export const VariablesCreateRequestSchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1),
+  core: z.enum(['tone', 'style', 'constraints', 'characters']).nullable().optional(),
+  scope: z.enum(['always', 'expand', 'write', 'manual']).optional(),
+});
+
+/** Validates variables:setScope request. */
+export const VariablesSetScopeRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  scope: z.enum(['always', 'expand', 'write', 'manual']),
+});
+
+/** Validates variables:setActive request. */
+export const VariablesSetActiveRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  active: z.boolean(),
+});
+
+/** Validates variables:archive request. */
+export const VariablesArchiveRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+});
+
+/** Validates variables:listCards request. */
+export const VariablesListCardsRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+});
+
+/** Validates variables:addCard request. */
+export const VariablesAddCardRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  title: z.string().min(1),
+});
+
+/** Validates variables:saveCard request. */
+export const VariablesSaveCardRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  cardId: z.string().min(1),
+  content: z.string(),
+});
+
+/** Validates variables:removeCard request. */
+export const VariablesRemoveCardRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  cardId: z.string().min(1),
+});
+
+// ── Secrets schemas ───────────────────────────────────────────────────────────
+
+export const SecretsSetApiKeyRequestSchema = z.object({
+  key: z.string().min(1, 'API key is required'),
+});
+
+export const SecretsHasApiKeyRequestSchema = z.object({});
+
+// ── Generation schemas ─────────────────────────────────────────────────────────
+
+const GenerateOptionsSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  versionSlug: z.string().optional(),
+  excludeVariableIds: z.array(z.string()).optional(),
+  asNewVersion: z.string().optional(),
+});
+
+export const GenerateExpandRequestSchema = GenerateOptionsSchema;
+
+export const GenerateWriteRequestSchema = GenerateOptionsSchema;
+
+export const GenerateIterateRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  stage: z.enum(['expanded', 'chapter']),
+  versionSlug: z.string().optional(),
+  instruction: z.string().min(1, 'Instruction is required'),
+  excludeVariableIds: z.array(z.string()).optional(),
+});
+
+export const GenerateCancelRequestSchema = z.object({
+  jobId: z.string().min(1, 'Job ID is required'),
+});
+
+// ── Chapter schemas (WP-15) ────────────────────────────────────────────────────
+
+export const ChapterGetArtifactRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  versionSlug: z.string().optional(),
+  stage: z.enum(['outline', 'expanded', 'chapter']),
+});
+
+export const ChapterSaveArtifactRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  versionSlug: z.string().optional(),
+  stage: z.enum(['expanded', 'chapter']),
+  html: z.string(),
+});
+
+export const ChapterGetStatusRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+});

@@ -169,6 +169,38 @@ benefit).
 
 ---
 
+## WP-12: Prompt Template Engine
+
+### D012 — `templatesDir` constructor parameter on TemplateEngine (R1)
+
+**Context:** The `TemplateEngine` loads built-in templates from disk at
+`path.join(__dirname, '..', 'templates')`. This path is correct for production
+(compiled JS in `dist/main/`) and for vitest (`__dirname` points to
+`src/main/services/`). However, tests that create throwaway templates need no
+collision with the source tree.
+
+**Chosen:** The `TemplateEngine` constructor accepts an optional `templatesDir`
+parameter that defaults to the built-in path. Tests pass a temp directory
+created per `describe` block. This is purely a testability improvement — the
+production code path is unchanged.
+
+---
+
+### D013 — `iterate` is not a variable scope (R1)
+
+**Context:** The test spec in WP-12 includes a test:
+"iterate variables only appear in iterate step". However, `VARIABLE_SCOPES` in
+the schema only has `always`, `expand`, `write`, `manual`. The `iterate` step
+is a workflow step, not a variable scope.
+
+**Chosen:** The `assemble(step)` method correctly filters by `scope === 'always'`
+or `scope === step`. Since `'iterate'` is not in `VariableScope`, calling
+`assemble('iterate', ...)` will only match `always`-scoped variables. The test
+was replaced to verify that the iterate step correctly captures
+`always`-scoped variables and excludes `expand`-scoped ones.
+
+---
+
 ### D011 — `reconcileManifest` commits only when changes are made (R1)
 
 **Context:** The startup reconciliation pass (TS §5.5) validates manifest ↔ refs

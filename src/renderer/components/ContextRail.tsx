@@ -9,10 +9,13 @@
  *
  * The entire rail can be toggled collapsed/expanded.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-16
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+
+import { useVariableStore, SCOPE_LABELS } from '../stores/variableStore';
+import type { VariableScope } from '../../shared/schemas/variable';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -37,6 +40,15 @@ const RAIL_SECTIONS: RailSectionDef[] = [
   { id: 'versions', label: 'Versions' },
 ];
 
+// ── Scope badge colors (matching variable-workspace) ───────────────────────────
+
+const SCOPE_COLORS: Record<VariableScope, string> = {
+  always: 'var(--color-accent)',
+  expand: 'var(--color-on-target)',
+  write: 'var(--color-stale)',
+  manual: 'var(--color-text-muted)',
+};
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function ContextRail({
@@ -59,6 +71,17 @@ export function ContextRail({
       return next;
     });
   }, []);
+
+  // ── Variable data (read from store, auto-load on mount) ──────────────────────
+
+  const { variables, loadVariables } = useVariableStore();
+
+  useEffect(() => {
+    loadVariables('demo');
+  }, [loadVariables]);
+
+  const activeVariables = variables.filter((v) => v.active);
+  const pausedVariables = variables.filter((v) => !v.active);
 
   return (
     <div className={`context-rail${collapsed ? ' context-rail--collapsed' : ''}`}>
@@ -115,8 +138,63 @@ export function ContextRail({
                     />
                   )}
                   {section.id === 'variables' && (
-                    <div className="rail-placeholder-text">
-                      No variables active in the current selection.
+                    <div className="rail-variables">
+                      {variables.length === 0 ? (
+                        <div className="rail-placeholder-text">
+                          No variables active in the current selection.
+                        </div>
+                      ) : (
+                        <>
+                          {activeVariables.length > 0 && (
+                            <div className="rail-variables__group">
+                              <div className="rail-variables__group-label">
+                                Active ({activeVariables.length})
+                              </div>
+                              {activeVariables.map((v) => (
+                                <div key={v.id} className="rail-variable-item">
+                                  <span
+                                    className="rail-variable-item__dot rail-variable-item__dot--active"
+                                    title="Active"
+                                  />
+                                  <span className="rail-variable-item__name">
+                                    {v.name}
+                                  </span>
+                                  <span
+                                    className="rail-variable-item__scope"
+                                    style={{ color: SCOPE_COLORS[v.scope] }}
+                                  >
+                                    {SCOPE_LABELS[v.scope]}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {pausedVariables.length > 0 && (
+                            <div className="rail-variables__group">
+                              <div className="rail-variables__group-label">
+                                Paused ({pausedVariables.length})
+                              </div>
+                              {pausedVariables.map((v) => (
+                                <div key={v.id} className="rail-variable-item">
+                                  <span
+                                    className="rail-variable-item__dot"
+                                    title="Paused"
+                                  />
+                                  <span className="rail-variable-item__name">
+                                    {v.name}
+                                  </span>
+                                  <span
+                                    className="rail-variable-item__scope"
+                                    style={{ color: SCOPE_COLORS[v.scope] }}
+                                  >
+                                    {SCOPE_LABELS[v.scope]}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   )}
                   {section.id === 'history' && (

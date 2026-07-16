@@ -5,7 +5,7 @@
  * main process and renderer. It is imported by both sides and must never
  * import Electron-specific or renderer-specific modules.
  *
- * Version: 0.2.0 | 2026-07-16
+ * Version: 0.5.0 | 2026-07-16
  */
 
 // ── Error envelope ────────────────────────────────────────────────
@@ -13,6 +13,8 @@
 
 import type { Project, ProjectSummary } from './schemas/project';
 import type { ParsePreview, Outline, OutlineMutation } from './schemas/outline';
+import type { Variable, VariableScope, CoreVariableType } from './schemas/variable';
+import type { GenRecord } from './schemas/meta';
 
 export interface IpcError {
   code: string; // e.g. 'INVALID_PAYLOAD', 'UNKNOWN_COMMAND', 'HANDLER_ERROR'
@@ -66,6 +68,95 @@ export interface IpcCommandMap {
     request: { projectId: string; mutations: OutlineMutation[] };
     response: Outline;
   };
+  // ── Variables (§7.1) ──────────────────────────────────────────
+  'variables:list': {
+    request: { projectId: string };
+    response: Variable[];
+  };
+  'variables:get': {
+    request: { projectId: string; variableId: string };
+    response: { variable: Variable; content: string };
+  };
+  'variables:save': {
+    request: { projectId: string; variableId: string; content: string };
+    response: { sha: string };
+  };
+  'variables:create': {
+    request: { projectId: string; name: string; core?: CoreVariableType | null; scope?: VariableScope };
+    response: Variable;
+  };
+  'variables:setScope': {
+    request: { projectId: string; variableId: string; scope: VariableScope };
+    response: Variable;
+  };
+  'variables:setActive': {
+    request: { projectId: string; variableId: string; active: boolean };
+    response: Variable;
+  };
+  'variables:archive': {
+    request: { projectId: string; variableId: string };
+    response: Variable;
+  };
+  // ── Variable cards (Character / Voice Sheets) ─────────────────
+  'variables:listCards': {
+    request: { projectId: string; variableId: string };
+    response: Array<{ cardId: string; title: string }>;
+  };
+  'variables:addCard': {
+    request: { projectId: string; variableId: string; title: string };
+    response: { cardId: string };
+  };
+  'variables:saveCard': {
+    request: { projectId: string; variableId: string; cardId: string; content: string };
+    response: { sha: string };
+  };
+  'variables:removeCard': {
+    request: { projectId: string; variableId: string; cardId: string };
+    response: { ok: true };
+  };
+  // ── Secrets (§7.6) ──────────────────────────────────
+  'secrets:setApiKey': {
+    request: { key: string };
+    response: { ok: true };
+  };
+  'secrets:hasApiKey': {
+    request: {};
+    response: { hasKey: boolean };
+  };
+  // ── Generation (§7.6) ─────────────────────────────────
+  'generate:expand': {
+    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; asNewVersion?: string };
+    response: { jobId: string };
+  };
+  'generate:write': {
+    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; asNewVersion?: string };
+    response: { jobId: string };
+  };
+  'generate:iterate': {
+    request: { projectId: string; chapterId: string; stage: 'expanded' | 'chapter'; versionSlug?: string; instruction: string; excludeVariableIds?: string[] };
+    response: { jobId: string };
+  };
+  'generate:cancel': {
+    request: { jobId: string };
+    response: { ok: true };
+  };
+  // ── Chapter (§7.1) ──────────────────────────────────────────
+  'chapter:getArtifact': {
+    request: { projectId: string; chapterId: string; versionSlug?: string; stage: 'outline' | 'expanded' | 'chapter' };
+    response: { html: string; meta?: GenRecord | null; stale: boolean };
+  };
+  'chapter:saveArtifact': {
+    request: { projectId: string; chapterId: string; versionSlug?: string; stage: 'expanded' | 'chapter'; html: string };
+    response: { sha: string };
+  };
+  'chapter:getStatus': {
+    request: { projectId: string; chapterId: string };
+    response: {
+      stageDots: { outline: 'empty' | 'filled' | 'stale'; expanded: 'empty' | 'filled' | 'stale'; chapter: 'empty' | 'filled' | 'stale' };
+      selectedVersion: string;
+      versionNames: Array<{ slug: string; name: string; selected: boolean }>;
+    };
+  };
 }
 
 // ── Event registry ────────────────────────────────────────────────
@@ -75,7 +166,10 @@ export interface IpcCommandMap {
 export interface IpcEventMap {
   pong: { message: string; timestamp: number };
   'project:changed': { projectId: string; action: 'opened' | 'closed' };
-  // future events added here
+  // ── Generation events (§7.6) ──────────────────────────
+  'generation:token': { jobId: string; delta: string };
+  'generation:done': { jobId: string; chapterId: string; stage: string; html?: string; genRecord?: GenRecord };
+  'generation:error': { jobId: string; code: string; message: string };
 }
 
 // ── IPC channels ──────────────────────────────────────────────────

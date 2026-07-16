@@ -143,7 +143,67 @@
   padding: var(--space-sm) 0;
 }
 
-/* ── Collapsed state ──────────────────────────────────────────────── */
+/* ── Variable items (WP-11 live data) ──────────────────────────────── */
+
+.rail-variables {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.rail-variables__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.rail-variables__group-label {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding-bottom: var(--space-xs);
+}
+
+.rail-variable-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.rail-variable-item__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid var(--color-text-muted);
+  background: transparent;
+}
+
+.rail-variable-item__dot--active {
+  background: var(--color-on-target);
+  border-color: var(--color-on-target);
+}
+
+.rail-variable-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+
+.rail-variable-item__scope {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
 
 .context-rail--collapsed {
   width: 36px !important;

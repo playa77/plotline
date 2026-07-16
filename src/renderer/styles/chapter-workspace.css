@@ -1,0 +1,572 @@
+/**
+ * ChapterWorkspace styles — stage tabs, streaming state, expand flow.
+ *
+ * BEM convention: `.chapter-workspace` is the root block.
+ * Depends on tokens.css for all color/spacing/typography variables.
+ *
+ * Version: 0.1.0 | 2026-07-16
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Root container
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Stage tab bar
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Individual tab ─────────────────────────────────────────────────────────── */
+
+.chapter-workspace__tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px var(--space-lg);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.chapter-workspace__tab:hover {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.chapter-workspace__tab:active {
+  background: var(--color-bg-active);
+}
+
+/* ── Active tab ─────────────────────────────────────────────────────────────── */
+
+.chapter-workspace__tab--active {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.chapter-workspace__tab--active:hover {
+  background: var(--color-bg-hover);
+}
+
+/* ── Disabled tab ───────────────────────────────────────────────────────────── */
+
+.chapter-workspace__tab--disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.chapter-workspace__tab--disabled:hover {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
+/* ── Stage dot indicator ────────────────────────────────────────────────────── */
+
+.chapter-workspace__dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background-color var(--transition-normal);
+}
+
+.chapter-workspace__dot--empty {
+  background-color: var(--color-stage-dot-empty);
+}
+
+.chapter-workspace__dot--filled {
+  background-color: var(--color-stage-dot-filled);
+}
+
+.chapter-workspace__dot--stale {
+  background-color: var(--color-stage-dot-stale);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Stage content area
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__stage {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Empty / expand state
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.chapter-workspace__empty-heading {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-lg);
+}
+
+.chapter-workspace__empty-text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  max-width: 400px;
+  margin-bottom: var(--space-2xl);
+}
+
+/* ── Expand button group layout ──────────────────────────────────────────────── */
+
+.chapter-workspace__expand-group {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative;
+}
+
+/* ── Dropdown menu ──────────────────────────────────────────────────────────── */
+
+.chapter-workspace__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  min-width: 180px;
+  padding: var(--space-sm) 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+}
+
+.chapter-workspace__dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 8px var(--space-lg);
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.chapter-workspace__dropdown-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.chapter-workspace__dropdown-item:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.chapter-workspace__dropdown-item:disabled:hover {
+  background: transparent;
+}
+
+.chapter-workspace__dropdown-divider {
+  height: 1px;
+  margin: var(--space-sm) 0;
+  background: var(--color-border);
+}
+
+.chapter-workspace__dropdown-label {
+  display: block;
+  padding: var(--space-sm) var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Streaming generation state
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__streaming {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* ── Streaming status bar ───────────────────────────────────────────────────── */
+
+.chapter-workspace__streaming-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.chapter-workspace__streaming-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* ── Pulsing indicator dot ──────────────────────────────────────────────────── */
+
+.chapter-workspace__pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: chapter-workspace-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes chapter-workspace-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+/* ── Streaming word count ───────────────────────────────────────────────────── */
+
+.chapter-workspace__streaming-wc {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  padding: 6px var(--space-xl);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  text-align: right;
+}
+
+/* ── Stop button (destructive style) ─────────────────────────────────────────── */
+
+.chapter-workspace__stop-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 5px var(--space-lg);
+  border: 1px solid var(--color-danger);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-danger);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.chapter-workspace__stop-btn:hover {
+  background: var(--color-danger);
+  color: var(--color-bg-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Error state
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__error {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+  gap: var(--space-lg);
+}
+
+.chapter-workspace__error-code {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-danger);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.chapter-workspace__error-message {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  max-width: 420px;
+  line-height: 1.7;
+}
+
+.chapter-workspace__retry-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px var(--space-xl);
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.chapter-workspace__retry-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Write button (same visual pattern as Expand)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__write-group {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative;
+}
+
+.chapter-workspace__write-btn,
+.chapter-workspace__expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-2xl);
+  border: 1px solid var(--color-accent);
+  border-radius: 6px 0 0 6px;
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  white-space: nowrap;
+}
+
+.chapter-workspace__write-btn:hover,
+.chapter-workspace__expand-btn:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 16px var(--color-accent-muted);
+}
+
+.chapter-workspace__write-btn:active,
+.chapter-workspace__expand-btn:active {
+  transform: scale(0.98);
+}
+
+.chapter-workspace__write-btn:disabled,
+.chapter-workspace__expand-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chapter-workspace__write-btn:disabled:hover,
+.chapter-workspace__expand-btn:disabled:hover {
+  background: var(--color-accent);
+  box-shadow: none;
+}
+
+/* ── Write chevron split button ─────────────────────────────────────────────── */
+
+.chapter-workspace__write-chevron,
+.chapter-workspace__expand-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 10px 0;
+  border: 1px solid var(--color-accent);
+  border-left: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 0 6px 6px 0;
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  cursor: pointer;
+  font-size: 10px;
+  transition: background var(--transition-fast);
+}
+
+.chapter-workspace__write-chevron:hover,
+.chapter-workspace__expand-chevron:hover {
+  background: var(--color-accent-hover);
+}
+
+.chapter-workspace__write-chevron:disabled,
+.chapter-workspace__expand-chevron:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Write chevron arrow ────────────────────────────────────────────────────── */
+
+.chapter-workspace__write-chevron-arrow,
+.chapter-workspace__expand-chevron-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--color-bg-primary);
+  transition: transform var(--transition-fast);
+}
+
+.chapter-workspace__write-chevron-arrow--open,
+.chapter-workspace__expand-chevron-arrow--open {
+  transform: rotate(180deg);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Info notice (e.g. "Expanded outline required")
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  max-width: 420px;
+}
+
+.chapter-workspace__notice-text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  text-align: center;
+}
+
+.chapter-workspace__notice-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px var(--space-lg);
+  border: 1px solid var(--color-accent);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.chapter-workspace__notice-link:hover {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Written stage word count bar
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__wc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--space-xl);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+.chapter-workspace__wc-target {
+  color: var(--color-text-secondary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Written tab placeholder
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__coming-soon {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  text-align: center;
+  gap: var(--space-lg);
+}
+
+.chapter-workspace__coming-soon-icon {
+  font-size: 36px;
+  opacity: 0.25;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.chapter-workspace__coming-soon-text {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  letter-spacing: 0.3px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Loading state (artifact fetch)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__loading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}

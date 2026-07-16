@@ -1,0 +1,21 @@
+CHAPTER OUTLINE:
+{{chapter_slice}}
+
+EXPANDED OUTLINE:
+{{upstream_artifact}}
+
+{{#if story_variables}}
+STORY CONTEXT:
+{{story_variables}}
+{{/if}}
+
+{{#if continuity_context}}
+CONTINUITY (final paragraphs of preceding chapter):
+{{continuity_context}}
+{{/if}}
+
+CHAPTER TARGET: {{word_target}}
+
+{{output_format_contract}}
+
+Write the full chapter now:

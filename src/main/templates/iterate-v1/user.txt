@@ -1,0 +1,18 @@
+CURRENT DOCUMENT:
+{{current_artifact}}
+
+{{#if upstream_artifact}}
+UPSTREAM ARTIFACT (for grounding):
+{{upstream_artifact}}
+{{/if}}
+
+{{#if story_variables}}
+STORY CONTEXT:
+{{story_variables}}
+{{/if}}
+
+INSTRUCTION: {{instruction}}
+
+{{output_format_contract}}
+
+Generate the complete revised document now:
