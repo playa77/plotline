@@ -140,9 +140,17 @@ function backtrackLcs<T>(
         j--;
         break;
       default:
-        // Shouldn't happen at (0,0), but break out cleanly
-        i = 0;
-        j = 0;
+        // Exhausted the LCS path — flush any remaining unmatched
+        // elements at the boundary.  Remaining originals → deletions;
+        // remaining modifieds → insertions.
+        while (i > 0) {
+          result.push({ type: 'deleted' as const, aVal: a[i - 1] });
+          i--;
+        }
+        while (j > 0) {
+          result.push({ type: 'inserted' as const, bVal: b[j - 1] });
+          j--;
+        }
         break;
     }
   }
@@ -329,8 +337,15 @@ function diffBlockLists(
         j--;
         break;
       default:
-        i = 0;
-        j = 0;
+        // Flush remaining unmatched elements at the boundary.
+        while (i > 0) {
+          alignment.push({ type: 'deleted', origIdx: i - 1 });
+          i--;
+        }
+        while (j > 0) {
+          alignment.push({ type: 'inserted', modIdx: j - 1 });
+          j--;
+        }
         break;
     }
   }

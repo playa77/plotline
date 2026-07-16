@@ -9,6 +9,16 @@ versions follow the document suite version (currently `0.1.0-dev`).
 ## [0.1.0-dev] — unreleased
 
 ### Added
+- **2026-07-16** — WP-18: DiffView component — Side-by-side HTML diff review
+  component (`DiffView`) that renders `DiffResult` decorations from the shared
+  diff engine. Features: block-level color-coded rows (unchanged/inserted/
+  deleted/changed), word-level inline segment highlighting for changed blocks,
+  stats bar with color-coded counts, stickied "Current"/"Proposed" column
+  headers, configurable maxHeight with scroll. BEM stylesheet in
+  `diff-view.css` using design tokens. Also fixed LCS backtrack boundary
+  bug in `diffEngine.ts` (unmatched insertions/deletions at the alignment
+  edge were silently dropped) and added 30 acceptance tests in
+  `DiffService.test.ts`. (this commit)
 - **2026-07-16** — WP-00: Repository scaffold — Electron + React + TypeScript
   toolchain with Electron Forge + Vite plugin, Vitest, ESLint flat config,
   Prettier, strict TS config, and decision ledger (`DECISIONS.md`). Creates
