@@ -1,5 +1,0 @@
-name: Path Traversal Workflow
-steps:
-  - name: step1
-    prompt_file: "../secret.txt"
-    model: openai/gpt-4o

@@ -1,5 +1,0 @@
-name: Invalid Step Name Workflow
-steps:
-  - name: "step one"
-    prompt_file: prompts/step1.md
-    model: openai/gpt-4o

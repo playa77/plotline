@@ -1,8 +1,0 @@
-name: Duplicate Names Workflow
-steps:
-  - name: outline
-    prompt_file: prompts/step1.md
-    model: openai/gpt-4o
-  - name: outline
-    prompt_file: prompts/step2.md
-    model: anthropic/claude-3.5-sonnet
