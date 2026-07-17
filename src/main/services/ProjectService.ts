@@ -121,6 +121,11 @@ export class ProjectService {
     this.openProjects.set(projectId, service);
     this.currentProject = { id: projectId, service };
 
+    // Seed the 5 non-custom Story Variables (1 system + 4 builtins)
+    if (this.variableService) {
+      await this.variableService.seedBuiltins(projectId);
+    }
+
     return project;
   }
 
