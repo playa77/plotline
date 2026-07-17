@@ -19,6 +19,7 @@ import './styles/context-rail.css';
 import './styles/outline-workspace.css';
 import './styles/variable-workspace.css';
 import './styles/command-palette.css';
+import './styles/import-dialog.css';
 
 function App(): JSX.Element {
   return <AppShell />;

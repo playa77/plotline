@@ -77,7 +77,16 @@ export function SettingsWorkspace({
         const p = await invoke('project:open', { projectId });
         setProject(p);
         // Apply theme on load
-        document.documentElement.setAttribute('data-theme', p.settings.theme);
+        if (p.settings.theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        // Apply typography settings on load
+        if (p.settings.typography) {
+          document.documentElement.style.zoom = `${p.settings.typography.uiScale}%`;
+          document.documentElement.style.setProperty('--editor-font-size', `${p.settings.typography.editorFontSize}px`);
+        }
       } catch (err) {
         const e = err as { code?: string; message?: string; detail?: string };
         useToastStore.getState().error(e.code ?? 'SETTINGS_LOAD_ERROR', e.message ?? 'Failed to load project settings', e.detail);
@@ -152,7 +161,11 @@ export function SettingsWorkspace({
   const handleThemeChange = useCallback(
     (theme: string) => {
       if (theme !== 'dark' && theme !== 'light') return;
-      document.documentElement.setAttribute('data-theme', theme);
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
       saveSettings({ theme });
     },
     [saveSettings],
@@ -376,6 +389,52 @@ export function SettingsWorkspace({
               editor: { fontMode: fontMode as 'serif' | 'mono' },
             })}
           />
+        </Section>
+
+        {/* ═══ Typography ════════════════════════════════════════════════════ */}
+        <Section title="Typography">
+          <div className="settings-field">
+            <div className="settings-field__row">
+              <span className="settings-field__label">UI Scale</span>
+              <span className="settings-field__value">{s.typography.uiScale}%</span>
+            </div>
+            <input
+              type="range"
+              className="settings-slider"
+              min={90}
+              max={150}
+              step={5}
+              value={s.typography.uiScale}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                document.documentElement.style.zoom = `${value}%`;
+                saveSettings({
+                  typography: { uiScale: value, editorFontSize: s.typography.editorFontSize },
+                });
+              }}
+            />
+          </div>
+          <div className="settings-field">
+            <div className="settings-field__row">
+              <span className="settings-field__label">Editor Font Size</span>
+              <span className="settings-field__value">{s.typography.editorFontSize}px</span>
+            </div>
+            <input
+              type="range"
+              className="settings-slider"
+              min={16}
+              max={24}
+              step={1}
+              value={s.typography.editorFontSize}
+              onChange={(e) => {
+                const value = parseInt(e.target.value, 10);
+                document.documentElement.style.setProperty('--editor-font-size', `${value}px`);
+                saveSettings({
+                  typography: { uiScale: s.typography.uiScale, editorFontSize: value },
+                });
+              }}
+            />
+          </div>
         </Section>
 
         {/* ═══ Backup Remote ═════════════════════════════════════════════════ */}

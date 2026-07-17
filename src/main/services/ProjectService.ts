@@ -92,8 +92,9 @@ export class ProjectService {
           iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
         },
         inference: { baseUrl: 'https://openrouter.ai/api/v1' },
-        theme: 'dark',
+        theme: 'light',
         editor: { fontMode: 'serif' },
+        typography: { uiScale: 100, editorFontSize: 18 },
         backupRemote: null,
       },
       structure: [],
@@ -164,6 +165,9 @@ export class ProjectService {
 
     this.openProjects.set(projectId, service);
     this.currentProject = { id: projectId, service };
+
+    // Persist as the active project
+    await this.setActiveProject(projectId, project.title);
 
     return project;
   }
@@ -263,6 +267,82 @@ export class ProjectService {
     await fs.promises.writeFile(uiPath, JSON.stringify(state, null, 2), 'utf-8');
   }
 
+  // ── Ensure project is open (auto-create fallback) ──────────────────────────
+
+  /**
+   * Ensure a project exists on disk and is open in memory.
+   *
+   * - If the project directory already contains a `.git` repo, open it normally.
+   * - If it doesn't exist, create a fresh project with the given `projectId` and
+   *   `title`, initialized with default settings.
+   *
+   * This is used by import handlers so the user can import an outline from a
+   * cold start without first creating a project manually.
+   *
+   * @returns The StorageService for the now-open project.
+   */
+  private async ensureOpen(projectId: string, title: string): Promise<StorageService> {
+    // Already open? Return it immediately.
+    const existing = this.openProjects.get(projectId);
+    if (existing) return existing;
+
+    const dir = this.projectDir(projectId);
+
+    // Check if it exists on disk
+    try {
+      await fs.promises.access(path.join(dir, '.git'));
+      // Exists — open it normally
+      await this.open(projectId);
+      return this.openProjects.get(projectId)!;
+    } catch {
+      // Does not exist — create from scratch
+    }
+
+    await fs.promises.mkdir(dir, { recursive: true });
+    await git.init({ fs: fs as unknown as FsClient, dir });
+
+    const service = new StorageService(dir);
+    const now = new Date().toISOString();
+
+    const project = {
+      schemaVersion: 1 as const,
+      projectId,
+      title,
+      createdAt: now,
+      updatedAt: now,
+      settings: {
+        continuityContext: { enabled: true, words: 500 },
+        models: {
+          expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+          write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+          iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+        },
+        inference: { baseUrl: 'https://openrouter.ai/api/v1' },
+        theme: 'light' as const,
+        editor: { fontMode: 'serif' as const },
+        typography: { uiScale: 100, editorFontSize: 18 },
+        backupRemote: null,
+      },
+      structure: [],
+    };
+
+    const manifestJson = Buffer.from(JSON.stringify(project, null, 2), 'utf-8');
+    await service.commit('refs/heads/main', {
+      'project.json': manifestJson,
+    }, {
+      label: 'Initial project manifest',
+      kind: 'manual',
+    });
+
+    this.openProjects.set(projectId, service);
+    this.currentProject = { id: projectId, service };
+
+    // Persist as the active project
+    await this.setActiveProject(projectId, title);
+
+    return service;
+  }
+
   // ── Outline import ───────────────────────────────────────────────────────
 
   /**
@@ -274,9 +354,7 @@ export class ProjectService {
    * @throws If the project is not open.
    */
   async importOutlinePreview(projectId: string, markdown: string): Promise<ParsePreview> {
-    if (!this.openProjects.has(projectId)) {
-      throw new Error(`Project not open: ${projectId}`);
-    }
+    // parseOutlineMarkdown is a pure function — no project state needed
     return parseOutlineMarkdown(markdown);
   }
 
@@ -284,12 +362,14 @@ export class ProjectService {
    * Confirm an outline import: write `outline.json` and update `project.json`
    * structure, then commit both to `refs/heads/main`.
    *
-   * @throws If the project is not open.
+   * If the project is not yet open or doesn't exist on disk, it is
+   * auto-created so that the import flow works from a cold start.
    */
   async confirmImportOutline(projectId: string, preview: ParsePreview): Promise<void> {
-    const service = this.openProjects.get(projectId);
+    let service = this.openProjects.get(projectId);
     if (!service) {
-      throw new Error(`Project not open: ${projectId}`);
+      // Auto-create the project if it doesn't exist yet
+      service = await this.ensureOpen(projectId, preview.projectTitle);
     }
 
     // 1. Read current manifest
@@ -440,6 +520,36 @@ export class ProjectService {
   /** Expose the projects directory path (for debugging / tests). */
   getProjectsDir(): string {
     return this.projectsDir;
+  }
+
+  /**
+   * Read the active-project.json file to determine which project is active.
+   * Returns null if no active project has been recorded.
+   */
+  async getActiveProjectId(): Promise<{ projectId: string; title: string } | null> {
+    try {
+      const raw = await fs.promises.readFile(this.getActiveProjectPath(), 'utf-8');
+      return JSON.parse(raw) as { projectId: string; title: string };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write the active-project.json file to record the active project.
+   * The file is stored alongside (not inside) the projects directory.
+   */
+  async setActiveProject(projectId: string, title: string): Promise<void> {
+    await fs.promises.writeFile(
+      this.getActiveProjectPath(),
+      JSON.stringify({ projectId, title }, null, 2),
+      'utf-8',
+    );
+  }
+
+  /** Path to the active-project.json file (one level above projectsDir). */
+  private getActiveProjectPath(): string {
+    return path.join(path.dirname(this.projectsDir), 'active-project.json');
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

@@ -28,6 +28,9 @@ export interface ManuscriptTreeProps {
 
   /** Called when user clicks a chapter to select it. */
   onSelectChapter: (chapterId: string, title: string) => void;
+
+  /** Called when user wants to import an outline. */
+  onImportOutline?: () => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -75,6 +78,7 @@ export function ManuscriptTree({
   projectId = 'demo',
   selectedChapterId,
   onSelectChapter,
+  onImportOutline,
 }: ManuscriptTreeProps): JSX.Element {
   // Track which parts are collapsed (none by default)
   const [collapsedParts, setCollapsedParts] = useState<Set<string>>(new Set());
@@ -177,6 +181,16 @@ export function ManuscriptTree({
         No outline imported yet.
         <br />
         Use Import Outline to get started.
+        <br />
+        {onImportOutline && (
+          <button
+            type="button"
+            className="tree-empty__import-btn"
+            onClick={onImportOutline}
+          >
+            Import Outline
+          </button>
+        )}
       </div>
     );
   }

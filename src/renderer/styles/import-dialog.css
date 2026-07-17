@@ -1,0 +1,235 @@
+/**
+ * ImportDialog styles — overlay/modal for the outline import flow.
+ *
+ * Version: 0.1.0 | 2026-07-17
+ */
+
+/* ── Overlay ─────────────────────────────────────────────────────────────────── */
+
+.import-dialog__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* ── Dialog box ──────────────────────────────────────────────────────────────── */
+
+.import-dialog__box {
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--space-2xl);
+  background: var(--color-surface);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-chrome);
+  color: var(--color-text-primary);
+}
+
+/* ── Error banner ────────────────────────────────────────────────────────────── */
+
+.import-dialog__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-danger-muted);
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+}
+
+.import-dialog__error-text {
+  flex: 1;
+}
+
+.import-dialog__error-dismiss {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  border-radius: 4px;
+}
+
+.import-dialog__error-dismiss:hover {
+  background: var(--color-bg-hover);
+}
+
+/* ── Heading & description ───────────────────────────────────────────────────── */
+
+.import-dialog__heading {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.import-dialog__description {
+  margin: 0 0 var(--space-xl);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+
+.import-dialog__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md) var(--space-xl);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+}
+
+.import-dialog__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.import-dialog__btn--primary {
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border: 1px solid var(--color-accent);
+}
+
+.import-dialog__btn--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.import-dialog__btn--secondary {
+  background: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
+}
+
+.import-dialog__btn--secondary:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+}
+
+/* ── Link button (secondary action) ──────────────────────────────────────────── */
+
+.import-dialog__link-btn {
+  display: block;
+  margin-top: var(--space-md);
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.import-dialog__link-btn:hover {
+  color: var(--color-accent-hover);
+}
+
+/* ── Textarea ────────────────────────────────────────────────────────────────── */
+
+.import-dialog__textarea {
+  display: block;
+  width: 100%;
+  min-height: 160px;
+  padding: var(--space-lg);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.import-dialog__textarea:focus {
+  border-color: var(--color-accent);
+}
+
+.import-dialog__textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ── Action row ──────────────────────────────────────────────────────────────── */
+
+.import-dialog__actions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+/* ── Preview list ────────────────────────────────────────────────────────────── */
+
+.import-dialog__preview-list {
+  margin: var(--space-xl) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.import-dialog__preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.import-dialog__preview-item:last-child {
+  border-bottom: none;
+}
+
+.import-dialog__preview-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.import-dialog__preview-value {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+/* ── Project title in preview ────────────────────────────────────────────────── */
+
+.import-dialog__project-title {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--color-accent);
+}
+
+/* ── Loading state ───────────────────────────────────────────────────────────── */
+
+.import-dialog__loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

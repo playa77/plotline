@@ -29,6 +29,8 @@ export interface WorkspaceSelection {
 
 export interface WorkspaceProps {
   selection: WorkspaceSelection;
+  projectId: string;
+  onImportOutline?: () => void;
 }
 
 // ── Mock Outline ───────────────────────────────────────────────────────────────
@@ -85,7 +87,7 @@ const mockOutline = buildMockOutline();
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function Workspace({ selection }: WorkspaceProps): JSX.Element {
+export function Workspace({ selection, projectId, onImportOutline }: WorkspaceProps): JSX.Element {
   switch (selection.type) {
     case 'none':
       return (
@@ -96,6 +98,13 @@ export function Workspace({ selection }: WorkspaceProps): JSX.Element {
               Choose a chapter from the manuscript tree on the left to begin
               writing or expanding.
             </div>
+            <button
+              type="button"
+              className="workspace-empty__import-btn"
+              onClick={onImportOutline}
+            >
+              Import Outline
+            </button>
           </div>
         </div>
       );
@@ -106,20 +115,22 @@ export function Workspace({ selection }: WorkspaceProps): JSX.Element {
           onMutate={(mutations) => {
             console.log('[Workspace] Outline mutations:', mutations);
           }}
+          onImportOutline={onImportOutline}
         />
       );
     case 'chapter':
       return (
         <ChapterWorkspace
-          projectId="demo"
+          projectId={projectId}
           chapterId={selection.chapterId!}
           chapterTitle={selection.chapterTitle!}
           wordTarget={{ min: 7000, max: 8000 }}
+          onImportOutline={onImportOutline}
         />
       );
     case 'variables':
-      return <VariableWorkspace projectId="demo" />;
+      return <VariableWorkspace projectId={projectId} />;
     case 'settings':
-      return <SettingsWorkspace projectId="demo" />;
+      return <SettingsWorkspace projectId={projectId} />;
   }
 }

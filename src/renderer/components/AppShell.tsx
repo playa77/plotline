@@ -18,6 +18,7 @@ import { Workspace } from './Workspace';
 import type { WorkspaceSelection } from './Workspace';
 import { ContextRail } from './ContextRail';
 import { CommandPalette } from './CommandPalette';
+import { ImportDialog } from './ImportDialog';
 import { Toast } from './Toast';
 
 import {
@@ -106,6 +107,32 @@ export function AppShell(): JSX.Element {
 
   // Command palette state
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Import dialog state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+
+  // Project identity — loaded from IPC on mount
+  const [projectId, setProjectId] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+
+  // Load the active project on mount
+  useEffect(() => {
+    invoke('project:getActive', {})
+      .then((active) => {
+        if (active) {
+          setProjectId(active.projectId);
+        } else {
+          setProjectId('');
+        }
+      })
+      .catch((err) => {
+        console.warn('[AppShell] Failed to load active project:', err);
+        setProjectId('');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   // Store hooks
   const genStore = useGenerationStore();
@@ -213,6 +240,30 @@ export function AppShell(): JSX.Element {
     });
   }, []);
 
+  // ── Project create / open ──────────────────────────────────────────────────
+
+  const handleCreateProject = useCallback(async () => {
+    try {
+      const project = await invoke('project:create', { title: 'Untitled Project' });
+      setProjectId(project.projectId);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      useToastStore.getState().error('PROJECT_ERROR', 'Failed to create project', e.message);
+    }
+  }, []);
+
+  const handleOpenProject = useCallback(async () => {
+    const input = window.prompt('Enter the project ID to open:');
+    if (!input || !input.trim()) return;
+    try {
+      const project = await invoke('project:open', { projectId: input.trim() });
+      setProjectId(project.projectId);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      useToastStore.getState().error('PROJECT_ERROR', 'Failed to open project', e.message);
+    }
+  }, []);
+
   // ── Compute effective right width ────────────────────────────────────────────
 
   const effectiveRightWidth = railCollapsed ? 36 : rightWidth;
@@ -221,7 +272,7 @@ export function AppShell(): JSX.Element {
 
   const actionContext: ActionContext = useMemo(
     () => ({
-      projectId: 'demo',
+      projectId,
       chapterId: selectedChapterId,
       selection,
       genStatus: genStore.status,
@@ -271,7 +322,7 @@ export function AppShell(): JSX.Element {
       expand: async () => {
         try {
           if (selectedChapterId)
-            await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId });
+            await invoke('generate:expand', { projectId, chapterId: selectedChapterId });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Expand failed', e.detail);
@@ -281,7 +332,7 @@ export function AppShell(): JSX.Element {
       reExpand: async () => {
         try {
           if (selectedChapterId)
-            await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId, asNewVersion: undefined });
+            await invoke('generate:expand', { projectId, chapterId: selectedChapterId, asNewVersion: undefined });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Re-expand failed', e.detail);
@@ -291,7 +342,7 @@ export function AppShell(): JSX.Element {
       write: async () => {
         try {
           if (selectedChapterId)
-            await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+            await invoke('generate:write', { projectId, chapterId: selectedChapterId });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Write failed', e.detail);
@@ -301,7 +352,7 @@ export function AppShell(): JSX.Element {
       reWrite: async () => {
         try {
           if (selectedChapterId)
-            await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+            await invoke('generate:write', { projectId, chapterId: selectedChapterId });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Re-write failed', e.detail);
@@ -331,7 +382,7 @@ export function AppShell(): JSX.Element {
 
       createVersion: async (name) => {
         try {
-          await versionStore.createVersion('demo', selectedChapterId ?? '', name);
+          await versionStore.createVersion(projectId, selectedChapterId ?? '', name);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Create version failed', e.detail);
@@ -339,7 +390,7 @@ export function AppShell(): JSX.Element {
       },
       selectVersion: async (slug) => {
         try {
-          await versionStore.selectVersion('demo', selectedChapterId ?? '', slug);
+          await versionStore.selectVersion(projectId, selectedChapterId ?? '', slug);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Select version failed', e.detail);
@@ -347,7 +398,7 @@ export function AppShell(): JSX.Element {
       },
       renameVersion: async (slug, newName) => {
         try {
-          await versionStore.renameVersion('demo', selectedChapterId ?? '', slug, newName);
+          await versionStore.renameVersion(projectId, selectedChapterId ?? '', slug, newName);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Rename version failed', e.detail);
@@ -355,7 +406,7 @@ export function AppShell(): JSX.Element {
       },
       archiveVersion: async (slug) => {
         try {
-          await versionStore.archiveVersion('demo', selectedChapterId ?? '', slug);
+          await versionStore.archiveVersion(projectId, selectedChapterId ?? '', slug);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Archive version failed', e.detail);
@@ -365,7 +416,7 @@ export function AppShell(): JSX.Element {
       restoreRevision: async (sha) => {
         try {
           if (selectedChapterId)
-            await invoke('history:restore', { projectId: 'demo', ref: selectedChapterId, sha });
+            await invoke('history:restore', { projectId: projectId, ref: selectedChapterId, sha });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Restore revision failed', e.detail);
@@ -374,7 +425,7 @@ export function AppShell(): JSX.Element {
 
       createVariable: async (name) => {
         try {
-          await variableStore.createVariable('demo', name);
+          await variableStore.createVariable(projectId, name);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Create variable failed', e.detail);
@@ -382,7 +433,7 @@ export function AppShell(): JSX.Element {
       },
       setVariableActive: async (id, active) => {
         try {
-          await variableStore.toggleActive('demo', id, active);
+          await variableStore.toggleActive(projectId, id, active);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Toggle variable failed', e.detail);
@@ -390,7 +441,7 @@ export function AppShell(): JSX.Element {
       },
       setVariableScope: async (id, scope) => {
         try {
-          await variableStore.updateScope('demo', id, scope);
+          await variableStore.updateScope(projectId, id, scope);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Update variable scope failed', e.detail);
@@ -399,7 +450,7 @@ export function AppShell(): JSX.Element {
 
       addCard: async (variableId, title) => {
         try {
-          await variableStore.addCard('demo', title);
+          await variableStore.addCard(projectId, title);
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Add card failed', e.detail);
@@ -409,7 +460,7 @@ export function AppShell(): JSX.Element {
       acceptProposal: async () => {
         try {
           const jobId = genStore.activeJob?.jobId;
-          if (jobId) await invoke('iterate:accept', { projectId: 'demo', jobId });
+          if (jobId) await invoke('iterate:accept', { projectId: projectId, jobId });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'ITERATE_ERROR', e.message ?? 'Accept proposal failed', e.detail);
@@ -430,7 +481,7 @@ export function AppShell(): JSX.Element {
         try {
           const jobId = genStore.activeJob?.jobId;
           if (jobId)
-            await invoke('iterate:acceptAsVersion', { projectId: 'demo', jobId, versionName: name });
+            await invoke('iterate:acceptAsVersion', { projectId: projectId, jobId, versionName: name });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'ITERATE_ERROR', e.message ?? 'Accept as version failed', e.detail);
@@ -440,7 +491,7 @@ export function AppShell(): JSX.Element {
       exportSubstack: async () => {
         try {
           if (selectedChapterId)
-            await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'clipboard' });
+            await invoke('export:substack', { projectId: projectId, chapterId: selectedChapterId, mode: 'clipboard' });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export to Substack failed', e.detail);
@@ -450,7 +501,7 @@ export function AppShell(): JSX.Element {
       exportHtml: async () => {
         try {
           if (selectedChapterId)
-            await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'file', filePath: '' });
+            await invoke('export:substack', { projectId: projectId, chapterId: selectedChapterId, mode: 'file', filePath: '' });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export HTML failed', e.detail);
@@ -460,7 +511,7 @@ export function AppShell(): JSX.Element {
       exportMarkdownChapter: async () => {
         try {
           if (selectedChapterId)
-            await invoke('export:markdown', { projectId: 'demo', scope: 'chapter', chapterId: selectedChapterId, filePath: '' });
+            await invoke('export:markdown', { projectId: projectId, scope: 'chapter', chapterId: selectedChapterId, filePath: '' });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export markdown chapter failed', e.detail);
@@ -469,7 +520,7 @@ export function AppShell(): JSX.Element {
 
       exportMarkdownBook: async () => {
         try {
-          await invoke('export:markdown', { projectId: 'demo', scope: 'book', filePath: '' });
+          await invoke('export:markdown', { projectId: projectId, scope: 'book', filePath: '' });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export markdown book failed', e.detail);
@@ -478,7 +529,7 @@ export function AppShell(): JSX.Element {
 
       exportPdf: async () => {
         try {
-          await invoke('export:pdf', { projectId: 'demo', templateId: 'trade-paperback', chapterIds: 'all', options: {}, outputPath: '' });
+          await invoke('export:pdf', { projectId: projectId, templateId: 'trade-paperback', chapterIds: 'all', options: {}, outputPath: '' });
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export PDF failed', e.detail);
@@ -486,6 +537,8 @@ export function AppShell(): JSX.Element {
       },
 
       promptInput: (placeholder) => window.prompt(placeholder),
+
+      importOutline: () => setImportDialogOpen(true),
     }),
     [
       selectedChapterId,
@@ -499,6 +552,43 @@ export function AppShell(): JSX.Element {
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
+  // Loading state while IPC fetch is in-flight
+  if (loading) {
+    return (
+      <div className="app-shell app-shell--loading">
+        <div className="app-shell__loading-text">Loading…</div>
+      </div>
+    );
+  }
+
+  // Welcome screen when no project is active
+  if (!projectId) {
+    return (
+      <div className="app-shell app-shell--welcome">
+        <div className="welcome-screen">
+          <h1 className="welcome-screen__title">Plotline</h1>
+          <p className="welcome-screen__subtitle">Write your book, chapter by chapter.</p>
+          <div className="welcome-screen__actions">
+            <button
+              type="button"
+              className="welcome-screen__btn welcome-screen__btn--primary"
+              onClick={handleCreateProject}
+            >
+              New Project
+            </button>
+            <button
+              type="button"
+              className="welcome-screen__btn"
+              onClick={handleOpenProject}
+            >
+              Open Project
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`app-shell${resizeTarget ? ' app-shell--resizing' : ''}`}
@@ -508,9 +598,10 @@ export function AppShell(): JSX.Element {
         <div className="library-pane__tree">
           <ManuscriptTree
             parts={demoParts}
-            projectId="demo"
+            projectId={projectId}
             selectedChapterId={selectedChapterId}
             onSelectChapter={handleSelectChapter}
+            onImportOutline={() => setImportDialogOpen(true)}
           />
         </div>
         <div className="library-pane__actions">
@@ -553,7 +644,7 @@ export function AppShell(): JSX.Element {
 
       {/* ── Workspace pane (center) ──────────────────────────── */}
       <main className="workspace-pane">
-        <Workspace selection={selection} />
+        <Workspace selection={selection} projectId={projectId} onImportOutline={() => setImportDialogOpen(true)} />
       </main>
 
       {/* ── Resize handle: center / right ────────────────────── */}
@@ -567,7 +658,7 @@ export function AppShell(): JSX.Element {
         <ContextRail
           collapsed={railCollapsed}
           onToggleCollapse={handleToggleRail}
-          projectId="demo"
+          projectId={projectId}
           chapterId={selectedChapterId ?? undefined}
         />
       </aside>
@@ -577,6 +668,16 @@ export function AppShell(): JSX.Element {
           open={paletteOpen}
           actions={getAvailableActions(actionContext, actionCallbacks)}
           onClose={() => setPaletteOpen(false)}
+        />
+      )}
+
+      {importDialogOpen && (
+        <ImportDialog
+          projectId={projectId}
+          onClose={() => setImportDialogOpen(false)}
+          onImported={() => {
+            setImportDialogOpen(false);
+          }}
         />
       )}
 

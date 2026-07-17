@@ -104,7 +104,7 @@
 
 .settings-section__chevron {
   display: inline-block;
-  font-size: 8px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   transition: transform var(--transition-fast);
   width: 12px;
@@ -403,4 +403,40 @@
 
 .settings-radio__input:focus-visible ~ .settings-radio__dot {
   box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Range slider
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-hover);
+  outline: none;
+  cursor: pointer;
+  margin: var(--space-sm) 0;
+}
+
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
+}
+
+.settings-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  border: 2px solid var(--color-surface);
 }

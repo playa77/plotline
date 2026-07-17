@@ -35,6 +35,34 @@
   font-size: var(--font-size-md);
   color: var(--color-text-muted);
   line-height: 1.7;
+  margin-bottom: var(--space-xl);
+}
+
+/* ── Workspace empty state import button ───────────────────────────── */
+
+.workspace-empty__import-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md) var(--space-xl);
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.workspace-empty__import-btn:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 16px var(--color-accent-muted);
+}
+
+.workspace-empty__import-btn:active {
+  transform: scale(0.98);
 }
 
 /* ── Workspace placeholder (for views not yet built) ──────────────── */

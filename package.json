@@ -1,7 +1,7 @@
 {
   "name": "plotline",
   "productName": "Plotline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Distraction-free long-form writing for Substack",
   "main": ".vite/build/index.js",
   "scripts": {

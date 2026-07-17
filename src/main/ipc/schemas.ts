@@ -53,6 +53,10 @@ export const UpdateSettingsRequestSchema = z.object({
     editor: z.object({
       fontMode: z.enum(['serif', 'mono']).optional(),
     }).optional(),
+    typography: z.object({
+      uiScale: z.number().min(90).max(150).optional(),
+      editorFontSize: z.number().min(16).max(24).optional(),
+    }).optional(),
     backupRemote: z.string().url().nullable().optional(),
   }),
 });
@@ -68,6 +72,14 @@ export const ConfirmImportRequestSchema: z.ZodType<IpcCommandMap['project:confir
   projectId: z.string().min(1, 'Project ID is required'),
   preview: z.custom<ParsePreview>((v) => v != null, { message: 'preview is required' }),
 });
+
+/** Validates project:pickAndImportOutline request. */
+export const PickAndImportOutlineRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+});
+
+/** Validates project:getActive request. */
+export const GetActiveProjectRequestSchema = z.object({});
 
 /** Validates outline:get request. */
 export const OutlineGetRequestSchema = z.object({

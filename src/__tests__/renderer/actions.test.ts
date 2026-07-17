@@ -76,6 +76,7 @@ function makeCallbacks(overrides: Partial<ActionCallbacks> = {}): ActionCallback
     exportMarkdownChapter: vi.fn(),
     exportMarkdownBook: vi.fn(),
     exportPdf: vi.fn(),
+    importOutline: vi.fn(),
     promptInput: vi.fn(),
     ...overrides,
   };

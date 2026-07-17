@@ -37,6 +37,7 @@ export interface ChapterWorkspaceProps {
   chapterId: string;
   chapterTitle: string;
   wordTarget?: { min: number; max: number } | null;
+  onImportOutline?: () => void;
 }
 
 // ── Dot class map ──────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export function ChapterWorkspace({
   chapterId,
   chapterTitle,
   wordTarget = null,
+  onImportOutline,
 }: ChapterWorkspaceProps): JSX.Element {
   // ── Local state ──────────────────────────────────────────────────────────
 
@@ -423,6 +425,13 @@ export function ChapterWorkspace({
             Select a chapter from the manuscript tree to view its outline,
             or import an outline to get started.
           </div>
+          <button
+            type="button"
+            className="chapter-workspace__empty-import-btn"
+            onClick={onImportOutline}
+          >
+            Import Outline
+          </button>
         </div>
       );
     }

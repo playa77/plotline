@@ -163,6 +163,33 @@
   margin-bottom: var(--space-2xl);
 }
 
+/* ── Empty state import button ────────────────────────────────────────────────── */
+
+.chapter-workspace__empty-import-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md) var(--space-xl);
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.chapter-workspace__empty-import-btn:hover {
+  background: var(--color-accent-hover);
+  box-shadow: 0 0 16px var(--color-accent-muted);
+}
+
+.chapter-workspace__empty-import-btn:active {
+  transform: scale(0.98);
+}
+
 /* ── Expand button group layout ──────────────────────────────────────────────── */
 
 .chapter-workspace__expand-group {
@@ -440,7 +467,7 @@
   background: var(--color-accent);
   color: var(--color-bg-primary);
   cursor: pointer;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   transition: background var(--transition-fast);
 }
 

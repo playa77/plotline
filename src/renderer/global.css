@@ -14,9 +14,9 @@ body,
 }
 
 body {
-  font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
+  font-family: var(--font-chrome);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }

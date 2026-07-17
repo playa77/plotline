@@ -6,15 +6,19 @@
  *
  * Version: 0.1.0 | 2026-07-16
  */
+import { dialog } from 'electron';
+import fs from 'node:fs';
 import { registerCommand } from '../registry';
 import {
   ImportOutlineRequestSchema,
   ConfirmImportRequestSchema,
+  PickAndImportOutlineRequestSchema,
   OutlineGetRequestSchema,
   OutlineMutateRequestSchema,
 } from '../schemas';
 import type { ProjectService } from '../../services/ProjectService';
 import type { StalenessService } from '../../services/StalenessService';
+import { parseOutlineMarkdown } from '../../services/outlineImporter';
 
 /**
  * Register all outline import handlers.
@@ -52,6 +56,30 @@ export function registerOutlineHandlers(
       // Outline import changes outline.json → invalidate all staleness
       stalenessService?.invalidateAll();
       return { ok: true };
+    },
+  );
+
+  // ── project:pickAndImportOutline ───────────────────────────────────
+  registerCommand(
+    'project:pickAndImportOutline',
+    PickAndImportOutlineRequestSchema,
+    async (_payload) => {
+      const result = await dialog.showOpenDialog({
+        title: 'Import Outline',
+        filters: [
+          { name: 'Markdown', extensions: ['md'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+        properties: ['openFile'],
+      });
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+      const filePath = result.filePaths[0];
+      if (!filePath) return null;
+      const markdown = fs.readFileSync(filePath, 'utf-8');
+      const preview = parseOutlineMarkdown(markdown);
+      return preview;
     },
   );
 

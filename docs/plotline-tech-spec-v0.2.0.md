@@ -1,11 +1,15 @@
 # Plotline — Technical Specification
 
 **Document:** 2 of 4 (Design Doc → **Tech Spec** → Roadmap → README)
-**Version:** v0.1.0
-**Date:** 2026-07-16
-**Status:** Draft for review
-**Depends on:** Design Doc v0.1.0 (its section numbers are referenced as DD §n)
+**Version:** v0.2.0
+**Date:** 2026-07-17
+**Status:** Active
+**Depends on:** Design Doc v0.3.0 (its section numbers are referenced as DD §n)
 **Audience:** Coding agent. This document defines *what* to build and the contracts between parts. Library and syntax choices are the agent's unless explicitly constrained.
+
+**Changelog**
+- **v0.2.0 (2026-07-17):** Additive, consuming DD v0.3.0: `settings.typography` in the manifest schema (§3.1); `project:pickAndImportOutline` IPC command for the native-file-picker import path (§7.1). No architectural change.
+- **v0.1.0 (2026-07-16):** Initial draft.
 
 ## 0. Decision Carry-Forward
 
@@ -118,6 +122,8 @@ Schemas are normative in shape; the agent chooses the validation mechanism (zod,
   settings: {
     continuityContext: { enabled: boolean, words: number },   // T1
     models: { expand: ModelRef, write: ModelRef, iterate: ModelRef },
+    typography: { uiScale: number /* 0.9–1.5, default 1.0 */,
+                  editorFontSize: number /* 16–24 px, default 19 */ },  // v0.2.0, DD §9
     inference: { baseUrl: string }                             // key NOT here — keychain, §9
   },
   structure: [                       // ordered; renders the manuscript tree
@@ -323,7 +329,8 @@ Namespaced request/response commands plus one-way events. All payloads validated
 | Command | Request → Response (essentials) |
 |---|---|
 | `project:create` / `project:open` / `project:list` / `project:close` | path/title → manifest |
-| `project:importOutline` | markdown text → ParsePreview; `project:confirmImport(preview)` → committed |
+| `project:importOutline` | markdown text (paste path) → ParsePreview; `project:confirmImport(preview)` → committed |
+| `project:pickAndImportOutline` | *(v0.2.0)* opens native file dialog in main, reads the chosen `.md`, → ParsePreview (same confirm flow); cancel → `{code: "user-cancelled"}` |
 | `outline:get` | → outline.json |
 | `outline:mutate` | structured op (add/move/edit/delete at part/chapter/section/beat level) → new outline + affected staleness |
 | `chapter:getArtifact` | chapterRef, stage → {html, meta, stale} |

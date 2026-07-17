@@ -62,10 +62,19 @@ export interface IpcCommandMap {
         inference?: { baseUrl?: string };
         theme?: 'dark' | 'light';
         editor?: { fontMode?: 'serif' | 'mono' };
+        typography?: { uiScale?: number; editorFontSize?: number };
         backupRemote?: string | null;
       };
     };
     response: Project;
+  };
+  'project:getActive': {
+    request: {};
+    response: { projectId: string; title: string } | null;
+  };
+  'project:pickAndImportOutline': {
+    request: { projectId: string };
+    response: ParsePreview | null;
   };
   'project:importOutline': {
     request: { projectId: string; markdown: string };

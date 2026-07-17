@@ -1,14 +1,15 @@
 # Plotline — Granular Roadmap
 
 **Document:** 3 of 4 (Design Doc → Tech Spec → **Roadmap** → README)
-**Version:** v0.2.0
+**Version:** v0.3.0
 **Date:** 2026-07-17
 **Status:** Active
-**Depends on:** Design Doc **v0.2.0** (DD), Technical Specification v0.1.0 (TS)
+**Depends on:** Design Doc **v0.3.0** (DD), Technical Specification **v0.2.0** (TS)
 
 **Changelog**
-- **v0.2.0 (2026-07-17):** Milestone **M6 — Visual Remediation** added (WP-31–WP-33, gate G-M6) with a contrast-verified reference token set. Context: WP-00–WP-30 are fully implemented; the DD v0.2.0 §9 rewrite therefore executes against a shipped codebase and targets app release **0.2.0**. Process note: milestone gates are **owner-present** by definition (§0); if the initial build cleared gates unattended, that is a harness defect to be fixed alongside M6 — G-M6 does not proceed without the owner.
-- **v0.1.1 (2026-07-17):** WP-07 and WP-09 amended to consume DD v0.2.0 §9 (proportional chrome type, light-theme default, automated WCAG contrast assertions). If WP-07/WP-09 are already implemented, the amendment is executed as remediation before the next gate.
+- **v0.3.0 (2026-07-17):** **WP-34 (Import UI)** and **WP-35 (Typography & accessibility settings)** added to M6; WP-33 re-scoped to depend on them; G-M6 unchanged in spirit but now covers the full set. Root-cause note: WP-06's AC were backend-only and no WP owned the import *UI* — the sole safety net was WP-30's manual F1 check, which was executed unattended. New process rule in §0: **manual acceptance criteria may only be checked off by the owner, never by the agent.**
+- **v0.2.0 (2026-07-17):** Milestone **M6 — Visual Remediation** added (WP-31–WP-33, gate G-M6) with a contrast-verified reference token set. Context: WP-00–WP-30 are fully implemented; the DD v0.2.0 §9 rewrite therefore executes against a shipped codebase and targets app release **0.2.0**. Gates are owner-present by definition.
+- **v0.1.1 (2026-07-17):** WP-07 and WP-09 amended to consume DD v0.2.0 §9.
 - **v0.1.0 (2026-07-16):** Initial plan.
 **Audience:** Coding agent, executing sequentially from a blank repository.
 
@@ -18,7 +19,7 @@
 
 **Sequence.** Work packages (WP) execute in numeric order unless a `Depends` line permits parallelism. Do not start a WP whose dependencies are not accepted.
 
-**Definition of Done, every WP.** (1) All acceptance criteria (AC) pass as automated tests where the AC is testable, or as a demonstrated manual check where it is UI-visual. (2) Type-checks and lints clean. (3) No TODOs referencing the WP's own scope. (4) One commit or PR per WP, message `WP-NN: <title>`, body listing AC status.
+**Definition of Done, every WP.** (1) All acceptance criteria (AC) pass as automated tests where the AC is testable, or as a demonstrated manual check where it is UI-visual. (2) Type-checks and lints clean. (3) No TODOs referencing the WP's own scope. (4) One commit or PR per WP, message `WP-NN: <title>`, body listing AC status. (5) *(v0.3.0)* **Manual ACs are owner-only:** the agent marks them `PENDING-OWNER`, never `PASS`. A WP with pending manual ACs may be built upon but is not Done, and no release WP may complete while any `PENDING-OWNER` item exists.
 
 **Milestone gates.** Each milestone ends in a review gate (G-Mn) — a stop point producing a short audit pack: what was built, deviations from spec (each tagged R1/R2/R3), open risks, and a runnable demo path. The agent halts at gates for owner approval. Deviating from DD/TS mid-WP without logging it in the audit pack is a process violation.
 
@@ -263,13 +264,23 @@ Editor content per amended WP-09 AC: ≥ 18 px serif, line-height ≈ 1.6, 60–
 **AC:** amended WP-09 AC pass; WP-18 diff golden fixtures re-rendered and legible in both themes; measure holds from 900 px to full-screen; tree rows ≥ 13 px verified.
 **Depends:** WP-31.
 
-### WP-33 — Regression sweep & release 0.2.0
-Full e2e re-run (including the one-click contract test and staleness matrix — typography changes must be behaviorally inert), empty/error-state visual sweep in both themes per WP-28 checklist, perf spot-check (TS §8.1 targets unaffected), `CHANGELOG.md` entry, version bump to `0.2.0`, tag.
-**AC:** F1–F6 pass on a clean machine; CI fully green including the new contrast suite; app reports `0.2.0` everywhere.
-**Depends:** WP-32.
+### WP-34 — Import UI *(added v0.3.0 — closes the dead-instruction defect)*
+Build the renderer side of the import pipeline per DD v0.3.0 §4: implement `project:pickAndImportOutline` (TS v0.2.0 §7.1, native file dialog in main); import dialog with file-picker primary + paste-markdown fallback; **ParsePreview rendering** (parts/chapters/sections with word targets and per-level counts, Confirm/Cancel); wire it into all three affordance points — New Project flow step, every empty state currently naming import (as real buttons), and a command palette action; on Confirm call `project:confirmImport` and route to the populated tree.
+**AC:** e2e *through the actual UI*: launch → New Project → Import → pick the LKY fixture file → preview asserts "4 parts · 11 chapters" and correct targets → Confirm → manuscript tree populates (this replaces the IPC-driven import step in the F1/one-click e2e — the e2e now exercises the UI path); paste-fallback e2e with the same fixture as a string; cancel at both dialog stages commits nothing (repo ref-set unchanged); **dead-instruction audit**: a test walks every empty state and asserts any "import" mention has an adjacent functional control; palette entry invokes the same action object as the buttons (no parallel code path).
+**Depends:** none within M6 (may run parallel to WP-31/32). Blocks G-M6.
 
-### 🔒 Gate G-M6 — the eyesight gate
-Owner-present, non-delegable: the owner reads a full generated chapter in the app for 15 uninterrupted minutes — the actual defect under test. Sign-off releases 0.2.0.
+### WP-35 — Typography & accessibility settings *(added v0.3.0)*
+Implement DD v0.3.0 §9 user typography controls: `settings.typography` schema (TS v0.2.0 §3.1) with migration defaulting existing projects to `{uiScale: 1.0, editorFontSize: 19}`; Settings UI with the two controls; live application without restart (chrome scale via root token multiplication, editor size via editor tokens); floor validation — no control position may render below DD minima, asserted against the token set at the range extremes; `Cmd/Ctrl +/−/0` bindings for editor text size when editor is focused.
+**AC:** settings round-trip and migrate; floor assertions in CI at `uiScale: 0.9` and `editorFontSize: 16`; live-change test (no reload event fired); keybindings don't collide with the WP-26 map (conflict test extended).
+**Depends:** WP-31 (tokens). Blocks G-M6.
+
+### WP-33 — Regression sweep & release 0.2.0 *(re-scoped v0.3.0)*
+Full e2e re-run (one-click contract now via the WP-34 UI path, staleness matrix — typography changes must be behaviorally inert), empty/error-state visual sweep in both themes per WP-28 checklist **plus the dead-instruction audit repo-wide**, perf spot-check (TS §8.1 targets unaffected), `CHANGELOG.md` entry, version bump to `0.2.0`, tag.
+**AC:** F1–F6 marked `PENDING-OWNER` (manual, per §0 rule 5); CI fully green including contrast suite and dead-instruction audit; app reports `0.2.0` everywhere; release blocked until all `PENDING-OWNER` items are owner-checked.
+**Depends:** WP-32, WP-34, WP-35.
+
+### 🔒 Gate G-M6 — the eyesight gate *(scope extended v0.3.0)*
+Owner-present, non-delegable. The owner: (1) imports a real outline through the UI from a cold start, (2) runs the two-click pipeline on one chapter, (3) reads a full generated chapter in the app for 15 uninterrupted minutes, (4) adjusts UI scale and editor text size and confirms they behave. Sign-off clears all `PENDING-OWNER` items and releases 0.2.0.
 
 ---
 
@@ -282,7 +293,7 @@ M2: 11 → 12 → 13 → 14 → 15 → 16
 M3: 17 → 19,21 ; 18 (after 09) → 19,22 ; 20 (after 16) ; 21 → 22
 M4: 23 → 24 → 25
 M5: 26,27 → 28 → 29 → 30
-M6: 31 → 32 → 33   (remediation; runs against the completed codebase)
+M6: 31 → 32 → 33 ; 34 (parallel) → 33 ; 35 (after 31) → 33   (remediation; runs against the completed codebase)
 ```
 
 Critical path: 00-03 → 05-06 → 09 → 11-16 → 17 → 21 → 28-30.

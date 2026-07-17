@@ -15,6 +15,7 @@ import {
   ListProjectsRequestSchema,
   CloseProjectRequestSchema,
   UpdateSettingsRequestSchema,
+  GetActiveProjectRequestSchema,
 } from '../schemas';
 import type { ProjectService } from '../../services/ProjectService';
 import type { Project } from '../../../shared/schemas/project';
@@ -33,6 +34,8 @@ export function registerProjectHandlers(projectService: ProjectService): void {
     CreateProjectRequestSchema,
     async (payload, window: BrowserWindow) => {
       const project = await projectService.create(payload.title);
+      // Persist as the active project so it re-opens on next launch
+      await projectService.setActiveProject(project.projectId, project.title);
       emitEvent(window, 'project:changed', {
         projectId: project.projectId,
         action: 'opened',
@@ -47,6 +50,8 @@ export function registerProjectHandlers(projectService: ProjectService): void {
     OpenProjectRequestSchema,
     async (payload, window: BrowserWindow) => {
       const project = await projectService.open(payload.projectId);
+      // Persist as the active project
+      await projectService.setActiveProject(project.projectId, project.title);
       emitEvent(window, 'project:changed', {
         projectId: project.projectId,
         action: 'opened',
@@ -91,6 +96,15 @@ export function registerProjectHandlers(projectService: ProjectService): void {
         payload.settings as Partial<Project['settings']>,
       );
       return updated;
+    },
+  );
+
+  // ── project:getActive ────────────────────────────────────────────
+  registerCommand(
+    'project:getActive',
+    GetActiveProjectRequestSchema,
+    async () => {
+      return projectService.getActiveProjectId();
     },
   );
 }

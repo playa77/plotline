@@ -87,9 +87,13 @@ const ProjectSettingsSchema = z.object({
   inference: z.object({
     baseUrl: z.string().url(),
   }),
-  theme: z.enum(['dark', 'light']).default('dark'),
+  theme: z.enum(['dark', 'light']).default('light'),
   editor: z.object({
     fontMode: z.enum(['serif', 'mono']).default('serif'),
+  }).default({}),
+  typography: z.object({
+    uiScale: z.number().min(90).max(150).default(100),
+    editorFontSize: z.number().min(16).max(24).default(18),
   }).default({}),
   backupRemote: z.string().url().nullable().default(null),
 });

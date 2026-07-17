@@ -36,6 +36,7 @@ function createMockProject(overrides?: Partial<Project>): Project {
       inference: { baseUrl: 'https://openrouter.ai/api/v1' },
       theme: 'dark',
       editor: { fontMode: 'serif' },
+      typography: { uiScale: 100, editorFontSize: 18 },
       backupRemote: null,
     },
     structure: [],
@@ -450,6 +451,6 @@ describe('SettingsWorkspace', () => {
 
     // Every Section component uses defaultOpen={true}
     const bodies = container.querySelectorAll('.settings-section__body');
-    expect(bodies.length).toBe(7); // 7 sections, all open
+    expect(bodies.length).toBe(8); // 8 sections, all open
   });
 });

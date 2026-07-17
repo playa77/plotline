@@ -2,9 +2,9 @@
  * Editor, toolbar, and status bar styles.
  *
  * The editing surface uses a serif font stack per DD §9;
- * the chrome (toolbar, status bar) uses a monospace stack.
+ * the chrome (toolbar, status bar) uses the sans-serif Inter font.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-17
  */
 
 /* =========================================================================
@@ -15,8 +15,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }
 
 /* =========================================================================
@@ -28,12 +28,12 @@
   flex-wrap: wrap;
   gap: 2px;
   padding: 8px 12px;
-  border-bottom: 1px solid #2a2a4e;
-  background: #16162a;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
   user-select: none;
   -webkit-user-select: none;
-  font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
 }
 
 .editor-toolbar-group {
@@ -44,7 +44,7 @@
 .editor-toolbar-group + .editor-toolbar-group {
   margin-left: 6px;
   padding-left: 6px;
-  border-left: 1px solid #2a2a4e;
+  border-left: 1px solid var(--color-border);
 }
 
 .editor-toolbar-btn {
@@ -57,7 +57,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #b0b0c0;
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
@@ -66,18 +66,18 @@
 }
 
 .editor-toolbar-btn:hover {
-  background: #2a2a4e;
-  color: #e0e0e0;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .editor-toolbar-btn:active {
-  background: #3a3a5e;
+  background: var(--color-bg-active);
 }
 
 .editor-toolbar-btn.is-active {
-  background: #3a3a5e;
-  color: #88c0ff;
-  border-color: #4a4a6e;
+  background: var(--color-bg-active);
+  color: var(--color-accent);
+  border-color: var(--color-border-strong);
 }
 
 .editor-toolbar-btn:disabled {
@@ -88,7 +88,7 @@
 .editor-toolbar-btn--label {
   min-width: auto;
   padding: 0 6px;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -114,16 +114,17 @@
   min-height: 300px;
   padding: 2rem 3rem;
   font-family: 'Charter', 'Georgia', 'Times New Roman', serif;
-  font-size: 18px;
-  line-height: 1.75;
-  color: #e0e0e0;
+  font-size: var(--editor-font-size, 18px);
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  max-width: 70ch;
 }
 
 /* Empty state placeholder */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: #5a5a7a;
+  color: var(--color-text-muted);
   pointer-events: none;
   height: 0;
 }
@@ -139,7 +140,7 @@
   font-size: 1.6em;
   font-weight: 700;
   line-height: 1.3;
-  color: #f0f0f0;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror h3 {
@@ -147,7 +148,7 @@
   font-size: 1.3em;
   font-weight: 600;
   line-height: 1.35;
-  color: #f0f0f0;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror h4 {
@@ -155,14 +156,14 @@
   font-size: 1.1em;
   font-weight: 600;
   line-height: 1.4;
-  color: #f0f0f0;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror blockquote {
   margin: 0.8em 0;
   padding: 0.4em 1em;
-  border-left: 3px solid #4a4a7a;
-  color: #b8b8d0;
+  border-left: 3px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
@@ -187,24 +188,24 @@
 .ProseMirror pre {
   margin: 0.8em 0;
   padding: 0.8em 1em;
-  background: #12121e;
-  border: 1px solid #2a2a4e;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
   border-radius: 6px;
   font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
   font-size: 14px;
   line-height: 1.5;
   overflow-x: auto;
   white-space: pre;
-  color: #c0c0d0;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror code {
   font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
   font-size: 0.9em;
   padding: 0.1em 0.3em;
-  background: #12121e;
+  background: var(--color-surface-raised);
   border-radius: 3px;
-  color: #d0d0e0;
+  color: var(--color-text-primary);
 }
 
 .ProseMirror pre code {
@@ -218,17 +219,17 @@
 .ProseMirror hr {
   margin: 1.5em 0;
   border: none;
-  border-top: 1px solid #3a3a5e;
+  border-top: 1px solid var(--color-border);
 }
 
 .ProseMirror a {
-  color: #88c0ff;
+  color: var(--color-accent);
   text-decoration: underline;
   cursor: pointer;
 }
 
 .ProseMirror a:hover {
-  color: #a0d0ff;
+  color: var(--color-accent-hover);
 }
 
 .ProseMirror img {
@@ -240,13 +241,13 @@
 }
 
 .ProseMirror img.ProseMirror-selectednode {
-  outline: 2px solid #88c0ff;
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 .ProseMirror s {
   text-decoration: line-through;
-  color: #8a8a9a;
+  color: var(--color-text-muted);
 }
 
 .ProseMirror strong {
@@ -258,11 +259,11 @@
    ========================================================================= */
 
 .ProseMirror ::selection {
-  background: #3a3a7e;
+  background: var(--color-accent-muted);
 }
 
 .ProseMirror ::-moz-selection {
-  background: #3a3a7e;
+  background: var(--color-accent-muted);
 }
 
 /* =========================================================================
@@ -281,7 +282,7 @@
   position: absolute;
   top: -2px;
   width: 20px;
-  border-top: 1px solid #88c0ff;
+  border-top: 1px solid var(--color-accent);
   animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
 }
 
@@ -304,26 +305,26 @@
   justify-content: flex-end;
   align-items: center;
   padding: 6px 16px;
-  border-top: 1px solid #2a2a4e;
-  background: #16162a;
-  font-family: 'IBM Plex Mono', 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  color: #7a7a9a;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
   gap: 16px;
 }
 
 .editor-status-bar .word-count {
-  color: #7a7a9a;
+  color: var(--color-text-muted);
 }
 
 .editor-status-bar .word-count--over {
-  color: #ff6b6b;
+  color: var(--color-danger);
 }
 
 .editor-status-bar .word-count--under {
-  color: #ffa94d;
+  color: var(--color-under-target);
 }
 
 .editor-status-bar .word-count--on-target {
-  color: #69db7c;
+  color: var(--color-on-target);
 }

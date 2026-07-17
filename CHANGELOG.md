@@ -211,3 +211,51 @@ versions follow the document suite version (currently `0.1.0`).
   per-chapter canonicalized-JSON SHA for `outlineSlice` and plain-content SHA
   for variable fingerprints (matching `StalenessService`). Upstream SHA now
   computed from content rather than raw tree OID. (this commit)
+
+---
+## [0.2.0] — 2026-07-17 (M6)
+
+### Added
+- **2026-07-17** — WP-31: Token set & contrast CI — Visual remediation milestone M6.
+  Rewrote `tokens.css` with WCAG-verified light/dark color pairs (≥4.5:1 text
+  contrast on both themes). Light theme now default on `:root`; dark theme on
+  `[data-theme="dark"]`. Swapped chrome font stack from IBM Plex Mono to system
+  UI `Inter, -apple-system, ...`. Bumped chrome font-size scale from 10-14px to
+  12-16px. Updated `Editor.css`, `global.css`, `diff-view.css`, `tree.css`,
+  `settings-workspace.css`, and `chapter-workspace.css` to use design tokens
+  instead of hardcoded colors/fonts. Added WCAG AA contrast CI check and
+  renderer font-size minima test. Reversed `SettingsWorkspace` theme toggle
+  direction (light default, dark override). (this commit)
+- **2026-07-17** — WP-32: Visual remediation audit — Verified WP-31 deliverables:
+  contrast CI test passes (20 test cases, both themes), font minima test passes
+  (3 assertions), no hardcoded-chrome violations in CSS or TSX. Confirmed all
+  monospace usage is restricted to code/pre contexts only. Fixed D019 theme
+  default: changed schema default from `'dark'` → `'light'` in both
+  `ProjectSettingsSchema` and `ProjectService.ts` default settings. (this commit)
+- **2026-07-17** — WP-33: Regression & release prep — Full test suite: 699 passed,
+  0 failed, 1 skipped (700 total). Fixed SettingsWorkspace section count test
+  (7→8 for new Typography section). Rewrote `deadInstruction.test.ts` to exclude
+  ImportDialog.tsx, BEM class names, and IPC call sites; added positive
+  assertions for ManuscriptTree and OutlineWorkspace import buttons. Version
+  bump 0.1.0 → 0.2.0. (this commit)
+- **2026-07-17** — WP-34: Import UI — Added `project:pickAndImportOutline` IPC
+  command: opens native file dialog, reads markdown, parses via existing
+  `parseOutlineMarkdown()`, returns `ParsePreview`. Created `ImportDialog`
+  component with three modes (trigger, paste textarea, preview with counts +
+  Confirm/Cancel). Wired import affordances at all 3 DD §4 entry points: command
+  palette (Cmd+K "Import Outline"), Workspace empty state button, and
+  ChapterWorkspace empty state button. Added `Import Outline` buttons to
+  ManuscriptTree and OutlineWorkspace empty states. Added dead-instruction audit
+  test to prevent future regressions. Fixed "Project not open: demo" error by
+  auto-creating/opening the demo project at app startup in `createWindow()`.
+  Removed unnecessary `openProjects` guard from `importOutlinePreview` (pure
+  function). (this commit)
+- **2026-07-17** — WP-35: Typography & accessibility settings — Added
+  `typography: { uiScale: 90-150% (default 100), editorFontSize: 16-24px
+  (default 18) }` to `ProjectSettingsSchema` with IPC plumbing through
+  `project:updateSettings`. Added Typography collapsible section to
+  SettingsWorkspace with range sliders. Live CSS application: `uiScale` applies
+  `zoom` on `<html>`, `editorFontSize` sets `--editor-font-size` custom
+  property consumed by `Editor.css`. Values applied on mount from saved
+  settings. Floor assertions: slider min/max prevents values outside 90-150%
+  and 16-24px. (this commit)

@@ -65,11 +65,11 @@
 }
 
 .diff-view__stat--inserted {
-  color: #22c55e;
+  color: var(--color-on-target);
 }
 
 .diff-view__stat--deleted {
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 .diff-view__stat--unchanged {
@@ -155,13 +155,13 @@
 }
 
 .diff-view__row--inserted .diff-view__column:last-child {
-  background: rgba(34, 197, 94, 0.08);
+  background: var(--color-diff-added-bg);
   color: var(--color-text-primary);
 }
 
 /* Deleted: left side has red tint, right side empty and transparent */
 .diff-view__row--deleted .diff-view__column:first-child {
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--color-diff-removed-bg);
   color: var(--color-text-primary);
 }
 
@@ -172,7 +172,7 @@
 
 /* Changed: both sides with a subtle background shift */
 .diff-view__row--changed .diff-view__column {
-  background: rgba(90, 158, 255, 0.04);
+  background: var(--color-bg-hover);
   color: var(--color-text-primary);
 }
 
@@ -187,16 +187,16 @@
 }
 
 .diff-view__segment--inserted {
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--color-on-target);
+  background: var(--color-diff-added-bg);
   border-radius: 2px;
   padding: 0 1px;
 }
 
 .diff-view__segment--deleted {
-  color: #ef4444;
+  color: var(--color-danger);
   text-decoration: line-through;
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--color-diff-removed-bg);
   border-radius: 2px;
   padding: 0 1px;
 }

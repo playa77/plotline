@@ -89,6 +89,8 @@ export interface ActionCallbacks {
   exportMarkdownChapter: () => Promise<void>;
   exportMarkdownBook: () => Promise<void>;
   exportPdf: () => Promise<void>;
+  /** Open the import outline dialog. */
+  importOutline: () => void;
   /** Prompt for text input inline (used by rename/restore/create). */
   promptInput: (placeholder: string) => string | null;
 }
@@ -244,6 +246,15 @@ export function getAvailableActions(
     keywords: ['sidebar', 'panel'],
     available: () => true,
     execute: () => cb.toggleRail(),
+  });
+
+  actions.push({
+    id: 'project:import',
+    label: 'Import Outline',
+    category: 'navigation',
+    keywords: ['import', 'markdown', 'md', 'outline'],
+    available: () => true,
+    execute: () => cb.importOutline(),
   });
 
   // Dynamic: select chapter

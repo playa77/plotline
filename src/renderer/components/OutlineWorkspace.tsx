@@ -62,6 +62,7 @@ interface OutlineWorkspaceProps {
   outline: Outline;
   onMutate?: (mutations: OutlineMutation[]) => void;
   readOnly?: boolean;
+  onImportOutline?: () => void;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────────
@@ -1423,6 +1424,7 @@ export function OutlineWorkspace({
   outline,
   onMutate,
   readOnly = false,
+  onImportOutline,
 }: OutlineWorkspaceProps): JSX.Element {
   // ── Local state ────────────────────────────────────────────────────────────
 
@@ -1775,6 +1777,18 @@ export function OutlineWorkspace({
           <div className="outline-empty__text">
             Import a markdown outline or add a part to begin structuring your book.
           </div>
+          {onImportOutline && (
+            <br />
+          )}
+          {onImportOutline && (
+            <button
+              type="button"
+              className="outline-empty__import-btn"
+              onClick={onImportOutline}
+            >
+              Import Outline
+            </button>
+          )}
         </div>
       </div>
     );

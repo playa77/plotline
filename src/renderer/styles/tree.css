@@ -2,7 +2,7 @@
  * Manuscript tree styles.
  *
  * Renders the book outline hierarchy: parts → chapters → sections.
- * Uses monospace font, small sizing, and stage dots for status.
+ * Uses chrome font stack, compact sizing, and stage dots for status.
  *
  * Version: 0.1.0 | 2026-07-16
  */
@@ -103,7 +103,7 @@
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: var(--font-size-xs);
   line-height: 1;
   color: var(--color-text-muted);
   transition: transform var(--transition-fast);

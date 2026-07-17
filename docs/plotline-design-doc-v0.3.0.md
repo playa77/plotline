@@ -1,10 +1,15 @@
 # Plotline — Design Doc
 
 **Document:** 1 of 4 (Design Doc → Tech Spec → Roadmap → README)
-**Version:** v0.1.0
-**Date:** 2026-07-16
-**Status:** Draft for review
+**Version:** v0.3.0
+**Date:** 2026-07-17
+**Status:** Active
 **Audience:** Product owner (review), coding agent (downstream context)
+
+**Changelog**
+- **v0.3.0 (2026-07-17):** §4 gains explicit **import affordances** and the "no dead instructions" rule (defect: backend importer existed with zero renderer path to it). §9 gains **user typography controls** (UI scale + editor font size) — accessibility gap: minima existed, user adjustment did not. Consumed by TS v0.2.0 and Roadmap v0.3.0.
+- **v0.2.0 (2026-07-17):** §9 rewritten. Monospace chrome dropped — Plotline is a long-form reading/writing instrument, and the v0.1.0 mono-everywhere aesthetic (carried over from the owner's developer-tool preferences) is wrong for this domain. Normative typography sizes and WCAG contrast minima added; light theme becomes default. Owner-reported eye strain is the driving defect.
+- **v0.1.0 (2026-07-16):** Initial draft.
 
 ---
 
@@ -124,6 +129,10 @@ The workspace renders this as an editable structured view: chapters are cards in
 
 Every chapter card carries the primary action for its current state: **Expand** if no expanded outline exists, otherwise a quiet **Open** plus stage dots. This is where the one-click journey usually starts.
 
+**Import affordances *(added v0.3.0, normative)*.** Importing a premade outline is the ~95 % entry path into the app and must be impossible to miss. The Import action is reachable from all of: (a) the **New Project** flow, as a step offered immediately after naming ("Start from an outline file / Start blank"); (b) **every empty state that mentions importing**, as a real button on that screen; (c) the **command palette**. The primary mechanism is a native file picker for a Markdown file; a paste-markdown textarea is the fallback within the same dialog. The parse preview (before anything is committed) shows detected Parts, Chapters, and sections with word targets and per-level counts ("4 parts · 11 chapters · 46 sections"), with Confirm / Cancel.
+
+**No dead instructions *(rule, added v0.3.0)*.** Empty-state or helper text may never reference an affordance that does not exist and function on that same screen. Any string of the form "Use X to get started" must be backed by X being clickable adjacent to it. This is checkable and belongs in acceptance criteria wherever empty states are built.
+
 ---
 
 ## 5. The Chapter Workspace — the Heart of the App
@@ -198,9 +207,19 @@ Export lives per chapter (Chapter stage primary action) and per book (Library pa
 
 ---
 
-## 9. Visual Design Language
+## 9. Visual Design Language *(rewritten in v0.2.0)*
 
-Dense, monospace, tool-like — modeled on VS Code / Linear / Raycast, never editorial. IBM Plex Mono throughout the chrome (tree, rails, status bar, buttons). The *editor content* is the one deliberate exception: manuscripts render in a readable proportional serif by default, because the writer must see something like what readers will see — with a one-toggle "draft mono" mode for those who prefer writing in the terminal register. Dark theme default, light theme available. Color is semantic and sparse: stage dots, staleness amber, diff green/red, one accent for primary actions. No decoration, no illustrations, no empty-state mascots — empty states are a single line of text plus the one relevant action ("No expanded outline yet. **Expand ▸**").
+**Governing principle:** Plotline is a long-form reading and writing instrument. Readability over hours dominates every other aesthetic value. The *tool-like* character survives in structure — no decoration, no editorial layouts, ruthless information hierarchy — but is expressed through architecture, not typography. Monospace is banned from chrome and content alike; it appears only where the content is genuinely code-like (LaTeX error logs, debug views).
+
+**Typography (normative).** Chrome — tree, rails, buttons, labels, status bar — uses a high-legibility proportional sans (Inter or the native system UI stack; agent's pick, ledgered), base size ≥ 14 px, tree rows ≥ 13 px, never smaller. Editor content renders in a proportional serif (Charter/Georgia class) at ≥ 18 px, line-height ≈ 1.6, measure constrained to 60–75 ch — the writer must see something like what readers will see. The "draft mono" editor toggle from v0.1.0 is retained as a strictly opt-in preference, off by default, and applies to editor content only, never chrome.
+
+**Color & contrast (normative).** Light theme is the default — a warm paper-like off-white surface, near-black text — because that is the low-strain register for prose work. Dark theme remains available and must be designed as its own token set, not an inversion. Contrast minima, enforced by automated tests against the token set (see Roadmap WP-07 AC): manuscript and all long-form text ≥ 7:1 (WCAG AAA); all chrome text ≥ 4.5:1 (AA); non-text UI elements (dots, borders, icons) ≥ 3:1. A token that fails the assertion fails the build. Color remains semantic and sparse: stage dots, staleness amber, diff green/red, one accent for primary actions.
+
+**Density.** Comfortable, not cramped. Density is achieved by information architecture (what earns a pixel), never by shrinking type below the minima above.
+
+**User typography controls *(added v0.3.0, normative)*.** Settings exposes two live-applying controls, no restart: **UI scale** (90–150 %, default 100 %) scaling all chrome typography and spacing proportionally, and **Editor text size** (16–24 px, default 19 px) for manuscript content. The §9 minima are *floors*: no control position may render any text below them (at 90 % scale, chrome base still ≥ 14 px — the scale range is validated against the token set, not trusted). Both persist per project. Keyboard: `Cmd/Ctrl +` / `−` / `0` adjust and reset editor text size when the editor is focused.
+
+No decoration, no illustrations, no empty-state mascots — empty states are a single line of text plus the one relevant action ("No expanded outline yet. **Expand ▸**").
 
 Keyboard-first: every primary action bound (`Cmd/Ctrl+E` Expand, `Cmd/Ctrl+W`… no — reserved; use `Cmd/Ctrl+Shift+E` / `Cmd/Ctrl+Shift+W` for Expand/Write, `Cmd/Ctrl+I` Iterate, `Cmd/Ctrl+K` command palette covering every action including version switching).
 

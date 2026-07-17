@@ -390,3 +390,125 @@ npm run build 2>&1 | tail -20               # verify forge packaging succeeds
 **✅ Gate closed 2026-07-17.** Owner approved. v0.1.0 tagged.
 
 ---
+
+## WP-31: Visual Remediation
+
+### D018 — Chrome font stack: Inter + system UI (R1)
+
+**Context:** DD v0.2.0 §9 requires swapping the chrome font from IBM Plex Mono to
+a more readable sans-serif stack for long-form writing work. The DD states
+"...swap the chrome font to Inter or the native system UI stack."
+
+**Chosen:** `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+Oxygen, Ubuntu, Cantarell, sans-serif` as the `--font-chrome` value. Inter is a
+well-regarded screen-reading face with strong hinting at small sizes; the system
+UI fallbacks cover all platforms without additional font downloads. IBM Plex
+Mono is retained only for code contexts (`pre`, `code` selectors).
+
+**R1:** Reversible <1h — changing the CSS variable value is a one-line edit, and
+no build or installation step depends on the font stack.
+
+### D019 — Light theme as default (R2)
+
+**Context:** The original app defaulted to a dark theme (`:root` + dark colors,
+`[data-theme="light"]` override). DD v0.2.0 §9 requires light as default for
+accessibility during long-form writing work.
+
+**Chosen:** Light theme values on `:root`; dark theme values on
+`[data-theme="dark"]`. The `SettingsWorkspace` theme toggle was reversed
+accordingly — selecting "dark" now sets `data-theme="dark"`, selecting "light"
+removes the attribute (falls through to `:root`).
+
+**Rejected alternative:** Keep dark as default with a one-time onboarding
+prompt. Rejected because WP-00 AC guarantees onboarding-free "pick up and write"
+— a new user should be on light by default.
+
+**R2:** Bounded cost — reversing this decision requires updating tokens.css
+block positions, the SettingsWorkspace toggle logic, and re-verifying all
+backward-compat aliases still resolve correctly in both themes.
+
+---
+
+## WP-32: Visual Remediation Audit
+
+### D020 — Verify WP-31 deliverables with automated guards (R1)
+
+**Context:** WP-31 rewrote design tokens and added contrast CI. WP-32 requires
+an audit to confirm no regressions slipped through.
+
+**Chosen:** Automated verification via existing test suite. Contrast CI test
+(20 cases, both themes) + font minima test (3 assertions) + manual scan for
+hardcoded-chrome violations. All passing. Mono-chrome scan confirmed only
+code/pre contexts use monospace. This is sufficient for gate.
+
+**R1:** Reversible <1h — adding additional audit checks is a test-file edit.
+
+---
+
+## WP-33: Regression & Release Prep
+
+### D021 — deadInstruction test rewrite strategy (R1)
+
+**Context:** The initial dead-instruction audit test over-matched on BEM class
+names (`import-dialog_*`) and ImportDialog.tsx itself (which IS the control,
+not a dead instruction). 30 false positives.
+
+**Chosen:** Three exclusion rules: (1) skip ImportDialog.tsx entirely, (2)
+skip lines where "import" only appears in `className="import-dialog_*"` or
+`invoke(...import...)` IPC calls, (3) verify the 3-line window around each
+match contains a real UI control (`<button`, `onClick`, `importOutline`,
+`ImportDialog`, or `setImport`). Added positive assertions for ManuscriptTree
+and OutlineWorkspace import buttons to prove the test would catch regressions.
+
+**R1:** Reversible <1h — exclusion list is a small array edit.
+
+---
+
+## WP-34: Import UI
+
+### D022 — Import dialog uses native file picker with paste fallback (R2)
+
+**Context:** DD v0.3.0 §4 specifies three import affordances (New Project
+flow, empty states, command palette) with native file picker via
+`project:pickAndImportOutline` and paste fallback in the dialog.
+
+**Chosen:** Mixed approach: command palette and empty-state buttons open the
+ImportDialog. The dialog offers two tabs/modes: "Choose File" (calls
+`project:pickAndImportOutline` → opens native Electron `dialog.showOpenDialog`)
+and "Paste Markdown" (textarea → calls `project:importOutline`). After parse,
+a preview step shows counts (parts, chapters, sections, beats) with
+Confirm/Cancel. On confirm, calls `project:confirmImport`.
+
+**Rejected alternative:** Separate screens for file picker and paste. Rejected
+because DD §4 explicitly calls for both in one dialog with "choose file" and
+"paste text" as two entry paths.
+
+**R2:** Bounded cost — the ImportDialog component is self-contained; swapping
+its internal mode switching would be local to one file.
+
+---
+
+## WP-35: Typography & Accessibility Settings
+
+### D023 — Typography as project-level settings applied via CSS custom properties (R2)
+
+**Context:** DD v0.3.0 §9 requires user-configurable UI scale (90-150%) and
+editor font size (16-24px) with live application and floor assertions.
+
+**Chosen:** Store `typography: { uiScale, editorFontSize }` in the project
+manifest under `settings.typography`. Apply `uiScale` via `zoom` on `<html>`
+(Chromium supports fractional zoom well, and it scales the entire UI including
+panel layouts). Apply `editorFontSize` via `--editor-font-size` CSS custom
+property on `:root`, consumed by `Editor.css` (`.ProseMirror { font-size:
+var(--editor-font-size, 18px); }`). Slider range inputs handle floor/ceiling
+assertions.
+
+**Rejected alternative:** Applying `uiScale` via `transform: scale()` on body
+causes layout reflow issues with positioned elements (modals, overlays) and
+would require `transform-origin` gymnastics. Using `font-size` on `html` as a
+% would cascade unpredictably into editor content font size.
+
+**R2:** Bounded cost — the CSS variable approach is decoupled from the schema;
+changing the application mechanism is a SettingsWorkspace + Editor.css edit.
+
+---
