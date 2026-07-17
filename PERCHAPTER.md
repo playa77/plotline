@@ -79,10 +79,10 @@ variables that apply project-wide:
 
 | Variable | Slug | Default Scope | What it is for |
 |---|---|---|---|
-| Tone | `tone` | `write` | Overall narrative tone (e.g., "lyrical and introspective") |
-| Writing Style | `style` | `write` | Prose style guidance (e.g., "short sentences, minimalist") |
+| Tone | `tone` | `always` | Overall narrative tone (e.g., "lyrical and introspective") |
+| Writing Style | `style` | `always` | Prose style guidance (e.g., "short sentences, minimalist") |
 | Plot Constraints | `constraints` | `always` | Plot rules that must never be violated |
-| Character / Voice Sheets | `characters` | `write` | Per-character voice and personality profiles |
+| Character / Voice Sheets | `characters` | `always` | Per-character voice and personality profiles |
 
 Each variable can be scoped to fire only on certain generation steps:
 
@@ -98,9 +98,9 @@ the same way.
 ### 3.2 Global Constraints (system variable, always injected)
 
 The "Global Constraints" system variable is automatically created when you
-import an outline. It is scope-locked to `always` — it fires on every
-generation call. Use this for hard rules that must apply to every chapter
-(e.g., "No anachronisms", "Maintain first-person POV").
+open or create a project. You can change its scope via the Variable Studio
+dropdown (it is no longer locked to `Always`). Use this for hard rules that
+must apply to every chapter (e.g., "No anachronisms", "Maintain first-person POV").
 
 ### 3.3 Manual toggles per chapter (via Context Rail)
 
@@ -157,10 +157,10 @@ guarantee the file format or location will remain stable.
 
 ## 5. What the templates say about style
 
-The write-v2 system prompt (`src/main/templates/write-v2/system.txt`) contains
-this authoritative rule:
+The write-v2 system prompt (`src/main/templates/write-v2/system.txt`) includes
+this rule (item 2 of its 9 rules):
 
-> Rule 5: Voice and style: STORY CONTEXT (if present) is authoritative creative
+> 2. Voice and style: STORY CONTEXT (if present) is authoritative creative
 > direction — follow its tone, writing style, plot constraints, and character/voice
 > sheets. Where it is silent, default to an engaging, assured narrative voice
 > appropriate to the material and consistent with the preceding text.
@@ -178,7 +178,7 @@ by the model.
 | Per-chapter `style-instruction.txt` | Half-built (reads but never written) | No GUI available |
 | `styleGuidance` setting toggle | Schema exists, no UI control | Use IPC directly or manual repo edit |
 | Per-project Story Variables (Tone, Style, etc.) | Fully functional | Variable Studio |
-| Global Constraints | Fully functional | Auto-created, always injected |
+| Global Constraints | Fully functional | Auto-created on project open or create; scope dropdown active |
 | Manual-scoped variables per chapter | Fully functional | Variable Studio + Context Rail |
 | Iterate (post-gen revision) | Fully functional | Chapter toolbar > Iterate |
 | Per-chapter style in outline import | Does not exist | N/A |
