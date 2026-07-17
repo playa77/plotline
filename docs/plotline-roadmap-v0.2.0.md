@@ -1,10 +1,15 @@
 # Plotline — Granular Roadmap
 
 **Document:** 3 of 4 (Design Doc → Tech Spec → **Roadmap** → README)
-**Version:** v0.1.0
-**Date:** 2026-07-16
-**Status:** Draft for review
-**Depends on:** Design Doc v0.1.0 (DD), Technical Specification v0.1.0 (TS)
+**Version:** v0.2.0
+**Date:** 2026-07-17
+**Status:** Active
+**Depends on:** Design Doc **v0.2.0** (DD), Technical Specification v0.1.0 (TS)
+
+**Changelog**
+- **v0.2.0 (2026-07-17):** Milestone **M6 — Visual Remediation** added (WP-31–WP-33, gate G-M6) with a contrast-verified reference token set. Context: WP-00–WP-30 are fully implemented; the DD v0.2.0 §9 rewrite therefore executes against a shipped codebase and targets app release **0.2.0**. Process note: milestone gates are **owner-present** by definition (§0); if the initial build cleared gates unattended, that is a harness defect to be fixed alongside M6 — G-M6 does not proceed without the owner.
+- **v0.1.1 (2026-07-17):** WP-07 and WP-09 amended to consume DD v0.2.0 §9 (proportional chrome type, light-theme default, automated WCAG contrast assertions). If WP-07/WP-09 are already implemented, the amendment is executed as remediation before the next gate.
+- **v0.1.0 (2026-07-16):** Initial plan.
 **Audience:** Coding agent, executing sequentially from a blank repository.
 
 ---
@@ -71,8 +76,8 @@ Parser per TS §5.3 conventions; `project:importOutline` returning ParsePreview;
 **Depends:** WP-05.
 
 ### WP-07 — App shell & manuscript tree
-Three-pane layout (DD §3): Library pane with manuscript tree from manifest+outline (Parts, chapters, expandable sections, stage dots — all hollow for now, word targets), center workspace router, collapsible context rail skeleton. Visual language baseline: IBM Plex Mono chrome, dark theme, semantic-color tokens defined once (DD §9).
-**AC:** tree renders the imported reference outline correctly; selection routes the center pane; panel widths persist via `ui-state.json`; zero decorative assets.
+Three-pane layout (DD §3): Library pane with manuscript tree from manifest+outline (Parts, chapters, expandable sections, stage dots — all hollow for now, word targets), center workspace router, collapsible context rail skeleton. Visual language baseline per DD v0.2.0 §9: proportional sans chrome (≥ 14 px base, ≥ 13 px tree rows), light theme default with dark as an independent token set, monospace nowhere in chrome, semantic-color tokens defined once.
+**AC:** tree renders the imported reference outline correctly; selection routes the center pane; panel widths persist via `ui-state.json`; zero decorative assets; **automated contrast assertions over the full token set — long-form text ≥ 7:1, chrome text ≥ 4.5:1, non-text UI ≥ 3:1 — wired into the test suite so a failing token fails CI**; no font-size token below the DD §9 minima (asserted).
 **Depends:** WP-05, WP-06 (fixture data).
 
 ### WP-08 — Book Outline workspace
@@ -81,7 +86,7 @@ Structured view (chapter cards in part groups, inline word-target fields, beat e
 **Depends:** WP-07.
 
 ### WP-09 — Rich-text editor component
-Editor with schema generated from the allowlist constant (TS §6.2): toolbar/shortcuts for exactly the subset, serif content font + draft-mono toggle, word count vs. target in status bar, autosave (2 s idle) wired to `chapter:saveArtifact`-shaped plumbing (target artifact configurable), paste runs through the sanitizer.
+Editor with schema generated from the allowlist constant (TS §6.2): toolbar/shortcuts for exactly the subset, serif content per DD v0.2.0 §9 (≥ 18 px, line-height ≈ 1.6, 60–75 ch measure) with the opt-in draft-mono toggle off by default and scoped to content only, word count vs. target in status bar, autosave (2 s idle) wired to `chapter:saveArtifact`-shaped plumbing (target artifact configurable), paste runs through the sanitizer.
 **AC:** structurally impossible to produce a non-allowlisted element (paste a hostile HTML corpus → clean subset); autosave commits appear with coalescing per TS §2.3; typing latency unaffected during a commit (measure: input-to-paint under load).
 **Depends:** WP-04, WP-10 can proceed in parallel.
 
@@ -227,6 +232,47 @@ Full audit pack across all milestones; owner sign-off; tag pushed.
 
 ---
 
+## Milestone M6 — Visual Remediation *(added in v0.2.0; executes against the shipped 0.1.0 codebase)*
+
+*Outcome: the app conforms to DD v0.2.0 §9. Target release: app `0.2.0`. Rationale: WP-07/WP-09 were built to the retired v0.1.0 visual language; the defect is eye strain during long-form work (mono chrome, small sizes, ~3:1 dark palette).*
+
+### WP-31 — Token set & contrast CI
+Replace `tokens.css` with two independent, DD-conformant theme sets. The reference values below are **verified** (WCAG ratios computed, all ≥ minima); the agent may adjust hues for taste but no substitution may fall below its row's requirement — enforced by the new CI suite. Swap the chrome font stack to Inter or the native system UI stack (ledger the pick); remove every monospace `font-family` outside code-context selectors (LaTeX log pane, debug views). Light theme becomes default; theme choice persists per project in `ui-state.json`. Add the contrast assertion suite and font-size minima assertions to CI (amended WP-07 AC).
+
+**Reference tokens (verified):**
+
+| Token | Light | Dark | Ratio req. | Verified L / D |
+|---|---|---|---|---|
+| surface | `#FBF9F6` | `#151619` | — | — |
+| surface-raised | `#F2EFE9` | `#1D1F23` | — | — |
+| text-primary (on surface) | `#1C1B19` | `#ECEAE5` | ≥ 7:1 | 16.4 / 15.1 |
+| text-primary (on raised) | `#1C1B19` | `#ECEAE5` | ≥ 7:1 | 15.0 / 13.7 |
+| text-secondary | `#504E49` | `#ADAAA2` | ≥ 4.5:1 | 7.9 / 7.8 |
+| accent (as text on surface) | `#155DA4` | `#7FB4E8` | ≥ 4.5:1 | 6.4 / 8.3 |
+| text on accent (buttons) | `#FFFFFF` on accent | — | ≥ 4.5:1 | 6.7 / — |
+| staleness amber (text/icon) | `#7A4E00` | `#E3AC52` | ≥ 4.5:1 | 6.9 / 8.9 |
+| diff-added-bg (under text-primary) | `#DFF0E0` | `#22392A` | ≥ 7:1 | 14.5 / 10.4 |
+| diff-removed-bg (under text-primary) | `#F9E2E0` | `#42272A` | ≥ 7:1 | 13.9 / 11.2 |
+| border / non-text UI | `#8F8B82` | `#6A6C72` | ≥ 3:1 | 3.2 / 3.5 |
+
+**AC:** contrast suite green over the *actual shipped* token set (not just the reference); repo-wide grep proves no mono chrome; light default verified on a fresh project; both themes screenshot-swept into the audit pack; no `font-size` token below DD §9 minima (asserted).
+**Depends:** DD v0.2.0.
+
+### WP-32 — Content typography & semantic-color rewire
+Editor content per amended WP-09 AC: ≥ 18 px serif, line-height ≈ 1.6, 60–75 ch measure (responsive clamp), draft-mono toggle off-by-default and scoped to editor content only. Re-derive every semantic-color consumer against the new tokens in **both** themes: stage dots, staleness badges, diff decorations (the dark-era green/red will not survive a light surface — use the verified diff-bg tokens), focus rings, selection color, streaming-cursor.
+**AC:** amended WP-09 AC pass; WP-18 diff golden fixtures re-rendered and legible in both themes; measure holds from 900 px to full-screen; tree rows ≥ 13 px verified.
+**Depends:** WP-31.
+
+### WP-33 — Regression sweep & release 0.2.0
+Full e2e re-run (including the one-click contract test and staleness matrix — typography changes must be behaviorally inert), empty/error-state visual sweep in both themes per WP-28 checklist, perf spot-check (TS §8.1 targets unaffected), `CHANGELOG.md` entry, version bump to `0.2.0`, tag.
+**AC:** F1–F6 pass on a clean machine; CI fully green including the new contrast suite; app reports `0.2.0` everywhere.
+**Depends:** WP-32.
+
+### 🔒 Gate G-M6 — the eyesight gate
+Owner-present, non-delegable: the owner reads a full generated chapter in the app for 15 uninterrupted minutes — the actual defect under test. Sign-off releases 0.2.0.
+
+---
+
 ## Dependency Snapshot
 
 ```
@@ -236,6 +282,7 @@ M2: 11 → 12 → 13 → 14 → 15 → 16
 M3: 17 → 19,21 ; 18 (after 09) → 19,22 ; 20 (after 16) ; 21 → 22
 M4: 23 → 24 → 25
 M5: 26,27 → 28 → 29 → 30
+M6: 31 → 32 → 33   (remediation; runs against the completed codebase)
 ```
 
 Critical path: 00-03 → 05-06 → 09 → 11-16 → 17 → 21 → 28-30.

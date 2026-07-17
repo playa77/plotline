@@ -10,7 +10,7 @@ Before any code or planning work, read all three documents in `docs/`. They are 
 
 - `docs/plotline-design-doc-v0.1.0.md` — product behavior, revision model, UI flows, open questions
 - `docs/plotline-tech-spec-v0.1.0.md` — architecture, Git model, data schemas, main-process services, IPC contract, testing contract
-- `docs/plotline-roadmap-v0.1.0.md` — 31 work packages (WP-00…WP-30) across 6 gated milestones (M0…M5)
+- `docs/plotline-roadmap-v0.2.0.md` — 31 work packages (WP-00…WP-30) across 6 gated milestones (M0…M5)
 
 If a decision isn't in these docs, it's undecided — don't infer it from filenames or generic framework conventions. When the docs conflict with the README, trust the docs (they are versioned; the README is a summary).
 
