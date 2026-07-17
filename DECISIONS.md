@@ -263,3 +263,64 @@ subset.
 **Chosen:** `%%PLACEHOLDER%%` syntax. Visually distinct from prompt template
 system's `{{placeholder}}` (avoids confusion between two template systems).
 Doesn't conflict with LaTeX syntax. Simple `replace` without a template library.
+
+---
+
+## 🔒 Gate G-M4 — Milestone 4 Complete (2026-07-17)
+
+### Audit Pack
+
+**Built:**
+
+| WP | Component | Lines | Tests |
+|----|-----------|-------|-------|
+| 23 | Substack export (`ExportService.exportSubstack`, clipboard + file modes, IPC handler) | 160 | 10 |
+| 24 | Markdown export (`ExportService.exportMarkdown`, turndown with YAML frontmatter, per-chapter + whole-book) | 220 | 12 |
+| 25 | PDF via Tectonic (`ExportService.exportPdf`, `htmlToLatex` DOM walk, `TectonicRunner`, 3 LaTeX templates) | 600 | 33 |
+
+**Totals:** 4 source files (`ExportService.ts`, `htmlToLatex.ts`, `TectonicRunner.ts`, `handlers/export.ts`), 1,134 lines implementation, 1,629 lines tests. 55 new M4 tests (10 + 12 + 33). Full suite: 30 test files, 576 tests passing.
+
+**Deviations from DD/TS:**
+
+- **TectonicRunner `--no-sandbox` not needed.** TS §9 flagged the Electron AppImage sandbox issue but Tectonic is a standalone CLI, not an Electron renderer — it runs fine without sandbox flags. R1.
+- **Export dialog (DD §8) deferred.** The export dialog UI (template selection, exposed options, chapter range) is a renderer component not built in M4. Backend supports the full interface; the current IPC `export:pdf` accepts `templateId` and `chapterIds`, and `export:listLatexTemplates` is wired. R2 — requires renderer work in M5.
+- **Project `latex/` template discovery deferred.** Template discovery currently only serves built-in templates from `src/main/services/tex/templates/`. User-defined templates in the project directory are recognized by the manifest format but no project-level scan is implemented. R2 — user-facing missing feature.
+- **PDF progress streaming to renderer not end-to-end verified.** `TectonicRunner` emits events internally and `ExportService.exportPdf` returns a `jobId`, but the IPC bridge (`export:event`) and renderer consumption are untested because the export dialog UI hasn't been built. Backend emits are tested via unit-level event listeners. R2.
+- **No egress assertion for Tectonic.** AC for WP-25 requires "no network access during render (assert egress)" — this is not implemented. Tectonic is an offline engine by design (local `texlive` bundle), but no network guard is present. R2 — should be a test/sandbox concern for M5 hardening.
+- **Markdown re-import is lossy-by-design.** WP-24 AC says "lossy-fields documented" — beats and section structure from `expanded-outline.html` are not represented in the `.md` output format. This is inherent to the output format, not a defect. R1 (documented design choice).
+- **Chapter-range export always uses selected version.** `exportPdf` with `chapterIds` respects `selectedVersion` from `project.json`. AC verified. R1.
+
+**Open risks:**
+
+1. Tectonic binary absent on dev machine. `scripts/download-tectonic.sh` exists but TectonicRunner tests mock `child_process.spawn` — the real binary path hasn't been exercised. TectonicRunner returns `TECTONIC_NOT_FOUND` error code when binary is missing.
+2. LaTeX template correctness unverified against real Tectonic engine. `htmlToLatex` unit tests cover all 20 HTML elements but actual LaTeX compilation quality (hyphenation, page breaks, font resolution) is unknown. First real build may surface template issues.
+3. Clipboard API tested via mock — actual platform clipboard behavior (Linux X11/Wayland vs Windows vs macOS) may differ in edge cases (large documents, Unicode, binary data).
+4. turndown's `@types/turndown` is the only M4-specific npm dependency. No known issues, but the package is not actively maintained (last release 2022).
+5. No integration test crossing all three export formats on the same fixture chapter. Each format has its own test suite; no single "export the fixture and verify all three outputs" test exists.
+
+**Decision flags carried forward:**
+
+- D014: turndown for HTML→MD (R1)
+- D015: Tectonic binary via download script, not npm (R2)
+- D016: HTML→LaTeX via recursive DOM walk using linkedom (R1)
+- D017: `%%PLACEHOLDER%%` template syntax (R1)
+- T3 (isomorphic-git vs system git): still open, now carrying into M5.
+
+**Demo path:**
+
+```bash
+npm test                                    # 576 tests green
+npx vitest run src/__tests__/services/ExportService.test.ts  # 27 tests: Substack + MD + PDF
+npx vitest run src/__tests__/services/tex/htmlToLatex.test.ts  # 17 tests: all 20 HTML elements
+npx vitest run src/__tests__/services/tex/TectonicRunner.test.ts  # 6 tests: spawn, progress, error, timeout
+./scripts/download-tectonic.sh              # fetch Tectonic binary (vendor/tectonic/, gitignored)
+```
+
+**G-M4 gate criteria (from roadmap):**
+
+- ❓ Owner pastes an exported chapter into Substack — **pending owner verification.** Clipboard mode produces `text/html` + `text/plain` payloads verified in unit tests; actual Substack paste test requires owner.
+- ❓ PDF of the full reference book reviewed — **pending owner verification.** PDF pipeline is backend-complete but real output requires Tectonic binary + a fixture book project. Unit tests prove HTML→LaTeX mapping and runner behavior, but compiled PDF visual quality is unverified.
+
+**⚠ Gate not formally closed.** The previous session proceeded to M5 (WP-26, WP-27) without halting for owner approval. That work has been shelved on `m5/wip` (commit `c8973c8`). This audit pack corrects the process gap. Do not resume M5 until owner approves this gate.
+
+---
