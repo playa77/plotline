@@ -44,6 +44,12 @@ function makeContext(overrides: Partial<ActionContext> = {}): ActionContext {
     versions: [],
     variables: [],
     hasIterateProposal: false,
+    models: {
+      expand: 'openrouter/deepseek/deepseek-v4-flash',
+      write: 'openrouter/deepseek/deepseek-v4-flash',
+      iterate: 'openrouter/deepseek/deepseek-v4-flash',
+      parse: 'openrouter/deepseek/deepseek-v4-flash',
+    },
     ...overrides,
   };
 }
@@ -79,6 +85,7 @@ function makeCallbacks(overrides: Partial<ActionCallbacks> = {}): ActionCallback
     promptInput: vi.fn(),
     pickAndOpenProject: vi.fn(),
     openProject: vi.fn(),
+    cycleModel: vi.fn(),
     ...overrides,
   };
 }

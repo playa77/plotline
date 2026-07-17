@@ -17,6 +17,18 @@ import type { WorkspaceSelection } from './components/Workspace';
 import type { VariableScope } from '../shared/schemas/variable';
 import { getActiveEditor } from './editorRef';
 
+// ── Model cycling ───────────────────────────────────────────────────────────────
+
+/** Models that the command palette cycles through on click. */
+export const CYCLE_MODELS = [
+  'deepseek/deepseek-v4-pro',
+  'deepseek/deepseek-v4-flash',
+  'anthropic/claude-sonnet-4-20250514',
+  'google/gemini-2.5-pro',
+  'openai/gpt-4.1',
+  'meta-llama/llama-4-maverick',
+];
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface CommandAction {
@@ -60,6 +72,13 @@ export interface ActionContext {
   variables: Array<{ id: string; name: string; scope: VariableScope; kind: string }>;
   /** Whether there is an active iterate proposal. */
   hasIterateProposal: boolean;
+  /** Current model names (provider/model format) for each role. */
+  models: {
+    expand: string;
+    write: string;
+    iterate: string;
+    parse: string;
+  };
 }
 
 export interface ActionCallbacks {
@@ -97,6 +116,8 @@ export interface ActionCallbacks {
   pickAndOpenProject: () => Promise<void>;
   /** Open an existing project by ID. */
   openProject: (projectId: string) => Promise<void>;
+  /** Cycle the model for a role to the next in the cycling list. */
+  cycleModel: (role: 'expand' | 'write' | 'iterate' | 'parse') => Promise<void>;
 }
 
 // ── Fuzzy matching ─────────────────────────────────────────────────────────────
@@ -331,6 +352,23 @@ export function getAvailableActions(
     available: () => hasChapter && isGenIdle,
     execute: () => void cb.reExpand(),
   });
+
+  // Model cycling — shows current model, click to cycle
+  for (const role of ['expand', 'write', 'iterate', 'parse'] as const) {
+    const label = role === 'expand' ? 'Expand' : role === 'write' ? 'Write' : role === 'iterate' ? 'Iterate' : 'Parse';
+    const shortcut = role === 'expand' ? 'Cmd+1' : role === 'write' ? 'Cmd+2' : role === 'iterate' ? 'Cmd+3' : 'Cmd+4';
+    const modelName = ctx.models[role];
+
+    actions.push({
+      id: `gen:model-${role}`,
+      label: `${label} (${modelName})`,
+      category: 'generation',
+      shortcut,
+      keywords: ['model', 'switch', 'cycle', role],
+      available: () => true, // always available — shows model even when idle
+      execute: () => void cb.cycleModel(role),
+    });
+  }
 
   // ── Iterate ──────────────────────────────────────────────────────────
 

@@ -25,6 +25,7 @@ import { ProjectSwitcher } from './ProjectSwitcher';
 
 import {
   getAvailableActions,
+  CYCLE_MODELS,
   type ActionContext,
   type ActionCallbacks,
 } from '../actions';
@@ -125,6 +126,14 @@ export function AppShell(): JSX.Element {
 
   // Outline parts — loaded from the project when projectId changes
   const [outlineParts, setOutlineParts] = useState<ParsedPart[]>([]);
+
+  // Current model names for each generation role
+  const [projectModels, setProjectModels] = useState<ActionContext['models']>({
+    expand: 'openrouter/deepseek/deepseek-v4-flash',
+    write: 'openrouter/deepseek/deepseek-v4-flash',
+    iterate: 'openrouter/deepseek/deepseek-v4-flash',
+    parse: 'openrouter/deepseek/deepseek-v4-flash',
+  });
 
   // Refresh token: incremented to force outline reload even when
   // projectId hasn't changed (e.g., importing an outline over the
@@ -354,6 +363,27 @@ export function AppShell(): JSX.Element {
     }
   }, []);
 
+  // ── Load models from project settings ─────────────────────────────────────
+
+  const loadModels = useCallback(async () => {
+    try {
+      const p = await invoke('project:open', { projectId }) as { settings: { models: Record<string, { provider: string; model: string }> } };
+      const m = p.settings.models;
+      setProjectModels({
+        expand: `${m.expand?.provider ?? 'openrouter'}/${m.expand?.model ?? 'deepseek/deepseek-v4-flash'}`,
+        write: `${m.write?.provider ?? 'openrouter'}/${m.write?.model ?? 'deepseek/deepseek-v4-flash'}`,
+        iterate: `${m.iterate?.provider ?? 'openrouter'}/${m.iterate?.model ?? 'deepseek/deepseek-v4-flash'}`,
+        parse: `${m.parse?.provider ?? 'openrouter'}/${m.parse?.model ?? 'deepseek/deepseek-v4-flash'}`,
+      });
+    } catch {
+      // project not open yet — leave defaults
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId) void loadModels();
+  }, [projectId, loadModels]);
+
   // ── Compute effective right width ────────────────────────────────────────────
 
   const effectiveRightWidth = railCollapsed ? 36 : rightWidth;
@@ -386,6 +416,7 @@ export function AppShell(): JSX.Element {
       })),
       hasIterateProposal:
         genStore.status === 'done' && genStore.activeJob?.step === 'iterate',
+      models: projectModels,
     }),
     [
       selectedChapterId,
@@ -395,6 +426,7 @@ export function AppShell(): JSX.Element {
       railCollapsed,
       versionStore.versions,
       variableStore.variables,
+      projectModels,
     ],
   );
 
@@ -624,6 +656,38 @@ export function AppShell(): JSX.Element {
 
       pickAndOpenProject: handlePickAndOpen,
       openProject: handleOpenProjectById,
+
+      cycleModel: async (role) => {
+        try {
+          const currentFull = projectModels[role]; // e.g. "openrouter/deepseek/deepseek-v4-flash"
+          const parts = currentFull.split('/');
+          // provider is first segment, model is the rest joined
+          const currentModel = parts.slice(1).join('/');
+          const currentProvider = parts[0];
+
+          // Find index of current model in the cycling list
+          const idx = CYCLE_MODELS.indexOf(currentModel);
+          const nextModel =
+            idx >= 0 && idx < CYCLE_MODELS.length - 1
+              ? CYCLE_MODELS[idx + 1]
+              : CYCLE_MODELS[0];
+
+          await invoke('project:updateSettings', {
+            projectId,
+            settings: {
+              models: { [role]: { provider: currentProvider, model: nextModel } },
+            },
+          });
+
+          // Update local state so the palette label refreshes immediately
+          setProjectModels((prev) => ({
+            ...prev,
+            [role]: `${currentProvider}/${nextModel}`,
+          }));
+        } catch {
+          // silently fail — model switching is convenience, not critical
+        }
+      },
     }),
     [
       selectedChapterId,
@@ -632,6 +696,8 @@ export function AppShell(): JSX.Element {
       versionStore,
       variableStore,
       handleToggleRail,
+      projectModels,
+      projectId,
     ],
   );
 
