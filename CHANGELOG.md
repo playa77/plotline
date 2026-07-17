@@ -105,6 +105,29 @@ versions follow the document suite version (currently `0.1.0-dev`).
   wired via `registerVersionHandlers`, and entrypoint integration in
   `src/main/index.ts`. 21 new tests. Total: 506 tests, 27 test files.
   (this commit)
+- **2026-07-17** — WP-23: Export service (Substack) — `ExportService` with
+  `exportSubstack` method for one-shot export of chapter artifacts to system
+  clipboard (HTML + plaintext) or file (raw HTML). Resolves chapter version
+  refs from project manifest, passes through Substack-safe HTML sanitizer,
+  structured error codes (`NO_ARTIFACT`, `INVALID_PAYLOAD`). IPC command
+  `export:substack` with Zod schema. 10 new tests.
+  (this commit)
+- **2026-07-17** — WP-24: Markdown export — HTML→MD conversion via turndown
+  with YAML frontmatter (title, part, version, slug, date). Per-chapter and
+  whole-book modes. Whole-book preserves manifest order with part headers.
+  Custom turndown rule for figure/figcaption. Re-importable through WP-06
+  outline importer (lossy: beats and section structure not preserved). 12 new
+  tests. (this commit)
+- **2026-07-17** — WP-25: PDF export via Tectonic — HTML→LaTeX converter for
+  the Substack-safe HTML subset (handle all 20 elements with recursive DOM
+  walking via linkedom, LaTeX escaping for 10 special characters), three
+  built-in LaTeX templates (trade-paperback, manuscript-submission, a4-article)
+  with %%PLACEHOLDER%% substitution, TectonicRunner for child_process.spawn
+  with stderr progress line capture and 120s timeout, IPC commands
+  (export:pdf returns jobId immediately, export:listLatexTemplates),
+  export:progress event for streaming Tectonic output, download script at
+  scripts/download-tectonic.sh. 33 new tests (17 htmlToLatex + 6
+  TectonicRunner + 6 ExportService PDF). (this commit)
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim

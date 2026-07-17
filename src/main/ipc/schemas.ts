@@ -264,3 +264,38 @@ export const VersionsArchiveRequestSchema = z.object({
   chapterId: z.string().min(1, 'Chapter ID is required'),
   slug: z.string().min(1, 'Version slug is required'),
 });
+
+// ── Export schemas (WP-23) ────────────────────────────────────────────────────────────
+
+export const ExportSubstackRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  chapterId: z.string().min(1, 'Chapter ID is required'),
+  versionSlug: z.string().optional(),
+  mode: z.enum(['clipboard', 'file']),
+  filePath: z.string().optional(),
+});
+
+export const ExportMarkdownRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  scope: z.enum(['chapter', 'book']),
+  chapterId: z.string().optional(),
+  versionSlug: z.string().optional(),
+  filePath: z.string().min(1, 'File path is required'),
+});
+
+// ── PDF export schemas (WP-25) ────────────────────────────────────────────
+
+export const ExportListLatexTemplatesRequestSchema = z.object({
+  projectId: z.string().optional(),
+});
+
+export const ExportPdfRequestSchema = z.object({
+  projectId: z.string().min(1, 'Project ID is required'),
+  templateId: z.string().min(1, 'Template ID is required'),
+  chapterIds: z.union([
+    z.array(z.string()),
+    z.literal('all'),
+  ]),
+  options: z.record(z.string(), z.string()),
+  outputPath: z.string().min(1, 'Output path is required'),
+});

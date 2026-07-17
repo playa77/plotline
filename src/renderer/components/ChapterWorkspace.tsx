@@ -298,6 +298,33 @@ export function ChapterWorkspace({
     setDropdownOpen((prev) => !prev);
   }, []);
 
+  // ── Export handlers (WP-23) ──────────────────────────────────────────────
+
+  const [exportDropdownOpen, setExportDropdownOpen] = useState<boolean>(false);
+
+  const handleExportSubstack = useCallback(async () => {
+    try {
+      await invoke('export:substack', { projectId, chapterId, mode: 'clipboard' });
+      // Could show a toast/success indicator — skip for now
+    } catch (err) {
+      console.error('[ChapterWorkspace] export:substack failed:', err);
+    }
+  }, [projectId, chapterId]);
+
+  const handleExportFile = useCallback(async () => {
+    // For WP-23, file export is basic: just export with a fixed name for now
+    // Full save dialog will come in a later pass
+    try {
+      await invoke('export:substack', { projectId, chapterId, mode: 'file', filePath: '' });
+    } catch (err) {
+      console.error('[ChapterWorkspace] export file failed:', err);
+    }
+  }, [projectId, chapterId]);
+
+  const handleExportDropdownToggle = useCallback(() => {
+    setExportDropdownOpen((prev) => !prev);
+  }, []);
+
   // Close dropdown on outside click
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -315,6 +342,22 @@ export function ChapterWorkspace({
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, [dropdownOpen]);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportDropdownOpen) return;
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.chapter-workspace__dropdown') &&
+          !target.closest('.chapter-workspace__export-chevron')) {
+        setExportDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [exportDropdownOpen]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Render helpers
@@ -538,6 +581,43 @@ export function ChapterWorkspace({
             <span>{wc.toLocaleString()} words</span>
             {targetRange && (
               <span className="chapter-workspace__wc-target">Target: {targetRange}</span>
+            )}
+          </div>
+          {/* Export action bar — primary action for written chapters per DD §5.3 */}
+          <div className="chapter-workspace__export-bar">
+            <button
+              type="button"
+              className="chapter-workspace__export-btn"
+              onClick={handleExportSubstack}
+            >
+              Copy for Substack
+            </button>
+            <button
+              type="button"
+              className="chapter-workspace__export-chevron"
+              onClick={handleExportDropdownToggle}
+              aria-label="More export options"
+            >
+              <span className={`chapter-workspace__export-chevron-arrow${exportDropdownOpen ? ' chapter-workspace__export-chevron-arrow--open' : ''}`} />
+            </button>
+            {exportDropdownOpen && (
+              <div className="chapter-workspace__dropdown" role="menu">
+                <span className="chapter-workspace__dropdown-label">Export options</span>
+                <button
+                  role="menuitem"
+                  className="chapter-workspace__dropdown-item"
+                  onClick={() => { setExportDropdownOpen(false); handleExportSubstack(); }}
+                >
+                  Copy for Substack
+                </button>
+                <button
+                  role="menuitem"
+                  className="chapter-workspace__dropdown-item"
+                  onClick={handleExportFile}
+                >
+                  Save as HTML…
+                </button>
+              </div>
             )}
           </div>
         </div>

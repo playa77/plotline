@@ -627,3 +627,53 @@
   background: var(--color-stale);
   color: var(--color-bg-primary);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Export bar (WP-23)
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__export-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0.75rem 0 0;
+  position: relative;
+}
+.chapter-workspace__export-btn {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  padding: 0.4rem 1rem;
+  font-family: var(--font-chrome);
+  font-size: 0.8rem;
+  cursor: pointer;
+  border-radius: 4px 0 0 4px;
+}
+.chapter-workspace__export-btn:hover {
+  opacity: 0.9;
+}
+.chapter-workspace__export-chevron {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  border-left: 1px solid rgba(255,255,255,0.2);
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  align-items: center;
+}
+.chapter-workspace__export-chevron:hover {
+  opacity: 0.9;
+}
+.chapter-workspace__export-chevron-arrow {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--color-bg);
+}
+.chapter-workspace__export-chevron-arrow--open {
+  transform: rotate(180deg);
+}

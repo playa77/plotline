@@ -1,0 +1,10 @@
+{
+  "id": "trade-paperback",
+  "name": "Trade Paperback",
+  "description": "6×9\" trade paperback format with chapter headings",
+  "defaultOptions": {
+    "fontSize": "11pt",
+    "paperWidth": "6in",
+    "paperHeight": "9in"
+  }
+}

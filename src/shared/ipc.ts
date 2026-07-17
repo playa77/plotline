@@ -214,6 +214,24 @@ export interface IpcCommandMap {
     request: { projectId: string; chapterId: string; slug: string };
     response: { ok: true };
   };
+  // ── Export (WP-23) ────────────────────────────────────────────
+  'export:substack': {
+    request: { projectId: string; chapterId: string; versionSlug?: string; mode: 'clipboard' | 'file'; filePath?: string };
+    response: { ok: boolean };
+  };
+  'export:markdown': {
+    request: { projectId: string; scope: 'chapter' | 'book'; chapterId?: string; versionSlug?: string; filePath: string };
+    response: { path: string; wordCount: number };
+  };
+  // ── PDF export (WP-25) ──────────────────────────────────────────────
+  'export:listLatexTemplates': {
+    request: { projectId?: string };
+    response: { templates: Array<{ id: string; name: string; description: string; defaultOptions: Record<string, string> }> };
+  };
+  'export:pdf': {
+    request: { projectId: string; templateId: string; chapterIds: string[] | 'all'; options: Record<string, string>; outputPath: string };
+    response: { jobId: string };
+  };
 }
 
 // ── Event registry ────────────────────────────────────────────────
@@ -229,6 +247,8 @@ export interface IpcEventMap {
   'generation:error': { jobId: string; code: string; message: string };
   // ── Staleness events (§7.6) ──────────────────────────
   'staleness:changed': { chapterIds: string[] };
+  // ── PDF export events (WP-25) ───────────────────────────────
+  'export:progress': { jobId: string; line: string; done: boolean; pdfPath?: string; error?: { code: string; message: string; detail?: string } };
 }
 
 // ── IPC channels ──────────────────────────────────────────────────

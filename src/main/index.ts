@@ -28,6 +28,8 @@ import { VersionService } from './services/VersionService';
 import { StalenessService } from './services/StalenessService';
 import { HistoryService } from './services/HistoryService';
 import { TemplateEngine } from './services/TemplateEngine';
+import { ExportService } from './services/ExportService';
+import { registerExportHandlers } from './ipc/handlers/export';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -75,6 +77,8 @@ function createWindow(): void {
   registerHistoryHandlers(historyService);
   const versionService = new VersionService(projectService);
   registerVersionHandlers(versionService);
+  const exportService = new ExportService(projectService);
+  registerExportHandlers(exportService);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

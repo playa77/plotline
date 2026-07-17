@@ -1,0 +1,10 @@
+{
+  "id": "a4-article",
+  "name": "A4 Article",
+  "description": "A4 article format, 11pt, suitable for papers and reports",
+  "defaultOptions": {
+    "fontSize": "11pt",
+    "paperWidth": "210mm",
+    "paperHeight": "297mm"
+  }
+}

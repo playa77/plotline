@@ -1,0 +1,8 @@
+{
+  "id": "manuscript-submission",
+  "name": "Manuscript Submission",
+  "description": "Standard manuscript format for literary submissions — 12pt, double-spaced, Courier",
+  "defaultOptions": {
+    "fontSize": "12pt"
+  }
+}
