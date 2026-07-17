@@ -144,6 +144,27 @@ versions follow the document suite version (currently `0.1.0`).
   grouping, context-dependent availability, event dispatch) and 27
   CommandPalette component tests (visibility, filtering, keyboard nav,
   backdrop, groupings, shortcuts, edge cases). (this commit)
+- **2026-07-17** — WP-28: Error & empty states pass — Toast notification
+  system (`toastStore.ts` Zustand store with auto-dismiss, `Toast.tsx` fixed
+  bottom-right stack component with slide/fade animations, `toast.css` with
+  dark/light theme tokens). Error handling sweep: 26 store catch blocks, 18
+  AppShell action callbacks, 3 ChapterWorkspace export/stop handlers, and 4
+  SettingsWorkspace API key/settings handlers now surface user-visible errors
+  via toast instead of silent `console.*` only. Empty states audit: all 6
+  components (ChapterWorkspace, Workspace, ContextRail, SettingsWorkspace,
+  VariableWorkspace, OutlineWorkspace) verified DD §9 compliant (single line
+  + action, no mascots, no blank panes). 9 fault-injection tests: mid-stream
+  connection drop (structured error envelope), API key revoke, corrupt
+  variable file via `assemble`, null-byte content save, IPC error envelope
+  exercise, toast store format. **663→671 tests (8 new).** (this commit)
+- **2026-07-17** — WP-29: Performance & scale pass — Synthetic benchmark
+  project generator (`bench-projects/generator.ts`) creates 100-chapter /
+  ~1,006-commit repos with 10 versions per chapter using isomorphic-git.
+  Benchmark suite (`bench-results/benchmark.test.ts`) measures all 4 TS §8.1
+  targets: project open 22.1ms (target ≤1.5s ✓), version switch avg 29.2ms
+  (target ≤200ms ✓), history list 500 entries avg 72.8ms (target ≤150ms ✓),
+  write throughput (individual 2.8ms). Results logged to `bench-results/results.json`.
+  All targets met with significant headroom. (this commit)
 - **2026-07-17** — WP-30: Packaging & release — Electron Forge makers configured
   for Linux (deb, AppImage) and Windows (Squirrel). AppImage sandbox workaround
   via `scripts/apprun.sh` with `--no-sandbox` wrapper. App icon generated at

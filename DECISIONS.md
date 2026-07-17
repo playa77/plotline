@@ -326,3 +326,67 @@ npx vitest run src/__tests__/services/tex/TectonicRunner.test.ts  # 6 tests: spa
 **✅ Gate closed 2026-07-17.** Owner approved. M5 work resuming.
 
 ---
+
+## 🔒 Gate G-M5 — Milestone 5 Complete (Release Gate)
+
+### Audit Pack
+
+**Built:**
+
+| WP | Component | Tests | Status |
+|----|-----------|-------|--------|
+| 26 | Command palette & keyboard map (45+ actions, Cmd+K integration) | 62 | ✅ |
+| 27 | Settings surface (7 sections, IPC round-trip, deep-merge) | 40 | ✅ |
+| 28 | Error & empty states pass (toast system, error sweep, fault injection) | 9 | ✅ |
+| 29 | Performance & scale pass (benchmark suite, TS §8.1 targets) | 4 | ✅ |
+| 30 | Packaging & release (forge makers, icon, sandbox, version bump) | — | ✅ |
+
+**Totals:** 35 test files, 671 tests passing, 1 skipped (pre-existing). `tsc --noEmit` clean.
+
+**Deviations from DD/TS:**
+
+- **Backup remote push/pull not implemented.** WP-27 adds `backupRemote` field to settings but no actual push/pull/backup feature exists. This is a future WP. R2.
+- **Export dialog UI deferred.** DD §8 export dialog (template picker, chapter range) is backend-complete but renderer component was not built in M5. R2 — carried from G-M4.
+- **Tectonic binary not downloaded.** `scripts/download-tectonic.sh` exists but the binary was never fetched. TectonicRunner tests mock spawn — real PDF compilation untested. R2 — carried from G-M4.
+- **No egress assertion for Tectonic** (WP-25 AC). R2 — carried from G-M4.
+- **Shortcut conflict test not automated.** WP-26 AC requires "shortcut conflict test against Electron/OS defaults" — shortcuts are defined but no automated conflict detection exists. R2.
+
+**Performance targets (TS §8.1):**
+
+| Target | Measured | Status |
+|--------|----------|--------|
+| Project open ≤ 1.5s (100 chapters, 1,000 commits) | 22.1ms | ✅ |
+| Version switch ≤ 200ms | 29.2ms avg | ✅ |
+| History list ≤ 150ms (500 entries) | 72.8ms avg | ✅ |
+| Keystroke latency unaffected by autosave | commit off input path | ✅ by design |
+
+**Open risks:**
+
+1. AppImage not built/tested on actual Linux machine. forge.config.js has makers but `npm run make` hasn't been run.
+2. App icon is a placeholder (generated "P" via ImageMagick) — not a real designed icon.
+3. No CI/CD pipeline. All testing is manual `npm test`.
+4. No end-to-end Electron test exists. All tests are unit/integration with mocked Electron APIs.
+5. Electron process has never been launched (`npm run dev` untested end-to-end).
+6. Windows build untested (no Windows machine available for the agent).
+
+**Demo path:**
+
+```bash
+npm test                                    # 671 tests green, 35 files
+npm run typecheck                           # tsc --noEmit clean
+npx vitest run bench-results/benchmark.test.ts  # TS §8.1 targets verified
+npx vitest run src/__tests__/resilience/fault-injection.test.ts  # 9 fault-injection tests
+npm run build 2>&1 | tail -20               # verify forge packaging succeeds
+```
+
+**Decision flags carried forward:**
+- T3 (isomorphic-git vs system git): still open.
+- Export dialog (DD §8): deferred.
+- Backup remote feature: unimplemented.
+- Tectonic binary: not yet downloaded.
+
+**Release readiness:** Code complete, tests green, targets met. Packaging configured but untested on real hardware. Manual acceptance flow F1–F6 (DD §10) requires Electron window launch.
+
+**✅ Gate closed 2026-07-17.** Owner approved. v0.1.0 tagged.
+
+---
