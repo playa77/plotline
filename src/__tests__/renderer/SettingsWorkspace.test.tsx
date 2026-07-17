@@ -2,7 +2,7 @@
  * SettingsWorkspace component tests (WP-27).
  *
  * Tests the settings pane rendering, section expand/collapse, and
- * interactions for all 7 settings sections. All IPC calls are mocked.
+ * interactions for all 8 settings sections. All IPC calls are mocked.
  *
  * @vitest-environment jsdom
  *
@@ -127,9 +127,9 @@ describe('SettingsWorkspace', () => {
     return { project, invokeMock };
   }
 
-  // ── Renders all 7 section headers ─────────────────────────────────
+  // ── Renders all 8 section headers ─────────────────────────────────
 
-  it('renders all 7 collapsible section headers', async () => {
+  it('renders all 8 collapsible section headers', async () => {
     renderWithMocks();
     await act(async () => {
       root = createRoot(container);
@@ -145,9 +145,9 @@ describe('SettingsWorkspace', () => {
     expect(text).toContain('Models');
     expect(text).toContain('Inference');
     expect(text).toContain('Continuity Context');
-    expect(text).toContain('Writing Style');
     expect(text).toContain('Theme');
     expect(text).toContain('Editor');
+    expect(text).toContain('Typography');
     expect(text).toContain('Backup Remote');
   });
 
@@ -454,6 +454,6 @@ describe('SettingsWorkspace', () => {
 
     // Every Section component uses defaultOpen={true}
     const bodies = container.querySelectorAll('.settings-section__body');
-    expect(bodies.length).toBe(9); // 9 sections, all open
+    expect(bodies.length).toBe(8); // 8 sections, all open
   });
 });
