@@ -73,16 +73,16 @@ export interface IpcCommandMap {
     response: { projectId: string; title: string } | null;
   };
   'project:pickAndImportOutline': {
-    request: { projectId: string };
+    request: { projectId?: string };
     response: ParsePreview | null;
   };
   'project:importOutline': {
-    request: { projectId: string; markdown: string };
+    request: { projectId?: string; markdown: string };
     response: ParsePreview;
   };
   'project:confirmImport': {
-    request: { projectId: string; preview: ParsePreview };
-    response: { ok: true };
+    request: { projectId?: string; preview: ParsePreview };
+    response: { ok: true; projectId: string; title: string };
   };
   'outline:get': {
     request: { projectId: string };
@@ -242,6 +242,15 @@ export interface IpcCommandMap {
     request: { projectId: string; chapterId: string; slug: string };
     response: { ok: true };
   };
+  // ── Project library / recents (WP-36) ─────────────────────────
+  'project:getRecents': {
+    request: {};
+    response: Array<{ projectId: string; title: string; lastOpened: string; wordCount: number }>;
+  };
+  'project:pickAndOpen': {
+    request: {};
+    response: { projectId: string; title: string } | null;
+  };
   // ── Export (WP-23) ────────────────────────────────────────────
   'export:substack': {
     request: { projectId: string; chapterId: string; versionSlug?: string; mode: 'clipboard' | 'file'; filePath?: string };
@@ -275,6 +284,8 @@ export interface IpcEventMap {
   'generation:error': { jobId: string; code: string; message: string };
   // ── Staleness events (§7.6) ──────────────────────────
   'staleness:changed': { chapterIds: string[] };
+  // ── Menu actions (WP-36) ────────────────────────────────────
+  'menu:action': { action: string; value?: string | number };
   // ── PDF export events (WP-25) ───────────────────────────────
   'export:progress': { jobId: string; line: string; done: boolean; pdfPath?: string; error?: { code: string; message: string; detail?: string } };
 }

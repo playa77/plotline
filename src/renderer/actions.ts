@@ -93,6 +93,11 @@ export interface ActionCallbacks {
   importOutline: () => void;
   /** Prompt for text input inline (used by rename/restore/create). */
   promptInput: (placeholder: string) => string | null;
+
+  /** Show the native folder picker and open the selected project. */
+  pickAndOpenProject: () => Promise<void>;
+  /** Open an existing project by ID. */
+  openProject: (projectId: string) => Promise<void>;
 }
 
 // ── Fuzzy matching ─────────────────────────────────────────────────────────────

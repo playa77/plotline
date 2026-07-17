@@ -20,7 +20,7 @@ import type { Outline } from '../../shared/schemas/outline';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface WorkspaceSelection {
-  type: 'none' | 'outline' | 'chapter' | 'variables' | 'settings';
+  type: 'none' | 'outline' | 'chapter' | 'variables' | 'settings' | 'exports';
   /** Only set when type === 'chapter'. */
   chapterId?: string;
   /** Only set when type === 'chapter'. */
@@ -31,6 +31,11 @@ export interface WorkspaceProps {
   selection: WorkspaceSelection;
   projectId: string;
   onImportOutline?: () => void;
+  onExportSubstack?: () => void;
+  onExportHtml?: () => void;
+  onExportMarkdownChapter?: () => void;
+  onExportMarkdownBook?: () => void;
+  onExportPdf?: () => void;
 }
 
 // ── Mock Outline ───────────────────────────────────────────────────────────────
@@ -87,7 +92,16 @@ const mockOutline = buildMockOutline();
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function Workspace({ selection, projectId, onImportOutline }: WorkspaceProps): JSX.Element {
+export function Workspace({
+  selection,
+  projectId,
+  onImportOutline,
+  onExportSubstack,
+  onExportHtml,
+  onExportMarkdownChapter,
+  onExportMarkdownBook,
+  onExportPdf,
+}: WorkspaceProps): JSX.Element {
   switch (selection.type) {
     case 'none':
       return (
@@ -104,6 +118,52 @@ export function Workspace({ selection, projectId, onImportOutline }: WorkspacePr
               onClick={onImportOutline}
             >
               Import Outline
+            </button>
+          </div>
+        </div>
+      );
+    case 'exports':
+      return (
+        <div className="workspace-exports">
+          <div className="workspace-exports__heading">Export</div>
+          <div className="workspace-exports__text">
+            Export your manuscript for publishing or sharing.
+          </div>
+          <div className="workspace-exports__actions">
+            <button
+              type="button"
+              className="workspace-exports__btn"
+              onClick={onExportSubstack}
+            >
+              Copy for Substack
+            </button>
+            <button
+              type="button"
+              className="workspace-exports__btn"
+              onClick={onExportHtml}
+            >
+              Save as HTML
+            </button>
+            <button
+              type="button"
+              className="workspace-exports__btn"
+              onClick={onExportMarkdownChapter}
+            >
+              Export Markdown (chapter)
+            </button>
+            <button
+              type="button"
+              className="workspace-exports__btn"
+              onClick={onExportMarkdownBook}
+            >
+              Export Markdown (whole book)
+            </button>
+            <button
+              type="button"
+              className="workspace-exports__btn"
+              onClick={onExportPdf}
+            >
+              Export PDF
             </button>
           </div>
         </div>

@@ -232,12 +232,21 @@ versions follow the document suite version (currently `0.1.0`).
   monospace usage is restricted to code/pre contexts only. Fixed D019 theme
   default: changed schema default from `'dark'` → `'light'` in both
   `ProjectSettingsSchema` and `ProjectService.ts` default settings. (this commit)
-- **2026-07-17** — WP-33: Regression & release prep — Full test suite: 699 passed,
+- **2026-07-17** — WP-33: Regression & release prep (initial) — Full test suite: 699 passed,
   0 failed, 1 skipped (700 total). Fixed SettingsWorkspace section count test
   (7→8 for new Typography section). Rewrote `deadInstruction.test.ts` to exclude
   ImportDialog.tsx, BEM class names, and IPC call sites; added positive
   assertions for ManuscriptTree and OutlineWorkspace import buttons. Version
   bump 0.1.0 → 0.2.0. (this commit)
+- **2026-07-17** — WP-33: Regression & release prep (final, post-WP-36/37) —
+  Full test suite re-run: 711 passed, 0 failed, 1 skipped (712 total).
+  `tsc --noEmit` clean. Dead-instruction audit (5/5) green. IPC coverage CI
+  (3/3, 49 commands: 41 reachable, 8 excluded, 0 uncovered) green.
+  One benchmark target (History list 500 entries: 217.7ms > 150ms) is a
+  pre-existing regression unchanged by M6 work. F1–F6 manual flow paths
+  marked PENDING-OWNER per §0 rule 5. App version `0.2.0` consistent:
+  `package.json`, About dialog (`app.getVersion()`), CHANGELOG header.
+  (this commit)
 - **2026-07-17** — WP-34: Import UI — Added `project:pickAndImportOutline` IPC
   command: opens native file dialog, reads markdown, parses via existing
   `parseOutlineMarkdown()`, returns `ParsePreview`. Created `ImportDialog`
@@ -259,3 +268,30 @@ versions follow the document suite version (currently `0.1.0`).
   property consumed by `Editor.css`. Values applied on mount from saved
   settings. Floor assertions: slider min/max prevents values outside 90-150%
   and 16-24px. (this commit)
+- **2026-07-17** — WP-36: Project Library, switcher & application menu — 
+  Created `AppStateService` (backend, `app-state.json` with recents list +
+  active project persistence, 9 unit tests). Built native Electron application
+  menu (`src/main/menu.ts`) with File (New/Open/Recents/Close/Quit), Edit
+  (standard clipboard roles + Find in Chapter), View (Theme/Scale/FontSize
+  radios), and Help (docs/about). Added `project:getRecents` and
+  `project:pickAndOpen` IPC commands. Created `ProjectLauncher` component
+  (welcome screen: New Project, Open Project, "Open from folder…", recents
+  list with word counts and relative timestamps) and `ProjectSwitcher`
+  component (dropdown in library pane header for switching/closing recent
+  projects). Wired `menu:action` IPC event for native menu → renderer
+  communication. Replaced old `window.prompt`-based welcome screen. 3 new
+  files, 5 modified. (this commit)
+- **2026-07-17** — WP-37: Renderer coverage audit — Created IPC coverage CI
+  test (`ipcCoverage.test.ts`, 3 tests) that walks the full `IpcCommandMap`
+  (49 commands) and asserts every command is either UI-reachable (41) or in
+  a documented exclusion list (8). Fixed exports pane gap: added `'exports'`
+  workspace type with 5 export buttons (Substack, HTML, MD Chapter, MD Book,
+  PDF) wired via AppShell action callbacks. PDF export dialog deferred to
+  WP-25 (hardcoded params in command palette). Coverage table printed to
+  test output. (this commit)
+
+### Changed
+- **2026-07-17** — WP-33 updated: Re-ran full test suite after WP-36/WP-37
+  integration (711 passed, 0 failed, 1 skipped). Dead-instruction audit and
+  IPC coverage CI both green. F1–F6 manual flow paths marked PENDING-OWNER
+  per §0 rule 5. (this commit)

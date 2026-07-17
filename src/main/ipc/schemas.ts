@@ -63,23 +63,29 @@ export const UpdateSettingsRequestSchema = z.object({
 
 /** Validates project:importOutline request. */
 export const ImportOutlineRequestSchema = z.object({
-  projectId: z.string().min(1, 'Project ID is required'),
+  projectId: z.string().optional(),
   markdown: z.string().min(1, 'Markdown content is required'),
 });
 
 /** Validates project:confirmImport request. */
 export const ConfirmImportRequestSchema: z.ZodType<IpcCommandMap['project:confirmImport']['request']> = z.object({
-  projectId: z.string().min(1, 'Project ID is required'),
+  projectId: z.string().optional(),
   preview: z.custom<ParsePreview>((v) => v != null, { message: 'preview is required' }),
 });
 
 /** Validates project:pickAndImportOutline request. */
 export const PickAndImportOutlineRequestSchema = z.object({
-  projectId: z.string().min(1, 'Project ID is required'),
+  projectId: z.string().optional(),
 });
 
 /** Validates project:getActive request. */
 export const GetActiveProjectRequestSchema = z.object({});
+
+/** Validates project:getRecents request. */
+export const GetRecentsRequestSchema = z.object({});
+
+/** Validates project:pickAndOpen request. */
+export const PickAndOpenRequestSchema = z.object({});
 
 /** Validates outline:get request. */
 export const OutlineGetRequestSchema = z.object({

@@ -94,13 +94,18 @@ export function IteratePanel({
     }) => {
       finishStream(payload.jobId);
 
+      // Only iterate jobs have proposals to accept — expand/write auto-commit
+      if (payload.stage !== 'iterate') return;
+      // Don't capture proposals meant for a different chapter
+      if (chapterId && payload.chapterId !== chapterId) return;
+
       // Capture the proposal HTML if this job produced content for our chapter
       if (payload.html) {
         activeJobIdRef.current = payload.jobId;
         setProposedArtifact(payload.html);
       }
     },
-    [finishStream],
+    [finishStream, chapterId],
   );
   useIpcEvent('generation:done', handleDone);
 

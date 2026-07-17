@@ -82,7 +82,10 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
 
   setError: (jobId: string, code: string, message: string) => {
     const { activeJob } = get();
-    if (!activeJob || activeJob.jobId !== jobId) return;
+    // Guard: ignore errors for jobs we aren't tracking, but allow
+    // errors even when no active job exists (e.g., pre-flight failures
+    // like missing API key that prevent startStream from being called).
+    if (activeJob && activeJob.jobId !== jobId) return;
     set({
       status: 'error',
       error: { code, message },

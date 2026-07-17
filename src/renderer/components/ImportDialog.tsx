@@ -19,9 +19,9 @@ import type { ParsePreview } from '../../shared/schemas/outline';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface ImportDialogProps {
-  projectId: string;
+  projectId?: string;
   onClose: () => void;
-  onImported: () => void;
+  onImported: (projectId: string, title: string) => void;
 }
 
 type ImportMode = 'trigger' | 'picking' | 'paste' | 'preview';
@@ -98,8 +98,8 @@ export function ImportDialog({
     setError(null);
 
     try {
-      await invoke('project:confirmImport', { projectId, preview });
-      onImported();
+      const result = await invoke('project:confirmImport', { projectId, preview });
+      onImported(result.projectId, result.title);
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       setError(e.message ?? 'Failed to confirm import');

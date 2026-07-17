@@ -78,6 +78,8 @@ function makeCallbacks(overrides: Partial<ActionCallbacks> = {}): ActionCallback
     exportPdf: vi.fn(),
     importOutline: vi.fn(),
     promptInput: vi.fn(),
+    pickAndOpenProject: vi.fn(),
+    openProject: vi.fn(),
     ...overrides,
   };
 }

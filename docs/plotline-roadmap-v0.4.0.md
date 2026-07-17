@@ -1,15 +1,16 @@
 # Plotline — Granular Roadmap
 
 **Document:** 3 of 4 (Design Doc → Tech Spec → **Roadmap** → README)
-**Version:** v0.3.0
+**Version:** v0.4.0
 **Date:** 2026-07-17
 **Status:** Active
-**Depends on:** Design Doc **v0.3.0** (DD), Technical Specification **v0.2.0** (TS)
+**Depends on:** Design Doc **v0.4.0** (DD), Technical Specification **v0.3.0** (TS)
 
 **Changelog**
-- **v0.3.0 (2026-07-17):** **WP-34 (Import UI)** and **WP-35 (Typography & accessibility settings)** added to M6; WP-33 re-scoped to depend on them; G-M6 unchanged in spirit but now covers the full set. Root-cause note: WP-06's AC were backend-only and no WP owned the import *UI* — the sole safety net was WP-30's manual F1 check, which was executed unattended. New process rule in §0: **manual acceptance criteria may only be checked off by the owner, never by the agent.**
-- **v0.2.0 (2026-07-17):** Milestone **M6 — Visual Remediation** added (WP-31–WP-33, gate G-M6) with a contrast-verified reference token set. Context: WP-00–WP-30 are fully implemented; the DD v0.2.0 §9 rewrite therefore executes against a shipped codebase and targets app release **0.2.0**. Gates are owner-present by definition.
-- **v0.1.1 (2026-07-17):** WP-07 and WP-09 amended to consume DD v0.2.0 §9.
+- **v0.4.0 (2026-07-17):** **WP-36 (Project Library, switcher & application menu)** and **WP-37 (Renderer coverage audit)** added to M6. Root cause acknowledged as a failure *class*, not an instance: work packages with backend-only AC allowed features to complete without any renderer path (import in v0.3.0, project management now). WP-37 makes the class structurally unrepeatable: every IPC command must be provably reachable from a registered UI action, asserted in CI. Suspected further instances (Exports pane entry point, PDF dialog entry, API-key entry UI) are enumerated in WP-37 for verification against the codebase.
+- **v0.3.0 (2026-07-17):** WP-34 (Import UI) and WP-35 (Typography & accessibility settings) added; owner-only manual ACs rule.
+- **v0.2.0 (2026-07-17):** Milestone M6 — Visual Remediation added (WP-31–WP-33, G-M6) with contrast-verified reference tokens; targets app 0.2.0.
+- **v0.1.1 (2026-07-17):** WP-07/WP-09 amended to consume DD v0.2.0 §9.
 - **v0.1.0 (2026-07-16):** Initial plan.
 **Audience:** Coding agent, executing sequentially from a blank repository.
 
@@ -274,13 +275,23 @@ Implement DD v0.3.0 §9 user typography controls: `settings.typography` schema (
 **AC:** settings round-trip and migrate; floor assertions in CI at `uiScale: 0.9` and `editorFontSize: 16`; live-change test (no reload event fired); keybindings don't collide with the WP-26 map (conflict test extended).
 **Depends:** WP-31 (tokens). Blocks G-M6.
 
-### WP-33 — Regression sweep & release 0.2.0 *(re-scoped v0.3.0)*
+### WP-36 — Project Library, switcher & application menu *(added v0.4.0)*
+Implement DD v0.4.0 §3 Project Library: cold-start **launcher** (recents from app-level `app-state.json` per TS v0.3.0 §1, New Project, Open… folder picker); in-app **project switcher** in the title bar + command palette actions; **native application menu** (File/Edit/View/Help per DD) whose items invoke the same action objects as their UI counterparts; switch/close-during-generation prompt (finish / cancel / stay); reopen-last-project behavior.
+**AC:** two-book e2e — create book A, import fixture, generate a chapter; create book B from the launcher, import, verify empty tree (isolation); switch A↔B via title bar, palette, and menu, asserting each project's state (selected versions, open chapter, typography settings) is fully restored and the two repos share no refs; recents list survives app restart, and deleting `app-state.json` loses only recents (asserted); generation-in-flight switch prompt covers all three choices.
+**Depends:** none within M6 (parallel-safe). Blocks G-M6.
+
+### WP-37 — Renderer coverage audit *(added v0.4.0 — kills the failure class)*
+Two parts. **(a) Permanent CI assertion:** a test that walks the TS §7.1 command table and asserts every command is reachable from at least one registered renderer action (or is on an explicit, commented allowlist for flow-internal commands such as `project:confirmImport`, which is stage 2 of the import flow, and `generate:cancel`-style event-driven calls). The command list is extracted from the IPC registration source, not hand-maintained — a new backend command without a UI path fails CI on arrival. **(b) One-time verification sweep** of the suspected instances from the spec audit, each fixed or explicitly ledgered if intentionally deferred: Library-pane **Exports** section (DD §3/§8 — whole-book Markdown and PDF entry point; no prior WP built it), **PDF export dialog entry point** (WP-25 built the dialog; verify something opens it), **API-key entry UI** in Settings (WP-27 AC never named it), and any further hits the CI assertion surfaces on first run.
+**AC:** CI assertion green with a minimal allowlist (each entry justified in a comment); sweep findings table in the audit pack — for every §7.1 command: reachable-via (button / palette / menu / flow-internal) with the source location; all confirmed gaps fixed within this WP or ledgered with an R-tag and owner-visible justification.
+**Depends:** WP-34, WP-36 (their actions must exist before coverage can pass). Blocks G-M6.
+
+### WP-33 — Regression sweep & release 0.2.0 *(re-scoped v0.4.0)*
 Full e2e re-run (one-click contract now via the WP-34 UI path, staleness matrix — typography changes must be behaviorally inert), empty/error-state visual sweep in both themes per WP-28 checklist **plus the dead-instruction audit repo-wide**, perf spot-check (TS §8.1 targets unaffected), `CHANGELOG.md` entry, version bump to `0.2.0`, tag.
 **AC:** F1–F6 marked `PENDING-OWNER` (manual, per §0 rule 5); CI fully green including contrast suite and dead-instruction audit; app reports `0.2.0` everywhere; release blocked until all `PENDING-OWNER` items are owner-checked.
-**Depends:** WP-32, WP-34, WP-35.
+**Depends:** WP-32, WP-34, WP-35, WP-36, WP-37.
 
-### 🔒 Gate G-M6 — the eyesight gate *(scope extended v0.3.0)*
-Owner-present, non-delegable. The owner: (1) imports a real outline through the UI from a cold start, (2) runs the two-click pipeline on one chapter, (3) reads a full generated chapter in the app for 15 uninterrupted minutes, (4) adjusts UI scale and editor text size and confirms they behave. Sign-off clears all `PENDING-OWNER` items and releases 0.2.0.
+### 🔒 Gate G-M6 — the eyesight gate *(scope extended v0.4.0)*
+Owner-present, non-delegable. The owner: (1) cold-starts into the launcher and creates/imports **two books**, (2) switches between them via title bar and menu, (3) runs the two-click pipeline on one chapter, (4) reads a full generated chapter in the app for 15 uninterrupted minutes, (5) adjusts UI scale and editor text size and confirms they behave, (6) reviews the WP-37 coverage table. Sign-off clears all `PENDING-OWNER` items and releases 0.2.0.
 
 ---
 
@@ -293,7 +304,7 @@ M2: 11 → 12 → 13 → 14 → 15 → 16
 M3: 17 → 19,21 ; 18 (after 09) → 19,22 ; 20 (after 16) ; 21 → 22
 M4: 23 → 24 → 25
 M5: 26,27 → 28 → 29 → 30
-M6: 31 → 32 → 33 ; 34 (parallel) → 33 ; 35 (after 31) → 33   (remediation; runs against the completed codebase)
+M6: 31 → 32 ; 34,36 (parallel) ; 35 (after 31) ; 37 (after 34,36) ; all → 33   (remediation vs. completed codebase)
 ```
 
 Critical path: 00-03 → 05-06 → 09 → 11-16 → 17 → 21 → 28-30.

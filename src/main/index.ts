@@ -2,12 +2,13 @@
  * Electron main process entrypoint.
  *
  * Creates the main application window, initializes the IPC registry,
- * and registers command handlers.
+ * registers command handlers, builds the native menu, and optionally
+ * re-opens the last active project on startup.
  *
- * Version: 0.3.0 | 2026-07-16
+ * Version: 0.4.0 | 2026-07-17
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import path from 'node:path';
 import { initIpcRegistry } from './ipc/registry';
 import { registerPingHandler } from './ipc/ping';
@@ -20,6 +21,7 @@ import { registerChapterHandlers } from './ipc/handlers/chapter';
 import { registerVersionHandlers } from './ipc/handlers/versions';
 import { registerHistoryHandlers } from './ipc/handlers/history';
 import { ProjectService } from './services/ProjectService';
+import { AppStateService } from './services/AppStateService';
 import { VariableService } from './services/VariableService';
 import { SecretsService } from './services/SecretsService';
 import { GenerationService } from './services/GenerationService';
@@ -30,18 +32,23 @@ import { HistoryService } from './services/HistoryService';
 import { TemplateEngine } from './services/TemplateEngine';
 import { ExportService } from './services/ExportService';
 import { registerExportHandlers } from './ipc/handlers/export';
+import { buildMenu, createActionInvoker } from './menu';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
 let mainWindow: BrowserWindow | null = null;
 
-function createWindow(): void {
+async function createWindow(): Promise<void> {
   // Create services before the window so handlers are ready
-  const projectService = new ProjectService(app.getPath('userData'));
+  const userDataPath = app.getPath('userData');
+  const projectService = new ProjectService(userDataPath);
+  const appStateService = new AppStateService(userDataPath);
   const variableService = new VariableService(projectService);
-  const secretsService = new SecretsService(app.getPath('userData'));
-  const templateEngine = new TemplateEngine();
+  const secretsService = new SecretsService(userDataPath);
+  const templateEngine = new TemplateEngine(
+    path.join(app.getAppPath(), 'src', 'main', 'templates'),
+  );
   const stalenessService = new StalenessService(projectService, variableService);
   const chapterService = new ChapterService(projectService, stalenessService);
   const generationService = new GenerationService(
@@ -67,8 +74,8 @@ function createWindow(): void {
   initIpcRegistry();
   registerPingHandler();
   const window = mainWindow;
-  registerProjectHandlers(projectService);
-  registerOutlineHandlers(projectService, stalenessService);
+  registerProjectHandlers(projectService, appStateService);
+  registerOutlineHandlers(projectService, stalenessService, appStateService);
   registerVariableHandlers(variableService, stalenessService);
   registerSecretsHandlers(secretsService);
   registerGenerationHandlers(generationService);
@@ -79,6 +86,12 @@ function createWindow(): void {
   registerVersionHandlers(versionService);
   const exportService = new ExportService(projectService);
   registerExportHandlers(exportService);
+
+  // Build and set native menu
+  const recents = await appStateService.getRecents();
+  const actions = createActionInvoker(window);
+  const menu = buildMenu(window, recents, actions);
+  Menu.setApplicationMenu(menu);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

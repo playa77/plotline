@@ -1,12 +1,13 @@
 # Plotline — Design Doc
 
 **Document:** 1 of 4 (Design Doc → Tech Spec → Roadmap → README)
-**Version:** v0.3.0
+**Version:** v0.4.0
 **Date:** 2026-07-17
 **Status:** Active
 **Audience:** Product owner (review), coding agent (downstream context)
 
 **Changelog**
+- **v0.4.0 (2026-07-17):** §3 gains the **Project Library** (launcher, recents, switcher) and a **native application menu** — the multi-book entry surface implied by A3 but never given UI treatment. Defect: backend project lifecycle existed with no renderer path (same failure class as v0.3.0's import gap).
 - **v0.3.0 (2026-07-17):** §4 gains explicit **import affordances** and the "no dead instructions" rule (defect: backend importer existed with zero renderer path to it). §9 gains **user typography controls** (UI scale + editor font size) — accessibility gap: minima existed, user adjustment did not. Consumed by TS v0.2.0 and Roadmap v0.3.0.
 - **v0.2.0 (2026-07-17):** §9 rewritten. Monospace chrome dropped — Plotline is a long-form reading/writing instrument, and the v0.1.0 mono-everywhere aesthetic (carried over from the owner's developer-tool preferences) is wrong for this domain. Normative typography sizes and WCAG contrast minima added; light theme becomes default. Owner-reported eye strain is the driving defect.
 - **v0.1.0 (2026-07-16):** Initial draft.
@@ -108,6 +109,10 @@ Three-pane layout, dense and tool-like (see §9 for visual language):
 ```
 
 **Left — Library pane.** The manuscript tree mirrors the Book Outline structure exactly: Parts as group headers, Chapters as primary nodes, sections (1.1, 1.2 …) as an expandable sub-level. Each chapter node shows two stage dots — Expanded / Written — filled, hollow, or amber (stale), plus the selected version name when it isn't *Main*, and actual-vs-target word count. Below the tree: Variables, Exports, Settings.
+
+**Project Library *(added v0.4.0, normative)*.** Plotline treats multiple books as first-class (A3): each book is its own project, and switching between them must be as unremarkable as switching files in an editor. On cold start with no project open, the app shows a **launcher**: recent projects (title, last-opened, word count) with one-click open, plus **New Project** and **Open…** (folder picker). While a project is open: the title bar shows the book title as a clickable **project switcher** (dropdown: recents + New + Open + Close Project), the same actions live in the command palette, and switching projects requires no save step — autosave means there is never unsaved state to lose. Closing or switching during an active generation prompts once: finish, cancel, or stay.
+
+**Application menu *(added v0.4.0, normative)*.** A native menu bar exists on all platforms: **File** (New Project, Open…, Open Recent ▸, Close Project, Exit), **Edit** (standard clipboard + Find in chapter), **View** (theme, UI scale, editor text size — mirroring the §9 controls), **Help** (docs, version). Menu items invoke the same action objects as their palette/button counterparts. An app whose window chrome offers no menu is not a finished desktop app; this was an omission, not a choice.
 
 **Center — Workspace.** Contextual to the selection. Chapter selected → the chapter workspace with three stage tabs (§5). Book Outline root selected → outline workspace (§4). A variable selected → the Variables studio (§6).
 

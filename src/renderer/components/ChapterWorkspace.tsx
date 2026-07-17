@@ -248,9 +248,9 @@ export function ChapterWorkspace({
         startStream(jobId, chapterId, 'expand');
       } catch (err) {
         console.error('[ChapterWorkspace] generate:expand failed:', err);
-        // Show error inline
-        setGenError('local-error', 'EXPAND_FAILED',
-          err instanceof Error ? err.message : 'Failed to start expansion');
+        const message = err instanceof Error ? err.message
+          : (err as { message?: string })?.message ?? 'Failed to start expansion';
+        setGenError(chapterId, 'EXPAND_FAILED', message);
       }
     },
     [projectId, chapterId, startStream, setGenError],
@@ -270,8 +270,9 @@ export function ChapterWorkspace({
         startStream(jobId, chapterId, 'write');
       } catch (err) {
         console.error('[ChapterWorkspace] generate:write failed:', err);
-        setGenError('local-error', 'WRITE_FAILED',
-          err instanceof Error ? err.message : 'Failed to start writing');
+        const message = err instanceof Error ? err.message
+          : (err as { message?: string })?.message ?? 'Failed to start writing';
+        setGenError(chapterId, 'WRITE_FAILED', message);
       }
     },
     [projectId, chapterId, startStream, setGenError],
@@ -825,6 +826,9 @@ export function ChapterWorkspace({
 
   return (
     <div className="chapter-workspace">
+      <div className="chapter-workspace__header">
+        <h2 className="chapter-workspace__title">{chapterTitle}</h2>
+      </div>
       {renderTabs()}
       {renderStageContent()}
     </div>

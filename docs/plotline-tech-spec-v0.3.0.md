@@ -1,13 +1,14 @@
 # Plotline — Technical Specification
 
 **Document:** 2 of 4 (Design Doc → **Tech Spec** → Roadmap → README)
-**Version:** v0.2.0
+**Version:** v0.3.0
 **Date:** 2026-07-17
 **Status:** Active
-**Depends on:** Design Doc v0.3.0 (its section numbers are referenced as DD §n)
+**Depends on:** Design Doc v0.4.0 (its section numbers are referenced as DD §n)
 **Audience:** Coding agent. This document defines *what* to build and the contracts between parts. Library and syntax choices are the agent's unless explicitly constrained.
 
 **Changelog**
+- **v0.3.0 (2026-07-17):** Additive, consuming DD v0.4.0: app-level `app-state.json` (recents, last-opened) alongside the per-project ephemeral state (§1). No architectural change.
 - **v0.2.0 (2026-07-17):** Additive, consuming DD v0.3.0: `settings.typography` in the manifest schema (§3.1); `project:pickAndImportOutline` IPC command for the native-file-picker import path (§7.1). No architectural change.
 - **v0.1.0 (2026-07-16):** Initial draft.
 
@@ -43,7 +44,7 @@ Design Doc D1–D6 are confirmed. Open questions from DD §12 are adopted as def
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Hard rules: the renderer never touches disk, Git, or network — everything crosses the IPC contract (§7). The main process serializes all Git mutations through a single per-project write queue (§5.4). All durable state lives in the Git object database; there is no side database. Anything not reconstructible from the repo (window layout, panel widths) goes in an ephemeral per-project `ui-state.json` outside the repo and is explicitly allowed to be lost.
+Hard rules: the renderer never touches disk, Git, or network — everything crosses the IPC contract (§7). The main process serializes all Git mutations through a single per-project write queue (§5.4). All durable state lives in the Git object database; there is no side database. Anything not reconstructible from the repo (window layout, panel widths) goes in an ephemeral per-project `ui-state.json` outside the repo and is explicitly allowed to be lost. *(v0.3.0)* Cross-project app state — the recents list and last-opened project for the DD §3 Project Library — lives in an app-level `app-state.json` in the platform config directory, same loss-tolerance: a deleted `app-state.json` costs the recents list, never any manuscript data.
 
 ---
 

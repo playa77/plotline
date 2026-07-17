@@ -19,6 +19,32 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
+   Chapter title header
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.chapter-workspace__header {
+  display: flex;
+  align-items: center;
+  padding: var(--space-md) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chapter-workspace__title {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
    Stage tab bar
    ══════════════════════════════════════════════════════════════════════════════ */
 
@@ -275,12 +301,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px var(--space-xl);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-accent-muted);
+  background: var(--color-accent-muted);
   font-family: var(--font-chrome);
   font-size: var(--font-size-md);
-  color: var(--color-text-secondary);
+  color: var(--color-accent);
   user-select: none;
+  font-weight: 500;
 }
 
 .chapter-workspace__streaming-label {

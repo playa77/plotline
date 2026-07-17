@@ -20,6 +20,8 @@ import { ContextRail } from './ContextRail';
 import { CommandPalette } from './CommandPalette';
 import { ImportDialog } from './ImportDialog';
 import { Toast } from './Toast';
+import { ProjectLauncher } from './ProjectLauncher';
+import { ProjectSwitcher } from './ProjectSwitcher';
 
 import {
   getAvailableActions,
@@ -30,9 +32,9 @@ import { useGenerationStore } from '../stores/generationStore';
 import { useVersionStore } from '../stores/versionStore';
 import { useVariableStore } from '../stores/variableStore';
 import { useToastStore } from '../stores/toastStore';
-import { invoke } from '../ipc/client';
+import { invoke, onEvent } from '../ipc/client';
 
-import { demoParts } from '../data/demoOutline';
+import type { ParsedPart } from '../../shared/schemas/outline';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -113,26 +115,58 @@ export function AppShell(): JSX.Element {
 
   // Project identity — loaded from IPC on mount
   const [projectId, setProjectId] = useState<string>('');
+  const [projectTitle, setProjectTitle] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Load the active project on mount
+  // Recent projects — loaded from IPC on mount
+  const [recents, setRecents] = useState<
+    Array<{ projectId: string; title: string; lastOpened: string; wordCount: number }>
+  >([]);
+
+  // Outline parts — loaded from the project when projectId changes
+  const [outlineParts, setOutlineParts] = useState<ParsedPart[]>([]);
+
+  // Load the active project and recents on mount
   useEffect(() => {
-    invoke('project:getActive', {})
-      .then((active) => {
+    const load = async () => {
+      try {
+        const [active, recentsData] = await Promise.all([
+          invoke('project:getActive', {}),
+          invoke('project:getRecents', {}),
+        ]);
         if (active) {
-          setProjectId(active.projectId);
-        } else {
-          setProjectId('');
+          // Actually open the project — getActive only returns metadata
+          try {
+            const project = await invoke('project:open', { projectId: active.projectId });
+            setProjectId(project.projectId);
+            setProjectTitle(project.title);
+          } catch {
+            // Project may have been deleted or is corrupted — clean up and show launcher
+            await invoke('project:close', { projectId: active.projectId });
+            setProjectId('');
+            setProjectTitle('');
+          }
         }
-      })
-      .catch((err) => {
-        console.warn('[AppShell] Failed to load active project:', err);
-        setProjectId('');
-      })
-      .finally(() => {
+        setRecents(recentsData);
+      } catch (err) {
+        console.warn('[AppShell] Failed to load initial state:', err);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+    load();
   }, []);
+
+  // Load the real outline whenever a project is opened
+  useEffect(() => {
+    if (!projectId) {
+      setOutlineParts([]);
+      return;
+    }
+    invoke('outline:get', { projectId })
+      .then((outline) => setOutlineParts(outline.parts as ParsedPart[]))
+      .catch(() => setOutlineParts([]));
+  }, [projectId]);
 
   // Store hooks
   const genStore = useGenerationStore();
@@ -240,27 +274,72 @@ export function AppShell(): JSX.Element {
     });
   }, []);
 
-  // ── Project create / open ──────────────────────────────────────────────────
+  // ── Project create / open / close ──────────────────────────────────────
 
   const handleCreateProject = useCallback(async () => {
     try {
       const project = await invoke('project:create', { title: 'Untitled Project' });
       setProjectId(project.projectId);
+      setProjectTitle(project.title);
+      const updated = await invoke('project:getRecents', {});
+      setRecents(updated);
     } catch (err: unknown) {
       const e = err as { message?: string };
       useToastStore.getState().error('PROJECT_ERROR', 'Failed to create project', e.message);
     }
   }, []);
 
-  const handleOpenProject = useCallback(async () => {
-    const input = window.prompt('Enter the project ID to open:');
-    if (!input || !input.trim()) return;
+  const handleOpenProjectById = useCallback(async (projectId: string) => {
     try {
-      const project = await invoke('project:open', { projectId: input.trim() });
+      const project = await invoke('project:open', { projectId });
       setProjectId(project.projectId);
+      setProjectTitle(project.title);
+      const updated = await invoke('project:getRecents', {});
+      setRecents(updated);
     } catch (err: unknown) {
       const e = err as { message?: string };
       useToastStore.getState().error('PROJECT_ERROR', 'Failed to open project', e.message);
+    }
+  }, []);
+
+  const handlePickAndOpen = useCallback(async () => {
+    try {
+      const result = await invoke('project:pickAndOpen', {});
+      if (result) {
+        setProjectId(result.projectId);
+        setProjectTitle(result.title);
+        const updated = await invoke('project:getRecents', {});
+        setRecents(updated);
+      }
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      useToastStore.getState().error('PROJECT_ERROR', 'Failed to open project', e.message);
+    }
+  }, []);
+
+  const handleCloseProject = useCallback(async () => {
+    try {
+      await invoke('project:close', {});
+      setProjectId('');
+      setProjectTitle('');
+      const updated = await invoke('project:getRecents', {});
+      setRecents(updated);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      useToastStore.getState().error('PROJECT_ERROR', 'Failed to close project', e.message);
+    }
+  }, []);
+
+  const handleSwitchProject = useCallback(async (newProjectId: string) => {
+    try {
+      const project = await invoke('project:open', { projectId: newProjectId });
+      setProjectId(project.projectId);
+      setProjectTitle(project.title);
+      const updated = await invoke('project:getRecents', {});
+      setRecents(updated);
+    } catch (err: unknown) {
+      const e = err as { message?: string };
+      useToastStore.getState().error('PROJECT_ERROR', 'Failed to switch project', e.message);
     }
   }, []);
 
@@ -277,7 +356,7 @@ export function AppShell(): JSX.Element {
       selection,
       genStatus: genStore.status,
       railCollapsed,
-      chapters: demoParts.flatMap((part) =>
+      chapters: outlineParts.flatMap((part) =>
         part.chapters.map((ch) => ({
           id: ch.chapterId,
           title: ch.title,
@@ -539,6 +618,9 @@ export function AppShell(): JSX.Element {
       promptInput: (placeholder) => window.prompt(placeholder),
 
       importOutline: () => setImportDialogOpen(true),
+
+      pickAndOpenProject: handlePickAndOpen,
+      openProject: handleOpenProjectById,
     }),
     [
       selectedChapterId,
@@ -549,6 +631,37 @@ export function AppShell(): JSX.Element {
       handleToggleRail,
     ],
   );
+
+  // ── Menu action listener (native menu → renderer) ─────────────────────
+
+  useEffect(() => {
+    const cleanup = onEvent('menu:action', (payload) => {
+      switch (payload.action) {
+        case 'new-project':
+          void handleCreateProject();
+          break;
+        case 'open-project':
+          void handlePickAndOpen();
+          break;
+        case 'close-project':
+          void handleCloseProject();
+          break;
+        case 'find-in-chapter':
+          setPaletteOpen(true);
+          break;
+        case 'set-theme':
+          console.log('[menu] set-theme:', payload.value);
+          break;
+        case 'set-ui-scale':
+          console.log('[menu] set-ui-scale:', payload.value);
+          break;
+        case 'set-editor-font-size':
+          console.log('[menu] set-editor-font-size:', payload.value);
+          break;
+      }
+    });
+    return cleanup;
+  }, [handleCreateProject, handlePickAndOpen, handleCloseProject]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -564,28 +677,13 @@ export function AppShell(): JSX.Element {
   // Welcome screen when no project is active
   if (!projectId) {
     return (
-      <div className="app-shell app-shell--welcome">
-        <div className="welcome-screen">
-          <h1 className="welcome-screen__title">Plotline</h1>
-          <p className="welcome-screen__subtitle">Write your book, chapter by chapter.</p>
-          <div className="welcome-screen__actions">
-            <button
-              type="button"
-              className="welcome-screen__btn welcome-screen__btn--primary"
-              onClick={handleCreateProject}
-            >
-              New Project
-            </button>
-            <button
-              type="button"
-              className="welcome-screen__btn"
-              onClick={handleOpenProject}
-            >
-              Open Project
-            </button>
-          </div>
-        </div>
-      </div>
+      <ProjectLauncher
+        recents={recents}
+        loading={loading}
+        onNewProject={handleCreateProject}
+        onOpenProject={handleOpenProjectById}
+        onPickProject={handlePickAndOpen}
+      />
     );
   }
 
@@ -595,9 +693,18 @@ export function AppShell(): JSX.Element {
     >
       {/* ── Library pane (left) ──────────────────────────────── */}
       <aside className="library-pane" style={{ width: leftWidth }}>
+        <div className="library-pane__header">
+          <ProjectSwitcher
+            currentTitle={projectTitle}
+            recents={recents}
+            currentProjectId={projectId}
+            onSwitchProject={handleSwitchProject}
+            onCloseProject={handleCloseProject}
+          />
+        </div>
         <div className="library-pane__tree">
           <ManuscriptTree
-            parts={demoParts}
+            parts={outlineParts}
             projectId={projectId}
             selectedChapterId={selectedChapterId}
             onSelectChapter={handleSelectChapter}
@@ -622,7 +729,7 @@ export function AppShell(): JSX.Element {
           <button
             type="button"
             className="library-action-btn"
-            onClick={() => setSelection({ type: 'none' })}
+            onClick={() => setSelection({ type: 'exports' })}
           >
             Exports
           </button>
@@ -644,7 +751,16 @@ export function AppShell(): JSX.Element {
 
       {/* ── Workspace pane (center) ──────────────────────────── */}
       <main className="workspace-pane">
-        <Workspace selection={selection} projectId={projectId} onImportOutline={() => setImportDialogOpen(true)} />
+        <Workspace
+          selection={selection}
+          projectId={projectId}
+          onImportOutline={() => setImportDialogOpen(true)}
+          onExportSubstack={actionCallbacks.exportSubstack}
+          onExportHtml={actionCallbacks.exportHtml}
+          onExportMarkdownChapter={actionCallbacks.exportMarkdownChapter}
+          onExportMarkdownBook={actionCallbacks.exportMarkdownBook}
+          onExportPdf={actionCallbacks.exportPdf}
+        />
       </main>
 
       {/* ── Resize handle: center / right ────────────────────── */}
@@ -673,10 +789,11 @@ export function AppShell(): JSX.Element {
 
       {importDialogOpen && (
         <ImportDialog
-          projectId={projectId}
+          projectId={projectId || undefined}
           onClose={() => setImportDialogOpen(false)}
-          onImported={() => {
+          onImported={(newProjectId: string, _title: string) => {
             setImportDialogOpen(false);
+            handleOpenProjectById(newProjectId);
           }}
         />
       )}
