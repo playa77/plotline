@@ -372,4 +372,181 @@ describe('ProjectService', () => {
     const reopened = await service.open(p1.projectId);
     expect(reopened.title).toBe('P1');
   });
+
+  // ── Settings: updateSettings (WP-27) ─────────────────────────────
+
+  describe('updateSettings', () => {
+    it('saves all settings fields and round-trips through close/open', async () => {
+      const project = await service.create('Settings Full Update');
+      const pid = project.projectId;
+
+      const updated = await service.updateSettings(pid, {
+        theme: 'light',
+        editor: { fontMode: 'mono' },
+        continuityContext: { enabled: false, words: 1000 },
+        inference: { baseUrl: 'https://custom.api/v1' },
+        models: {
+          expand: { provider: 'custom', model: 'model-x' },
+          write: { provider: 'custom', model: 'model-y' },
+          iterate: { provider: 'custom', model: 'model-z' },
+        },
+        backupRemote: 'https://github.com/user/repo.git',
+      });
+
+      expect(updated.settings.theme).toBe('light');
+      expect(updated.settings.editor.fontMode).toBe('mono');
+      expect(updated.settings.continuityContext.enabled).toBe(false);
+      expect(updated.settings.continuityContext.words).toBe(1000);
+      expect(updated.settings.inference.baseUrl).toBe(
+        'https://custom.api/v1',
+      );
+      expect(updated.settings.models.expand).toEqual({
+        provider: 'custom',
+        model: 'model-x',
+      });
+      expect(updated.settings.models.write).toEqual({
+        provider: 'custom',
+        model: 'model-y',
+      });
+      expect(updated.settings.models.iterate).toEqual({
+        provider: 'custom',
+        model: 'model-z',
+      });
+      expect(updated.settings.backupRemote).toBe(
+        'https://github.com/user/repo.git',
+      );
+
+      // Round-trip: close and reopen verifies persistence
+      await service.close(pid);
+      const reopened = await service.open(pid);
+      expect(reopened.settings.theme).toBe('light');
+      expect(reopened.settings.editor.fontMode).toBe('mono');
+      expect(reopened.settings.continuityContext.enabled).toBe(false);
+      expect(reopened.settings.continuityContext.words).toBe(1000);
+      expect(reopened.settings.models.expand).toEqual({
+        provider: 'custom',
+        model: 'model-x',
+      });
+      expect(reopened.settings.backupRemote).toBe(
+        'https://github.com/user/repo.git',
+      );
+    });
+
+    it('merges partial update into existing settings', async () => {
+      const project = await service.create('Partial Merge');
+      const pid = project.projectId;
+
+      // Set theme first
+      await service.updateSettings(pid, { theme: 'light' });
+      // Then set editor font mode — both should persist
+      await service.updateSettings(pid, { editor: { fontMode: 'mono' } });
+
+      await service.close(pid);
+      const reopened = await service.open(pid);
+
+      expect(reopened.settings.theme).toBe('light');
+      expect(reopened.settings.editor.fontMode).toBe('mono');
+      // Unrelated fields remain at defaults
+      expect(reopened.settings.continuityContext.enabled).toBe(true);
+      expect(reopened.settings.inference.baseUrl).toBe(
+        'https://openrouter.ai/api/v1',
+      );
+    });
+
+    it('deep merges nested objects', async () => {
+      const project = await service.create('Deep Merge');
+      const pid = project.projectId;
+
+      // Set only continuityContext.enabled (partial nested update)
+      await service.updateSettings(pid, {
+        continuityContext: { enabled: false, words: 500 },
+      } as typeof project.settings);
+
+      // Then set only words — enabled should not be overwritten
+      await service.updateSettings(pid, {
+        continuityContext: { enabled: false, words: 750 },
+      } as typeof project.settings);
+
+      await service.close(pid);
+      const reopened = await service.open(pid);
+
+      // Both values present after deep merge
+      expect(reopened.settings.continuityContext.enabled).toBe(false);
+      expect(reopened.settings.continuityContext.words).toBe(750);
+    });
+
+    it('validates against schema and throws on invalid values', async () => {
+      const project = await service.create('Validation Test');
+      const pid = project.projectId;
+
+      await expect(
+        service.updateSettings(pid, {
+          theme: 'invalid' as 'dark' | 'light',
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('persists through close/open cycle', async () => {
+      const project = await service.create('Persist Test');
+      const pid = project.projectId;
+
+      await service.updateSettings(pid, {
+        backupRemote: 'https://github.com/user/repo.git',
+        continuityContext: { enabled: true, words: 300 },
+      });
+
+      await service.close(pid);
+      const reopened = await service.open(pid);
+
+      expect(reopened.settings.backupRemote).toBe(
+        'https://github.com/user/repo.git',
+      );
+      expect(reopened.settings.continuityContext.words).toBe(300);
+    });
+
+    it('returns the updated project on success', async () => {
+      const project = await service.create('Return Value');
+      const pid = project.projectId;
+
+      const updated = await service.updateSettings(pid, {
+        theme: 'light',
+      });
+      expect(updated).toBeDefined();
+      expect(updated.projectId).toBe(pid);
+      expect(updated.settings.theme).toBe('light');
+    });
+
+    it('throws for nonexistent project', async () => {
+      await expect(
+        service.updateSettings('01ARZ3NDEKTSV4RRFFQ69G5FAV', {
+          theme: 'light',
+        }),
+      ).rejects.toThrow(/Project not open/i);
+    });
+
+    it('with empty partial is a no-op', async () => {
+      const project = await service.create('No-op Test');
+      const pid = project.projectId;
+      const original = structuredClone(project);
+
+      await service.updateSettings(pid, {});
+
+      await service.close(pid);
+      const reopened = await service.open(pid);
+
+      expect(reopened.settings.theme).toBe(original.settings.theme);
+      expect(reopened.settings.editor.fontMode).toBe(
+        original.settings.editor.fontMode,
+      );
+      expect(reopened.settings.continuityContext.words).toBe(
+        original.settings.continuityContext.words,
+      );
+      expect(reopened.settings.inference.baseUrl).toBe(
+        original.settings.inference.baseUrl,
+      );
+      expect(reopened.settings.backupRemote).toBe(
+        original.settings.backupRemote,
+      );
+    });
+  });
 });

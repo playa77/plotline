@@ -146,7 +146,7 @@ export function filterActions(
     .map((a) => {
       const labelScore = fuzzyScore(query, a.label);
       const keywordScore = a.keywords
-        ? Math.max(0, ...a.keywords.map((k) => fuzzyScore(query, k)))
+        ? Math.max(-1, ...a.keywords.map((k) => fuzzyScore(query, k)))
         : -1;
       const bestScore = Math.max(labelScore, keywordScore);
       return { action: a, score: bestScore };

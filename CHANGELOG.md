@@ -128,6 +128,22 @@ versions follow the document suite version (currently `0.1.0-dev`).
   export:progress event for streaming Tectonic output, download script at
   scripts/download-tectonic.sh. 33 new tests (17 htmlToLatex + 6
   TectonicRunner + 6 ExportService PDF). (this commit)
+- **2026-07-17** — WP-26: Command palette & keyboard map — `Cmd/Ctrl+K`
+  Raycast-style command palette covering every user-facing action. Built
+  `actions.ts` (826 lines): typed `CommandAction` interface, `fuzzyScore`/`filterActions`/
+  `groupActions`, 45+ actions across 9 categories (navigation, generation,
+  iterate, versions, history, editor, export, outline, variables), and
+  `getAvailableActions()` with context-aware availability filtering. The
+  `CommandPalette` component (278 lines): portal overlay, animated backdrop,
+  fuzzy search with group headers, keyboard nav (arrow/home/end/enter/escape),
+  mouse hover selection, platform-aware shortcut badge. Integrated into
+  `AppShell` with `paletteOpen` state, `ActionContext` computed from stores,
+  `ActionCallbacks` wired to IPC, and `Cmd/Ctrl+K` keyboard listener. Fixed
+  `nav:settings` bug (navigated to `'none'` instead of `'settings'`).
+  **WP-26 tests** (this commit): 35 actions tests (fuzzy score, filtering,
+  grouping, context-dependent availability, event dispatch) and 27
+  CommandPalette component tests (visibility, filtering, keyboard nav,
+  backdrop, groupings, shortcuts, edge cases). (this commit)
 - **2026-07-17** — WP-27: Settings surface — Full settings workspace with
   collapsible sections for API Key (keychain-backed set/check/delete),
   Models (per-role model selectors for Expand/Write/Iterate), Inference URL,
@@ -140,7 +156,14 @@ versions follow the document suite version (currently `0.1.0-dev`).
   Light theme color tokens in `tokens.css`. Settings button in AppShell now
   selects `{ type: 'settings' }`. 1 new file (SettingsWorkspace.tsx),
   1 new stylesheet (settings-workspace.css), 9 files modified.
-  `tsc --noEmit` clean, all 576 existing tests pass. (this commit)
+  **WP-27 tests** (this commit): 8 `updateSettings` unit tests in
+  `ProjectService.test.ts` (full round-trip, partial merge, deep merge,
+  schema validation, persist through close/open, return value,
+  nonexistent project, empty-partial no-op) and 12 `SettingsWorkspace`
+  component tests (7 section headers, expand/collapse, loading state,
+  API Key states, Theme/Editor radio selection, toggle, number field,
+  model field display, text field input, all-sections-open default).
+  `tsc --noEmit` clean, 40 new tests all passing. (this commit)
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim

@@ -146,6 +146,14 @@ export function CommandPalette({
           e.preventDefault();
           setSelectedIndex((prev) => Math.max(prev - 1, 0));
           break;
+        case 'Home':
+          e.preventDefault();
+          setSelectedIndex(0);
+          break;
+        case 'End':
+          e.preventDefault();
+          setSelectedIndex(flatList.length - 1);
+          break;
         case 'Enter': {
           e.preventDefault();
           const item = flatList[selectedIndex];
@@ -166,7 +174,9 @@ export function CommandPalette({
     const el = listRef.current?.querySelector(
       '.command-palette__item--selected',
     ) as HTMLElement | null;
-    el?.scrollIntoView({ block: 'nearest' });
+    if (typeof el?.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' });
+    }
   }, [selectedIndex]);
 
   // ── Mouse hover → select ─────────────────────────────────────────────────
