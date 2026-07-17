@@ -141,7 +141,6 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  user-select: none;
 }
 
 /* ── Item ──────────────────────────────────────────────────────────────── */
@@ -154,7 +153,6 @@
   padding: 0 var(--space-xl);
   cursor: pointer;
   transition: background var(--transition-fast);
-  user-select: none;
 }
 
 .command-palette__item:hover,

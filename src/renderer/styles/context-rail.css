@@ -84,8 +84,6 @@
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -337,8 +335,6 @@
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-sm);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
   border-radius: 3px;
   transition: background var(--transition-fast);
 }
@@ -932,8 +928,6 @@
   min-width: 0;
   gap: var(--space-sm);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .rail-version__name {

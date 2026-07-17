@@ -105,7 +105,6 @@
   letter-spacing: 0.5px;
   color: var(--color-text-muted);
   line-height: 1.6;
-  user-select: none;
 }
 
 .diff-view__column-header:first-child {

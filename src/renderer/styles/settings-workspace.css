@@ -95,7 +95,6 @@
   text-align: left;
   transition: color var(--transition-fast);
   letter-spacing: 0.3px;
-  user-select: none;
 }
 
 .settings-section__header:hover {
@@ -286,7 +285,6 @@
   align-items: center;
   gap: var(--space-md);
   cursor: pointer;
-  user-select: none;
 }
 
 .settings-toggle__input {
@@ -350,7 +348,6 @@
   font-family: var(--font-chrome);
   font-size: var(--font-size-md);
   color: var(--color-text-secondary);
-  user-select: none;
   transition: color var(--transition-fast);
 }
 

@@ -28,8 +28,6 @@
   padding: var(--space-md) var(--space-xl);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .chapter-workspace__title {
@@ -55,8 +53,6 @@
   padding: 0 var(--space-xl);
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 /* ── Individual tab ─────────────────────────────────────────────────────────── */
@@ -312,7 +308,6 @@
   font-family: var(--font-chrome);
   font-size: var(--font-size-md);
   color: var(--color-accent);
-  user-select: none;
   font-weight: 500;
 }
 
@@ -656,8 +651,6 @@
   font-family: var(--font-chrome);
   font-size: var(--font-size-md);
   color: var(--color-text-secondary);
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .chapter-workspace__upstream-badge-label {

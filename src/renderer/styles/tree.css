@@ -22,8 +22,6 @@
 
 .tree-part {
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .tree-part__header {
@@ -77,8 +75,6 @@
   padding-left: calc(var(--space-xl) + var(--tree-indent));
   gap: var(--space-sm);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
   transition: background var(--transition-fast);
   position: relative;
 }
@@ -180,7 +176,6 @@
   padding: 0 var(--space-lg);
   padding-left: calc(var(--space-xl) + var(--tree-indent) + var(--tree-indent));
   gap: var(--space-sm);
-  cursor: default;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   transition: color var(--transition-fast), background var(--transition-fast);
