@@ -10,6 +10,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectService, type ProjectSummary } from '../../main/services/ProjectService';
+import { VariableService } from '../../main/services/VariableService';
 import { StorageService } from '../../main/storage/StorageService';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -116,7 +117,7 @@ describe('ProjectService', () => {
     // Write valid JSON that fails schema validation (missing required title)
     const storageService = service.getOpenProject(projectId)!;
     const badManifest = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       projectId,
       // title is missing
       createdAt: new Date().toISOString(),
@@ -546,6 +547,204 @@ describe('ProjectService', () => {
       );
       expect(reopened.settings.backupRemote).toBe(
         original.settings.backupRemote,
+      );
+    });
+  });
+
+  // ── V1 → V2 Migration (AC 3.1, 3.2) ──────────────────────────────
+
+  describe('v1→v2 migration', () => {
+    it('AC 3.1 — open auto-migrates a v1 project and bumps schemaVersion', async () => {
+      // Create a v1 project (using direct git operations)
+      const createResult = await service.create('V1 Project');
+      const pid = createResult.projectId;
+      const storageService = service.getOpenProject(pid)!;
+
+      // Write a v1 manifest (schemaVersion 1) with old-format variables
+      const v1Manifest = {
+        schemaVersion: 1,
+        projectId: pid,
+        title: 'V1 Project',
+        createdAt: createResult.createdAt,
+        updatedAt: createResult.updatedAt,
+        settings: createResult.settings,
+        structure: [],
+      };
+
+      // Write all 4 old-style builtins to the repo
+      await storageService.commit('refs/heads/main', {
+        'project.json': Buffer.from(JSON.stringify(v1Manifest, null, 2), 'utf-8'),
+        'variables/tone/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'tone', name: 'Tone', core: 'tone', scope: 'always', active: true, order: 0,
+        })),
+        'variables/tone/content.html': Buffer.from('<p>Formal tone</p>'),
+        'variables/style/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'style', name: 'Writing Style', core: 'style', scope: 'always', active: true, order: 1,
+        })),
+        'variables/style/content.html': Buffer.from('<p>Descriptive style</p>'),
+        'variables/constraints/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'constraints', name: 'Plot Constraints', core: 'constraints', scope: 'always', active: true, order: 2,
+        })),
+        'variables/constraints/content.html': Buffer.from('<p>No magic</p>'),
+        'variables/characters/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'characters', name: 'Character / Voice Sheets', core: 'characters', scope: 'always', active: true, order: 3,
+        })),
+        'variables/characters/content.html': Buffer.from('<p>Alice: brave</p>'),
+      }, msg('v1 setup'));
+
+      // Set up VariableService on the ProjectService
+      const vs = new VariableService(service);
+      service.variableService = vs;
+
+      await service.close(pid);
+
+      // Re-open — should trigger migration
+      const reopened = await service.open(pid);
+
+      // Manifest schemaVersion is now 2
+      expect(reopened.schemaVersion).toBe(2);
+      expect(reopened.projectId).toBe(pid);
+      expect(reopened.title).toBe('V1 Project');
+
+      // All 5 default variables exist
+      const list = await vs.list(pid);
+      expect(list).toHaveLength(5);
+
+      // Tone is preserved with content
+      const tone = await vs.get(pid, 'tone');
+      expect(tone.variable.kind).toBe('builtin');
+      expect(tone.content).toBe('<p>Formal tone</p>');
+
+      // Global Constraints exists
+      const gc = list.find((v) => v.id === 'global-constraints')!;
+      expect(gc).toBeDefined();
+      expect(gc.kind).toBe('system');
+      expect(gc.scopeLocked).toBe(true);
+
+      // Migration commit exists in history
+      const history = await vs.list(pid);
+      expect(history.length).toBeGreaterThanOrEqual(5);
+    });
+
+    it('AC 3.2 — opening a migrated project again is idempotent', async () => {
+      // Set up a v1 project and migrate it
+      const createResult = await service.create('Idempotent');
+      const pid = createResult.projectId;
+      const storageService = service.getOpenProject(pid)!;
+
+      const v1Manifest = {
+        schemaVersion: 1,
+        projectId: pid,
+        title: 'Idempotent',
+        createdAt: createResult.createdAt,
+        updatedAt: createResult.updatedAt,
+        settings: createResult.settings,
+        structure: [],
+      };
+
+      // Write all 4 old builtins
+      await storageService.commit('refs/heads/main', {
+        'project.json': Buffer.from(JSON.stringify(v1Manifest, null, 2), 'utf-8'),
+        'variables/tone/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'tone', name: 'Tone', core: 'tone', scope: 'always', active: true, order: 0,
+        })),
+        'variables/tone/content.html': Buffer.from('<p>Tone</p>'),
+        'variables/style/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'style', name: 'Writing Style', core: 'style', scope: 'always', active: true, order: 1,
+        })),
+        'variables/style/content.html': Buffer.from('<p>Style</p>'),
+        'variables/constraints/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'constraints', name: 'Plot Constraints', core: 'constraints', scope: 'always', active: true, order: 2,
+        })),
+        'variables/constraints/content.html': Buffer.from('<p>Constraints</p>'),
+        'variables/characters/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'characters', name: 'Character / Voice Sheets', core: 'characters', scope: 'always', active: true, order: 3,
+        })),
+        'variables/characters/content.html': Buffer.from('<p>Characters</p>'),
+      }, msg('v1 setup'));
+
+      const vs = new VariableService(service);
+      service.variableService = vs;
+      await service.close(pid);
+
+      // First open — migration
+      await service.open(pid);
+
+      // Snapshot the tree
+      const svc1 = service.getOpenProject(pid)!;
+      const tree1 = await svc1.readTree('refs/heads/main');
+      const log1 = await svc1.log('refs/heads/main', 10);
+
+      await service.close(pid);
+
+      // Second open — should not modify anything
+      await service.open(pid);
+
+      const svc2 = service.getOpenProject(pid)!;
+      const tree2 = await svc2.readTree('refs/heads/main');
+      const log2 = await svc2.log('refs/heads/main', 10);
+
+      // Tree is identical
+      expect(tree2).toEqual(tree1);
+      // Log length is identical
+      expect(log2.length).toBe(log1.length);
+
+      // Variables are stable
+      const list = await vs.list(pid);
+      expect(list).toHaveLength(5);
+    });
+
+    it('throws helpful error when VariableService is not available for migration', async () => {
+      const createResult = await service.create('No VS');
+      const pid = createResult.projectId;
+      const storageService = service.getOpenProject(pid)!;
+
+      const v1Manifest = {
+        schemaVersion: 1,
+        projectId: pid,
+        title: 'No VS',
+        createdAt: createResult.createdAt,
+        updatedAt: createResult.updatedAt,
+        settings: createResult.settings,
+        structure: [],
+      };
+
+      await storageService.commit('refs/heads/main', {
+        'project.json': Buffer.from(JSON.stringify(v1Manifest, null, 2), 'utf-8'),
+      }, msg('v1 setup'));
+
+      await service.close(pid);
+
+      // variableService is NOT set — should throw
+      await expect(service.open(pid)).rejects.toThrow(
+        /VariableService is not available/,
+      );
+    });
+
+    it('throws helpful error when VariableService is not available for migration', async () => {
+      const createResult = await service.create('No VS');
+      const pid = createResult.projectId;
+      const storageService = service.getOpenProject(pid)!;
+
+      const v1Manifest = {
+        schemaVersion: 1,
+        projectId: pid,
+        title: 'No VS',
+        createdAt: createResult.createdAt,
+        updatedAt: createResult.updatedAt,
+        settings: createResult.settings,
+        structure: [],
+      };
+
+      await storageService.commit('refs/heads/main', {
+        'project.json': Buffer.from(JSON.stringify(v1Manifest, null, 2), 'utf-8'),
+      }, msg('v1 setup'));
+
+      await service.close(pid);
+
+      // variableService is NOT set — should throw
+      await expect(service.open(pid)).rejects.toThrow(
+        /VariableService is not available/,
       );
     });
   });

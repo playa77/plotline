@@ -639,6 +639,167 @@ describe('VariableService', () => {
     });
   });
 
+  // ── migrateFromV1 ─────────────────────────────────────────────────────
+
+  describe('migrateFromV1', () => {
+    const msg = (label: string) => ({ label, kind: 'manual' as const });
+
+    it('AC 3.1 — migrates old-format builtins and seeds Global Constraints', async () => {
+      const project = await projectService.create('Migration Test');
+      const pid = project.projectId;
+      const storageService = projectService.getOpenProject(pid)!;
+
+      // Write all 4 old-format builtins (schemaVersion 1, core-based)
+      await storageService.commit('refs/heads/main', {
+        'variables/tone/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'tone', name: 'Tone', core: 'tone', scope: 'always', active: true, order: 0,
+        })),
+        'variables/tone/content.html': Buffer.from('<p>Formal tone</p>'),
+        'variables/style/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'style', name: 'Writing Style', core: 'style', scope: 'always', active: true, order: 1,
+        })),
+        'variables/style/content.html': Buffer.from('<p>Descriptive style</p>'),
+        'variables/constraints/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'constraints', name: 'Plot Constraints', core: 'constraints', scope: 'always', active: true, order: 2,
+        })),
+        'variables/constraints/content.html': Buffer.from('<p>No magic</p>'),
+        'variables/characters/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'characters', name: 'Character / Voice Sheets', core: 'characters', scope: 'always', active: true, order: 3,
+        })),
+        'variables/characters/content.html': Buffer.from('<p>Alice: brave</p>'),
+      }, msg('setup old variables'));
+
+      // Run migration
+      const result = await variableService.migrateFromV1(pid);
+
+      // Migrated 4 variables, seeded Global Constraints
+      expect(result.migrated).toBe(4);
+      expect(result.seededSystem).toBe(true);
+      expect(Object.keys(result.files).length).toBeGreaterThanOrEqual(5);
+
+      // Commit the migration
+      await storageService.commit('refs/heads/main', result.files, {
+        label: 'Upgraded story variables',
+        kind: 'variable:migration',
+      });
+
+      // Verify: all 5 default variables exist
+      const list = await variableService.list(pid);
+      expect(list).toHaveLength(5);
+
+      // Global Constraints exists
+      const gc = list.find((v) => v.id === 'global-constraints')!;
+      expect(gc).toBeDefined();
+      expect(gc.kind).toBe('system');
+      expect(gc.scopeLocked).toBe(true);
+      expect(gc.deletable).toBe(false);
+      expect(gc.renamable).toBe(false);
+      expect(gc.position).toBe(0);
+
+      // Tone is preserved with correct fields
+      const tone = list.find((v) => v.id === 'tone')!;
+      expect(tone).toBeDefined();
+      expect(tone.name).toBe('Tone');
+      expect(tone.kind).toBe('builtin');
+      expect(tone.scope).toBe('always');
+      expect(tone.scopeLocked).toBe(false);
+      expect(tone.deletable).toBe(false);
+      expect(tone.renamable).toBe(false);
+      expect(tone.position).toBe(0);
+      expect(tone.schemaVersion).toBe(2);
+      // active field should not exist on v2 variables
+      expect((tone as Record<string, unknown>).active).toBeUndefined();
+      // core field should not exist on v2 variables
+      expect((tone as Record<string, unknown>).core).toBeUndefined();
+
+      // Content preserved
+      const toneContent = await variableService.get(pid, 'tone');
+      expect(toneContent.content).toBe('<p>Formal tone</p>');
+
+      const styleContent = await variableService.get(pid, 'style');
+      expect(styleContent.content).toBe('<p>Descriptive style</p>');
+
+      const constraintsContent = await variableService.get(pid, 'constraints');
+      expect(constraintsContent.content).toBe('<p>No magic</p>');
+
+      const charsContent = await variableService.get(pid, 'characters');
+      expect(charsContent.content).toBe('<p>Alice: brave</p>');
+
+      // Global Constraints has empty content
+      const gcContent = await variableService.get(pid, 'global-constraints');
+      expect(gcContent.content).toBe('');
+    });
+
+    it('AC 3.2 — is idempotent (second call returns 0 migrated)', async () => {
+      const project = await projectService.create('Idempotency Test');
+      const pid = project.projectId;
+      const storageService = projectService.getOpenProject(pid)!;
+
+      // Write old-format variables (all 4 builtins)
+      await storageService.commit('refs/heads/main', {
+        'variables/tone/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'tone', name: 'Tone', core: 'tone', scope: 'always', active: true, order: 0,
+        })),
+        'variables/tone/content.html': Buffer.from('<p>Content</p>'),
+        'variables/style/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'style', name: 'Writing Style', core: 'style', scope: 'always', active: true, order: 1,
+        })),
+        'variables/style/content.html': Buffer.from('<p>Content</p>'),
+        'variables/constraints/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'constraints', name: 'Plot Constraints', core: 'constraints', scope: 'always', active: true, order: 2,
+        })),
+        'variables/constraints/content.html': Buffer.from('<p>Content</p>'),
+        'variables/characters/variable.json': Buffer.from(JSON.stringify({
+          schemaVersion: 1, id: 'characters', name: 'Character / Voice Sheets', core: 'characters', scope: 'always', active: true, order: 3,
+        })),
+        'variables/characters/content.html': Buffer.from('<p>Content</p>'),
+      }, msg('setup old variables'));
+
+      // First migration
+      const result1 = await variableService.migrateFromV1(pid);
+      expect(result1.migrated).toBe(4);
+      expect(result1.seededSystem).toBe(true);
+      await storageService.commit('refs/heads/main', result1.files, {
+        label: 'Upgraded story variables', kind: 'variable:migration',
+      });
+
+      const listAfterFirst = await variableService.list(pid);
+      expect(listAfterFirst).toHaveLength(5);
+
+      // Second migration — should be a no-op
+      const result2 = await variableService.migrateFromV1(pid);
+      expect(result2.migrated).toBe(0);
+      expect(result2.seededSystem).toBe(false);
+      expect(Object.keys(result2.files)).toHaveLength(0);
+
+      // Variables unchanged
+      const listAfterSecond = await variableService.list(pid);
+      expect(listAfterSecond).toHaveLength(5);
+    });
+
+    it('AC 3.3 — seedBuiltins includes Global Constraints', async () => {
+      const project = await projectService.create('GC via Seed');
+      const pid = project.projectId;
+
+      await variableService.seedBuiltins(pid);
+
+      const list = await variableService.list(pid);
+      expect(list).toHaveLength(5);
+
+      // Global Constraints is first (position 0, system kind)
+      const gc = list[0]!;
+      expect(gc.id).toBe('global-constraints');
+      expect(gc.kind).toBe('system');
+      expect(gc.position).toBe(0);
+
+      // Then builtins
+      expect(list[1]!.id).toBe('tone');
+      expect(list[2]!.id).toBe('style');
+      expect(list[3]!.id).toBe('constraints');
+      expect(list[4]!.id).toBe('characters');
+    });
+  });
+
   // ── Error: project not open ──────────────────────────────────────────
 
   it('throws when project is not open', async () => {

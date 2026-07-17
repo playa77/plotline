@@ -19,6 +19,7 @@ import type { ParsePreview, Outline, OutlineMutation } from '../../shared/schema
 import { parseOutlineMarkdown } from './outlineImporter';
 import { generateULID } from '../../shared/utils/ulid';
 import type { FsClient } from 'isomorphic-git';
+import type { VariableService } from './VariableService';
 
 // ── Exported types ──────────────────────────────────────────────────────────
 
@@ -47,6 +48,13 @@ export class ProjectService {
   private readonly projectsDir: string;
   private readonly openProjects = new Map<string, StorageService>();
   private currentProject: { id: string; service: StorageService } | null = null;
+
+  /**
+   * Optional reference to VariableService, needed for v1→v2 project migration.
+   * Can be set after construction to break the circular dependency between
+   * ProjectService ↔ VariableService.
+   */
+  variableService?: VariableService;
 
   /**
    * @param appDataDir - The Electron `app.getPath('userData')` directory.
@@ -146,14 +154,63 @@ export class ProjectService {
     try {
       const blob = await service.readBlob('refs/heads/main', 'project.json');
       const raw = blob.toString('utf-8');
-      const parsed = ProjectSchema.safeParse(JSON.parse(raw));
-      if (!parsed.success) {
-        const details = parsed.error.issues
-          .map((i) => `${i.path.join('.')}: ${i.message}`)
-          .join('; ');
-        throw new Error(`Corrupted manifest: ${details}`);
+      const parsed = JSON.parse(raw);
+
+      // ── Schema version migration (v1 → v2) ────────────────────────────
+      if (parsed.schemaVersion === 1) {
+        if (!this.variableService) {
+          throw new Error(
+            'Project requires variable migration (v1→v2), but VariableService is not available',
+          );
+        }
+
+        // Register project temporarily so VariableService can access it
+        this.openProjects.set(projectId, service);
+        this.currentProject = { id: projectId, service };
+
+        const { files, migrated, seededSystem } =
+          await this.variableService.migrateFromV1(projectId);
+
+        // Bump manifest schemaVersion
+        parsed.schemaVersion = 2;
+        parsed.updatedAt = new Date().toISOString();
+        files['project.json'] = Buffer.from(
+          JSON.stringify(parsed, null, 2),
+          'utf-8',
+        );
+
+        // Single migration commit
+        await service.commit('refs/heads/main', files, {
+          label: 'Upgraded story variables',
+          kind: 'variable:migration',
+        });
+
+        // Re-read manifest to get a freshly validated copy
+        const freshBlob = await service.readBlob(
+          'refs/heads/main',
+          'project.json',
+        );
+        const freshParsed = ProjectSchema.safeParse(
+          JSON.parse(freshBlob.toString('utf-8')),
+        );
+        if (!freshParsed.success) {
+          const details = freshParsed.error.issues
+            .map((i) => `${i.path.join('.')}: ${i.message}`)
+            .join('; ');
+          throw new Error(`Corrupted manifest after migration: ${details}`);
+        }
+        project = freshParsed.data;
+      } else {
+        // Normal validation for already-correct schemaVersion
+        const validated = ProjectSchema.safeParse(parsed);
+        if (!validated.success) {
+          const details = validated.error.issues
+            .map((i) => `${i.path.join('.')}: ${i.message}`)
+            .join('; ');
+          throw new Error(`Corrupted manifest: ${details}`);
+        }
+        project = validated.data;
       }
-      project = parsed.data;
     } catch (err) {
       if (err instanceof SyntaxError) {
         throw new Error('Corrupted manifest: invalid JSON');

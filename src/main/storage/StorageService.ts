@@ -21,7 +21,7 @@ import type { FsClient } from 'isomorphic-git';
 /** Structured commit message parsed from the JSON message stored in the commit. */
 export interface CommitMessage {
   label: string;
-  kind: 'manual' | 'autosave' | 'expand' | 'write' | 'iterate' | 'restore';
+  kind: 'manual' | 'autosave' | 'expand' | 'write' | 'iterate' | 'restore' | 'variable:migration';
   instruction?: string;
   wordDelta?: number;
   /** Authoring session that created this commit (set by StorageService). */

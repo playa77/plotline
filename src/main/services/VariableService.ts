@@ -142,6 +142,104 @@ export class VariableService {
     return created;
   }
 
+  // ── migrateFromV1 ───────────────────────────────────────────────────
+
+  /**
+   * Migrate variables from legacy v1 schema (core-based) to v2 (kind-based).
+   * Returns file changes without committing — the caller (ProjectService)
+   * is responsible for committing the migration (including the manifest bump)
+   * as a single commit with kind 'variable:migration'.
+   *
+   * For each variable found in the old format:
+   * 1. Reads variable.json (schemaVersion 1, core field)
+   * 2. Converts to StoryVariable (schemaVersion 2, kind field)
+   * 3. Preserves content.html unchanged
+   * 4. Seeds Global Constraints if not present
+   *
+   * Conversion mapping:
+   *   core: 'tone'|'style'|'constraints'|'characters' → kind: 'builtin'
+   *   core: null → kind: 'custom'
+   *   active → REMOVED (field absent in v2)
+   *   order → position
+   *   NEW: scopeLocked, deletable, renamable, createdAt, updatedAt
+   *
+   * Idempotent — variables already at schemaVersion 2 are skipped.
+   */
+  async migrateFromV1(projectId: string): Promise<{
+    files: Record<string, Buffer>;
+    migrated: number;
+    seededSystem: boolean;
+  }> {
+    const service = this.getService(projectId);
+    const tree = await service.readTree('refs/heads/main');
+
+    const files: Record<string, Buffer> = {};
+    let migrated = 0;
+
+    for (const [filepath] of Object.entries(tree)) {
+      const match = filepath.match(/^variables\/([^/]+)\/variable\.json$/);
+      if (!match || filepath.startsWith('variables/archived/')) continue;
+
+      try {
+        const buf = await service.readBlob('refs/heads/main', filepath);
+        const oldVar = JSON.parse(buf.toString('utf-8'));
+
+        // Skip already-migrated variables
+        if (oldVar.schemaVersion === 2) continue;
+
+        const core: string | null = oldVar.core ?? null;
+        const isBuiltin = core !== null;
+
+        const newVar: StoryVariable = {
+          schemaVersion: 2,
+          id: oldVar.id,
+          name: oldVar.name,
+          kind: isBuiltin ? 'builtin' : 'custom',
+          scope: oldVar.scope ?? 'always',
+          scopeLocked: false,
+          deletable: !isBuiltin,
+          renamable: !isBuiltin,
+          position: oldVar.order ?? 0,
+          createdAt: oldVar.createdAt ?? this.now(),
+          updatedAt: this.now(),
+        };
+
+        files[filepath] = Buffer.from(JSON.stringify(newVar, null, 2), 'utf-8');
+        migrated++;
+      } catch {
+        // Skip unparseable entries
+      }
+    }
+
+    // Add Global Constraints if not present
+    let seededSystem = false;
+    const gcPath = 'variables/global-constraints/variable.json';
+    if (!tree[gcPath]) {
+      // Also check if it was already added by our file changes
+      const alreadyAdded = (Object.keys(files).includes(gcPath));
+      if (!alreadyAdded) {
+        const gcVar: StoryVariable = {
+          schemaVersion: 2,
+          id: 'global-constraints',
+          name: 'Global Constraints',
+          kind: 'system',
+          scope: 'always',
+          scopeLocked: true,
+          deletable: false,
+          renamable: false,
+          position: 0,
+          createdAt: this.now(),
+          updatedAt: this.now(),
+        };
+        files[gcPath] = Buffer.from(JSON.stringify(gcVar, null, 2), 'utf-8');
+        files['variables/global-constraints/content.html'] = Buffer.from('', 'utf-8');
+        seededSystem = true;
+      }
+    }
+
+    return { files, migrated, seededSystem };
+  }
+
   // ── list ───────────────────────────────────────────────────────────────
 
   /**

@@ -46,6 +46,7 @@ async function createWindow(): Promise<void> {
   const appStateService = new AppStateService(userDataPath);
   const historyService = new HistoryService(projectService);
   const variableService = new VariableService(projectService, historyService);
+  projectService.variableService = variableService; // resolve circular dep
   const secretsService = new SecretsService(userDataPath);
   const templateEngine = new TemplateEngine(
     path.join(app.getAppPath(), 'src', 'main', 'templates'),
