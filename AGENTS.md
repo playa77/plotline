@@ -54,4 +54,21 @@ From roadmap §0 (Execution Conventions):
 ## Conventions that differ from defaults
 
 - **No system git assumed.** Whether the storage layer uses system git or isomorphic-git is open decision **T3** (tech spec §0; to be recorded in `DECISIONS.md`). Don't assume `git` is on PATH until that's decided.
-- **Per-project settings live in the project manifest** (`project.json`, tech spec §3.1), not in app-level config. Model selection, inference base URL, continuity budget, theme, and editor font mode are all per-project.
+ - **Per-project settings live in the project manifest** (`project.json`, tech spec §3.1), not in app-level config. Model selection, inference base URL, continuity budget, theme, and editor font mode are all per-project.
+
+## Session lessons (append as discovered; never remove)
+
+### SL-001 — Untracked fixture files are invisible to future sessions
+`git status` showed `??` for `Full_extended_outline.md` — present on disk but never committed. The `## PART THREE` prefix was missing and remained undetected because no test (and no fresh checkout) exercises the fixture end-to-end. **Rule:** when the user provides or references working material, commit it immediately. Run `git status` before every import/manual test and investigate every `??` line.
+
+### SL-002 — Verify outline structure before reporting import results
+The parser requires `^##\s+PART\b` to detect parts. Before showing a user an import preview, grep the fixture for `^## PART` and count parts — the fixture should have exactly 4 parts for "Tether". A mismatched count means the file is stale or incorrectly formatted. **Rule:** structural verification before UI tests.
+
+### SL-003 — Never `git checkout HEAD --` a specialist's work without reviewing the diff first
+When the WP-VARS-1 fixer drifted out of scope, all its changes were blindly reverted — including valid fixes (outline refresh in AppShell, IPC error propagation). **Rule:** `git diff` before `git checkout`. Revert selectively.
+
+### SL-004 — Per-chapter style instructions are NOT to be removed
+"Trust in your style, tone and global variables" means ALL variable types, including per-chapter style guidance that lives in `GenerationService.ts`. The `styleGuidance` schema field and the per-chapter `style-instruction.txt` block are intentional features. **Rule:** when the user says "rely on variables," they mean the whole variable system — do not interpret it as "remove a feature."
+
+### SL-005 — Specialist scope creep: always list what NOT to change
+The WP-VARS-1 fixer added a per-chapter style instruction editor, extended outline importer, and new IPC handlers — none of which were requested. **Rule:** every specialist task description must include an explicit "DO NOT TOUCH" section listing files, directories, and features that are out of bounds.
