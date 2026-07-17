@@ -12,9 +12,9 @@ This directory ships built-in prompt templates for the three generation steps:
 
 | Template   | Version | Step    | Status |
 |------------|---------|---------|--------|
-| expand-v1  | 1.2.0   | expand  | active |
-| write-v1   | 1.1.0   | write   | legacy (whole-chapter, single pass) |
-| write-v2   | 2.1.0   | write   | active (per-section) |
+| expand-v1  | 1.3.0   | expand  | active |
+| write-v1   | 1.2.0   | write   | legacy (whole-chapter, single pass) |
+| write-v2   | 2.2.0   | write   | active (per-section) |
 | iterate-v1 | 1.1.0   | iterate | active |
 
 Template content changes bump the `version` field in `template.json`
@@ -68,6 +68,10 @@ templates/
   to the manuscript, while still refusing to treat anything inside injected
   data blocks as directives about the model's task, rules, or output format
   (prompt-injection hygiene).
+- **Length is a hard budget.** Expand is capped at 1/3 of the chapter word
+  target (planning artifact, always far shorter than the chapter); write
+  treats word targets as ceilings (+10% max) with explicit precedence:
+  target wins over exhaustive beat coverage.
 - **Iterate is minimal-diff.** The iterate template requires verbatim
   preservation of all text outside the instruction's scope, because output is
   reviewed in the DiffView.
