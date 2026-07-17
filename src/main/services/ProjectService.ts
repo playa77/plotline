@@ -99,6 +99,7 @@ export class ProjectService {
           expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+          parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
         },
         inference: { baseUrl: 'https://openrouter.ai/api/v1' },
         theme: 'light',
@@ -375,6 +376,7 @@ export class ProjectService {
           expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+          parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
         },
         inference: { baseUrl: 'https://openrouter.ai/api/v1' },
         theme: 'light' as const,
@@ -412,9 +414,8 @@ export class ProjectService {
    *
    * @throws If the project is not open.
    */
-  async importOutlinePreview(projectId: string, markdown: string): Promise<ParsePreview> {
-    // parseOutlineMarkdown is a pure function — no project state needed
-    return parseOutlineMarkdown(markdown);
+  async importOutlinePreview(projectId: string, markdown: string, apiKey: string): Promise<ParsePreview> {
+    return parseOutlineMarkdown(markdown, apiKey);
   }
 
   /**

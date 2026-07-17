@@ -327,6 +327,14 @@ export function SettingsWorkspace({
               models: { ...s.models, iterate: { provider: provider ?? s.models.iterate.provider, model } },
             })}
           />
+          <ModelField
+            label="Parse (outline import)"
+            provider={s.models.parse.provider}
+            model={s.models.parse.model}
+            onSave={(model, provider) => saveSettings({
+              models: { ...s.models, parse: { provider: provider ?? s.models.parse.provider, model } },
+            })}
+          />
         </Section>
 
         {/* ═══ Inference ═════════════════════════════════════════════════════ */}

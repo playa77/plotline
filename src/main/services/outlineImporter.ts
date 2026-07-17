@@ -1,12 +1,15 @@
 /**
  * Markdown outline importer — converts a reference outline into Plotline's
- * structured outline.json format.
+ * structured outline.json format via LLM-based parsing.
  *
- * Pure function: no disk access, no Git operations. Takes markdown text,
- * returns a ParsePreview with the parsed outline, validated Outline object,
- * and project-manifest structure array.
+ * Part A: buildOutlineAndStructure — pure assembly from LLM-parsed data.
+ * Part B: parseOutlineMarkdown — async LLM-based parsing via OpenRouter.
  *
- * Version: 0.1.0 | 2026-07-16
+ * The regex-based state machine was replaced with an LLM approach in v0.2.0.
+ * The assembly logic (ULID generation, RichBlock conversion, schema validation)
+ * remains as a pure function for testability.
+ *
+ * Version: 0.2.0 | 2026-07-17
  */
 
 import { generateULID } from '../../shared/utils/ulid';
@@ -14,69 +17,76 @@ import type { RichBlock, Outline, ParsedPart, ParsedChapter, ParsedSection, Pars
 import type { ChapterEntry, StructureItem } from '../../shared/schemas/project';
 import { OutlineSchema } from '../../shared/schemas/outline';
 
+// ── LLM-parsed data interfaces ──────────────────────────────────────────────
+
+/**
+ * Raw outline data as returned by the LLM.
+ * All IDs are absent — they are generated during assembly.
+ */
+export interface LLMParsedOutline {
+  projectTitle: string;
+  frontMatterText: string[];
+  backMatterText: string[];
+  parts: LLMParsedPart[];
+}
+
+export interface LLMParsedPart {
+  title: string;
+  chapters: LLMParsedChapter[];
+}
+
+export interface LLMParsedChapter {
+  title: string;
+  wordTargetMin?: number | null;
+  wordTargetMax?: number | null;
+  sections: LLMParsedSection[];
+}
+
+export interface LLMParsedSection {
+  number: string;
+  title: string;
+  wordTarget?: number | null;
+  beats: string[];
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Parse a word target line like:
- *   `**Target: 7,000–8,000 words**`
- *   `**Target: 3,000–4,000 words**`
- *
- * Handles both endash (–) and regular dash (-), with optional commas.
+ * Convert accumulated plain-text lines into RichBlock paragraphs.
+ * Each block of text separated by blank lines becomes one paragraph.
  */
-function parseWordTarget(line: string): { min: number; max: number } | null {
-  const match = line.match(/([\d,]+)\s*[–\-]\s*([\d,]+)/);
-  if (!match) return null;
+function linesToParagraphBlocks(lines: string[]): RichBlock[] {
+  const blocks: RichBlock[] = [];
+  const paraLines: string[] = [];
 
-  const min = parseInt(match[1]!.replace(/,/g, ''), 10);
-  const max = parseInt(match[2]!.replace(/,/g, ''), 10);
-
-  if (isNaN(min) || isNaN(max)) return null;
-  return { min, max };
-}
-
-/**
- * Parse a table row like `| Year | Event |` into cell strings.
- */
-function parseTableRow(line: string): string[] {
-  return line
-    .split('|')
-    .filter((_, i, arr) => i > 0 && i < arr.length - 1)
-    .map((cell) => cell.trim());
-}
-
-/**
- * Convert collected `|` lines into a RichBlock `table`.
- * Expects at least header + separator rows; skips the separator row.
- */
-function buildTableBlock(tableLines: string[]): RichBlock {
-  if (tableLines.length < 2) {
-    return { type: 'paragraph', text: tableLines.join('\n') };
-  }
-
-  const headers = parseTableRow(tableLines[0]!);
-  const rows: string[][] = [];
-
-  for (let i = 2; i < tableLines.length; i++) {
-    const row = parseTableRow(tableLines[i]!);
-    if (row.length > 0 && row.some((c) => c.length > 0)) {
-      rows.push(row);
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (paraLines.length > 0) {
+        blocks.push({ type: 'paragraph', text: paraLines.join('\n') });
+        paraLines.length = 0;
+      }
+    } else {
+      paraLines.push(line);
     }
   }
+  if (paraLines.length > 0) {
+    blocks.push({ type: 'paragraph', text: paraLines.join('\n') });
+  }
 
-  return { type: 'table', headers, rows };
+  return blocks;
 }
+
+// ── Part A: Pure assembly ────────────────────────────────────────────────────
 
 /**
  * Build the project-manifest structure array from parsed parts.
  *
  * Real parts are emitted as `{ kind: 'part', ... }` items.
- * A virtual "Epilogue" part holding only the standalone epilogue chapter
- * is unwrapped into a `{ kind: 'chapter', ... }` item.
+ * A virtual "Epilogue" part (title === 'Epilogue', exactly one chapter)
+ * is unwrapped into a `{ kind: 'chapter', ... }` item so the outline
+ * tree stays flat for single-chapter appendices.
  */
-function buildStructure(
-  parts: ParsedPart[],
-  standaloneEpilogueChapterId: string | null,
-): StructureItem[] {
+function buildStructure(parts: ParsedPart[]): StructureItem[] {
   const structure: StructureItem[] = [];
   const now = new Date().toISOString();
 
@@ -101,9 +111,8 @@ function buildStructure(
   for (const part of parts) {
     // Detect the virtual Epilogue part (only the standalone epilogue chapter)
     if (
-      standaloneEpilogueChapterId &&
-      part.chapters.length === 1 &&
-      part.chapters[0]!.chapterId === standaloneEpilogueChapterId
+      part.title === 'Epilogue' &&
+      part.chapters.length === 1
     ) {
       const chapter = part.chapters[0]!;
       structure.push({
@@ -123,324 +132,49 @@ function buildStructure(
   return structure;
 }
 
-// ── Front / back matter parsing ──────────────────────────────────────────────
-
 /**
- * Convert accumulated plain-text lines into RichBlock paragraphs.
- * Each block of text separated by blank lines becomes one paragraph.
- */
-function linesToParagraphBlocks(lines: string[]): RichBlock[] {
-  const blocks: RichBlock[] = [];
-  // Group consecutive non-empty lines into paragraphs, splitting on blank lines
-  const paraLines: string[] = [];
-
-  for (const line of lines) {
-    if (line.trim() === '') {
-      if (paraLines.length > 0) {
-        blocks.push({ type: 'paragraph', text: paraLines.join('\n') });
-        paraLines.length = 0;
-      }
-    } else {
-      paraLines.push(line);
-    }
-  }
-  if (paraLines.length > 0) {
-    blocks.push({ type: 'paragraph', text: paraLines.join('\n') });
-  }
-
-  return blocks;
-}
-
-// ── Main parser ──────────────────────────────────────────────────────────────
-
-/**
- * Parse a structured book-outline markdown file into Plotline's internal format.
+ * Assemble an LLM-parsed outline into a fully-formed ParsePreview.
  *
- * Supported conventions:
- *  - `# Title` → project title
- *  - `## PART ...` → part heading
- *  - `### Chapter N: Title` → chapter start
- *  - `### Epilogue: Title` → epilogue (treated as chapter)
- *  - `**Target: X–Y words**` → chapter word target
- *  - `#### N.M Title *(n words)*` → section with optional word target
- *  - `- beat text` → section beat
- *  - `(description)` → placeholder chapter (no sections)
- *  - `## Appendix ...` → back-matter heading
- *  - Tables (`| ... |`) → back-matter table blocks
+ * 1. Converts frontMatterText / backMatterText → RichBlock[]
+ * 2. Generates ULIDs for every part, chapter, and section
+ * 3. Combines wordTargetMin/Max into the canonical `{ min, max } | null` format
+ * 4. Builds the `Outline` object (preserving virtual epilogue parts)
+ * 5. Validates against `OutlineSchema`
+ * 6. Builds `StructureItem[]` (unwrapping virtual epilogue)
+ * 7. Returns the complete `ParsePreview`
+ *
+ * Edge cases handled:
+ *   - Empty front/back matter → empty RichBlock arrays
+ *   - Part title 'Epilogue' with one chapter → unwrapped in structure
+ *   - Missing/null word targets → null
  */
-export function parseOutlineMarkdown(markdown: string): ParsePreview {
-  const lines = markdown.split('\n');
+export function buildOutlineAndStructure(parsed: LLMParsedOutline): ParsePreview {
+  // 1. Convert front/back matter text lines to RichBlocks
+  const frontMatter = linesToParagraphBlocks(parsed.frontMatterText ?? []);
+  const backMatter = linesToParagraphBlocks(parsed.backMatterText ?? []);
 
-  let projectTitle = '';
-  const parts: ParsedPart[] = [];
-  const backMatter: RichBlock[] = [];
+  // 2–3. Build parts with generated ULIDs and combined word targets
+  const parts: ParsedPart[] = parsed.parts.map((llmPart) => ({
+    id: generateULID(),
+    title: llmPart.title || 'Untitled Part',
+    chapters: llmPart.chapters.map((llmCh) => ({
+      chapterId: generateULID(),
+      title: llmCh.title,
+      wordTarget:
+        llmCh.wordTargetMin != null && llmCh.wordTargetMax != null
+          ? { min: llmCh.wordTargetMin, max: llmCh.wordTargetMax }
+          : null,
+      sections: llmCh.sections.map((llmSec) => ({
+        id: generateULID(),
+        number: llmSec.number || '',
+        title: llmSec.title || '',
+        wordTarget: llmSec.wordTarget ?? null,
+        beats: llmSec.beats ?? [],
+      })),
+    })),
+  }));
 
-  // Parsing state
-  let inFrontMatter = true;
-  let inBackMatter = false;
-  let currentPart: ParsedPart | null = null;
-  let currentChapter: ParsedChapter | null = null;
-  let currentSection: ParsedSection | null = null;
-
-  // Front matter accumulated lines (everything before first `## PART`)
-  const frontMatterLines: string[] = [];
-
-  // Back matter table accumulator
-  let pendingTable: string[] | null = null;
-
-  // Epilogue that appears outside any part
-  let standaloneEpilogue: ParsedChapter | null = null;
-
-  // ── State helpers ───────────────────────────────────────────────────────
-
-  function closeSection(): void {
-    currentSection = null;
-  }
-
-  function closeChapter(): void {
-    currentChapter = null;
-    currentSection = null;
-  }
-
-  function closePart(): void {
-    currentPart = null;
-    closeChapter();
-  }
-
-  /** Flush accumulated front-matter lines into RichBlock paragraphs. */
-  function commitFrontMatter(): void {
-    // empty — frontMatterLines will be consumed at the end
-  }
-
-  // ── Line processing ─────────────────────────────────────────────────────
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i]!.trimEnd(); // preserve intentional leading space (for tables etc.)
-    const plain = trimmed.trim();
-
-    // ── Project title (first `# ` line, not `##`) ────────────────
-    if (i === 0 && plain.startsWith('# ') && !plain.startsWith('## ')) {
-      projectTitle = plain.slice(2).trim();
-      continue;
-    }
-
-    // ── Part detection ────────────────────────────────────────────
-    if (/^##\s+PART\b/i.test(plain)) {
-      // Flush front matter before first part
-      if (inFrontMatter) {
-        inFrontMatter = false;
-      }
-
-      closeChapter();
-      closePart();
-
-      const title = plain
-        .replace(/^##\s+PART\s*/i, '')
-        .replace(/^[IVXLCDM]+\s*[—\-–]\s*/, '')
-        .trim() || 'Untitled Part';
-
-      currentPart = { id: generateULID(), title, chapters: [] };
-      parts.push(currentPart);
-      continue;
-    }
-
-    // ── Back matter detection (## Appendix) ───────────────────────
-    if (plain.startsWith('## Appendix') || plain.startsWith('## APPENDIX')) {
-      if (inFrontMatter) {
-        inFrontMatter = false;
-      }
-      closeChapter();
-      closePart();
-      inBackMatter = true;
-
-      // Flush any pending table first
-      if (pendingTable !== null) {
-        if (pendingTable.length >= 2) {
-          backMatter.push(buildTableBlock(pendingTable));
-        }
-        pendingTable = null;
-      }
-
-      backMatter.push({
-        type: 'heading',
-        level: 2,
-        text: plain.replace(/^##\s+/, '').trim(),
-      });
-      continue;
-    }
-
-    // ── Horizontal rules / separators (ignore) ────────────────────
-    if (/^[-*_]{3,}$/.test(plain)) {
-      continue;
-    }
-
-    // ── Empty lines ───────────────────────────────────────────────
-    if (plain === '') {
-      // Reset any "pendingWordTarget" assumption on blank lines
-      if (inBackMatter && pendingTable !== null) {
-        // Table finished by blank line
-        if (pendingTable.length >= 2) {
-          backMatter.push(buildTableBlock(pendingTable));
-        }
-        pendingTable = null;
-      }
-      continue;
-    }
-
-    // ── Front matter accumulation ────────────────────────────────
-    if (inFrontMatter) {
-      frontMatterLines.push(plain);
-      continue;
-    }
-
-    // ── Back matter ──────────────────────────────────────────────
-    if (inBackMatter) {
-      if (plain.startsWith('|')) {
-        if (pendingTable === null) {
-          pendingTable = [];
-        }
-        pendingTable.push(plain);
-      } else {
-        // Flush pending table
-        if (pendingTable !== null) {
-          if (pendingTable.length >= 2) {
-            backMatter.push(buildTableBlock(pendingTable));
-          }
-          pendingTable = null;
-        }
-
-        // Italic / emphasis lines → paragraph
-        if (/^[*_]/.test(plain) && /[*_]$/.test(plain)) {
-          const text = plain.replace(/^[*_]+/, '').replace(/[*_]+$/, '').trim();
-          backMatter.push({ type: 'paragraph', text });
-        } else if (plain.startsWith('## ')) {
-          // Another heading in back matter
-          backMatter.push({
-            type: 'heading',
-            level: 2,
-            text: plain.replace(/^##\s+/, '').trim(),
-          });
-        } else if (plain.startsWith('- ')) {
-          // List item in back matter
-          backMatter.push({ type: 'list', ordered: false, items: [plain.slice(2).trim()] });
-        } else {
-          backMatter.push({ type: 'paragraph', text: plain });
-        }
-      }
-      continue;
-    }
-
-    // ── Chapter detection ─────────────────────────────────────────
-    const chapterMatch = plain.match(
-      /^###\s*(Chapter\s+\d+|Epilogue)\s*[:—–-]?\s*(.+)$/,
-    );
-    if (chapterMatch) {
-      closeChapter();
-
-      const prefix = chapterMatch[1]!; // "Chapter N" or "Epilogue"
-      const titlePart = chapterMatch[2]!.trim();
-      const chapterId = generateULID();
-      currentChapter = {
-        chapterId,
-        title: `${prefix}: ${titlePart}`,
-        wordTarget: null,
-        sections: [],
-      };
-
-      if (currentPart) {
-        currentPart.chapters.push(currentChapter);
-      } else if (prefix === 'Epilogue') {
-        // Epilogue outside any part — save as standalone
-        standaloneEpilogue = currentChapter;
-      }
-      continue;
-    }
-
-    // ── Word target (right after chapter title) ────────────────────
-    if (currentChapter && plain.startsWith('**Target:')) {
-      currentChapter.wordTarget = parseWordTarget(plain);
-      continue;
-    }
-
-    // ── Section detection ─────────────────────────────────────────
-    if (currentChapter) {
-      // Match: #### N.M Title *(n words)*  OR  #### N.M Title
-      const sectionMatch = plain.match(
-        /^####\s+(\d+\.\d+)\s+(.+?)(?:\s+\*[\((]([\d,]+)\s*words[\))]\*)?$/,
-      );
-      if (sectionMatch) {
-        currentSection = null;
-        const sectionId = generateULID();
-        const number = sectionMatch[1]!;
-        const title = sectionMatch[2]!.trim();
-        const wordTargetStr = sectionMatch[3];
-        const wordTarget = wordTargetStr
-          ? parseInt(wordTargetStr.replace(/,/g, ''), 10)
-          : null;
-        currentSection = {
-          id: sectionId,
-          number,
-          title,
-          wordTarget,
-          beats: [],
-        };
-        currentChapter.sections.push(currentSection);
-        continue;
-      }
-    }
-
-    // ── Beat detection (under a section) ──────────────────────────
-    if (currentSection && plain.startsWith('- ')) {
-      currentSection.beats.push(plain.slice(2).trim());
-      continue;
-    }
-
-    // ── Epilogue beats (directly under chapter, no section headers) ──
-    if (currentChapter && !currentSection && plain.startsWith('- ')) {
-      // Auto-create a synthetic section for epilogue-style chapters
-      if (currentChapter.sections.length === 0) {
-        currentSection = {
-          id: generateULID(),
-          number: '',
-          title: '',
-          wordTarget: null,
-          beats: [],
-        };
-        currentChapter.sections.push(currentSection);
-      }
-      currentSection!.beats.push(plain.slice(2).trim());
-      continue;
-    }
-
-    // ── Placeholder chapters: (description text in parentheses) ────
-    if (currentChapter && /^\(.+\)$/.test(plain)) {
-      // Chapter is a placeholder — just skip it (section list stays empty)
-      continue;
-    }
-
-    // ── Any other line in structured area (ignore) ─────────────────
-    // This catches stray content, e.g. separator descriptions.
-  }
-
-  // ── Flush pending table ─────────────────────────────────────────────
-  if (pendingTable !== null && pendingTable.length >= 2) {
-    backMatter.push(buildTableBlock(pendingTable));
-  }
-
-  // ── Convert front-matter lines to RichBlocks ────────────────────────
-  const frontMatter = linesToParagraphBlocks(frontMatterLines);
-
-  // ── Handle standalone epilogue → virtual part ────────────────────────
-  if (standaloneEpilogue) {
-    const epiloguePart: ParsedPart = {
-      id: generateULID(),
-      title: 'Epilogue',
-      chapters: [standaloneEpilogue],
-    };
-    parts.push(epiloguePart);
-  }
-
-  // ── Build the Outline ────────────────────────────────────────────────
+  // 4. Build the Outline object (preserves virtual epilogue parts in data)
   const outline: Outline = {
     schemaVersion: 1,
     frontMatter,
@@ -457,7 +191,7 @@ export function parseOutlineMarkdown(markdown: string): ParsePreview {
     backMatter,
   };
 
-  // Validate against OutlineSchema
+  // 5. Validate against OutlineSchema
   const validation = OutlineSchema.safeParse(outline);
   if (!validation.success) {
     const details = validation.error.issues
@@ -466,16 +200,224 @@ export function parseOutlineMarkdown(markdown: string): ParsePreview {
     throw new Error(`Outline schema validation failed: ${details}`);
   }
 
-  // ── Build structure ─────────────────────────────────────────────────
-  const standaloneId = standaloneEpilogue?.chapterId ?? null;
-  const structure = buildStructure(parts, standaloneId);
+  // 6. Build structure (unwraps virtual epilogue)
+  const structure = buildStructure(parts);
 
+  // 7. Return the complete preview
   return {
-    projectTitle,
+    projectTitle: parsed.projectTitle || '',
     frontMatter,
     parts,
     backMatter,
     outline,
     structure,
   };
+}
+
+// ── Part B: Async LLM-based parsing ──────────────────────────────────────────
+
+/**
+ * System prompt that instructs the LLM how to parse a book outline markdown
+ * into the expected structured JSON format.
+ */
+const SYSTEM_PROMPT = `You are a book outline parser. Your task is to read a markdown book outline and extract its structural elements as JSON. Be thorough and detect ALL parts, chapters, sections, and beats present in the text.
+
+Return a JSON object with this exact structure:
+{
+  "projectTitle": "string — the book title from the first # heading, or empty string if none",
+  "frontMatterText": ["array of strings — every line of content before the first ## PART heading, preserved exactly as-is"],
+  "backMatterText": ["array of strings — every line after the last chapter/section, including appendix headings, tables, notes, exactly as-is"],
+  "parts": [
+    {
+      "title": "string — the part title, without the '## PART ' prefix, without Roman numeral prefix like 'I —'. E.g. 'ONE: The Fire That Carries Us' not '## PART ONE: The Fire That Carries Us'",
+      "chapters": [
+        {
+          "title": "string — the chapter title without '### ' prefix. E.g. 'Chapter 1: The Last Shore' or 'Chapter 1 — The Last Shore'",
+          "wordTargetMin": number or null,
+          "wordTargetMax": number or null,
+          "sections": [
+            {
+              "number": "string — section number like '1.1', '1.2', or empty string for unnumbered",
+              "title": "string — section title without '#### ' prefix",
+              "wordTarget": number or null,
+              "beats": ["array of strings — bullet point beats under the section, without the '- ' prefix"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+RULES:
+- Detect parts ONLY from lines starting with '## PART' (case-insensitive). A part may appear as '## PART ONE', '## PART I —', '## PART 1:' etc.
+- Detect chapters from lines starting with '### Chapter' or '### Epilogue'. Separators after 'Chapter N' can be ':', '—', '–', '-', or nothing. 
+- Detect sections from '#### N.M Title' patterns or any subheading under a chapter (h4 level).
+- Detect beats from bullet points ('- ') under a section.
+- Detect word targets from patterns like '**Target: 7000-8000**', '**Length:** 7000-8000', '*(7,000 words)*', etc. For chapter-level targets, set both wordTargetMin and wordTargetMax. For section-level, use single wordTarget.
+- If a chapter has no sections but has bullet points directly under it, create one section with empty number and title containing those bullets as beats.
+- An Epilogue outside any part should still be included — create it as a standalone part with title "Epilogue".
+- Do NOT fabricate chapters, sections, or beats that aren't in the text. 
+- Do NOT include the markdown headers (###, ####, ##) in titles.
+- Preserve the original text exactly — do not paraphrase or modify titles.`;
+
+/**
+ * Parse a structured book-outline markdown file using an LLM via OpenRouter.
+ *
+ * Sends the markdown to deepseek/deepseek-v4-flash with a structured parsing
+ * prompt, then validates and assembles the result into a ParsePreview.
+ *
+ * @param markdown - Raw markdown content of the book outline
+ * @param apiKey   - OpenRouter API key for authentication
+ * @param baseUrl  - Optional custom OpenRouter-compatible base URL
+ * @returns A fully populated ParsePreview
+ * @throws If the API key is missing, the LLM call fails, or parsing fails
+ */
+export async function parseOutlineMarkdown(
+  markdown: string,
+  apiKey: string,
+  baseUrl?: string,
+  /** Model override (defaults to deepseek/deepseek-v4-flash). */
+  model?: string,
+): Promise<ParsePreview> {
+  if (!apiKey) {
+    throw new Error(
+      'API key required for outline import. Set your OpenRouter API key in Settings.',
+    );
+  }
+
+  const url = `${baseUrl || 'https://openrouter.ai/api/v1'}/chat/completions`;
+
+  // ── Call the LLM API ────────────────────────────────────────────────────
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: model || 'deepseek/deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: markdown },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }),
+    });
+  } catch (err) {
+    throw new Error(
+      `Failed to reach LLM API: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // ── Handle HTTP errors ─────────────────────────────────────────────────
+  if (!response.ok) {
+    let errorBody = '';
+    try {
+      const errJson = (await response.json()) as { error?: { message?: string } };
+      errorBody = errJson.error?.message || JSON.stringify(errJson);
+    } catch {
+      errorBody = await response.text().catch(() => '(no body)');
+    }
+    throw new Error(`LLM API error (${response.status}): ${errorBody}`);
+  }
+
+  // ── Parse the response envelope ────────────────────────────────────────
+  let responseData: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    responseData = (await response.json()) as typeof responseData;
+  } catch (err) {
+    throw new Error(
+      `Failed to parse LLM API response as JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const content = responseData?.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error('LLM response was empty or could not be parsed as JSON');
+  }
+
+  // ── Parse the inner JSON payload ───────────────────────────────────────
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(content) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error(
+      `LLM response was empty or could not be parsed as JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  // ── Structural validation ──────────────────────────────────────────────
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('LLM response JSON is not an object');
+  }
+  if (!Array.isArray(parsed.parts)) {
+    throw new Error('LLM response missing required "parts" array');
+  }
+
+  for (let i = 0; i < parsed.parts.length; i++) {
+    const part = parsed.parts[i] as Record<string, unknown> | undefined;
+    if (!part || typeof part !== 'object') {
+      throw new Error(`LLM response part[${i}] is not an object`);
+    }
+    if (!Array.isArray(part.chapters)) {
+      throw new Error(`LLM response part[${i}] missing required "chapters" array`);
+    }
+    for (let j = 0; j < part.chapters.length; j++) {
+      const ch = (part.chapters as Array<Record<string, unknown>>)[j]!;
+      if (!ch || typeof ch !== 'object') {
+        throw new Error(`LLM response part[${i}].chapters[${j}] is not an object`);
+      }
+      if (!Array.isArray(ch.sections)) {
+        throw new Error(
+          `LLM response part[${i}].chapters[${j}] missing required "sections" array`,
+        );
+      }
+    }
+  }
+
+  // ── Build the typed LLMParsedOutline ───────────────────────────────────
+  const llmParsed: LLMParsedOutline = {
+    projectTitle:
+      typeof parsed.projectTitle === 'string' ? parsed.projectTitle : '',
+    frontMatterText: Array.isArray(parsed.frontMatterText)
+      ? (parsed.frontMatterText as unknown[]).map(String)
+      : [],
+    backMatterText: Array.isArray(parsed.backMatterText)
+      ? (parsed.backMatterText as unknown[]).map(String)
+      : [],
+    parts: (parsed.parts as unknown[]).map((part: unknown) => {
+      const p = part as Record<string, unknown>;
+      return {
+        title: typeof p.title === 'string' ? p.title : '',
+        chapters: ((p.chapters as unknown[]) || []).map((ch: unknown) => {
+          const c = ch as Record<string, unknown>;
+          return {
+            title: typeof c.title === 'string' ? c.title : '',
+            wordTargetMin:
+              c.wordTargetMin != null ? Number(c.wordTargetMin) : null,
+            wordTargetMax:
+              c.wordTargetMax != null ? Number(c.wordTargetMax) : null,
+            sections: ((c.sections as unknown[]) || []).map((sec: unknown) => {
+              const s = sec as Record<string, unknown>;
+              return {
+                number: typeof s.number === 'string' ? s.number : '',
+                title: typeof s.title === 'string' ? s.title : '',
+                wordTarget: s.wordTarget != null ? Number(s.wordTarget) : null,
+                beats: Array.isArray(s.beats)
+                  ? (s.beats as unknown[]).map(String)
+                  : [],
+              };
+            }),
+          };
+        }),
+      };
+    }),
+  };
+
+  // ── Assemble and return ─────────────────────────────────────────────────
+  return buildOutlineAndStructure(llmParsed);
 }

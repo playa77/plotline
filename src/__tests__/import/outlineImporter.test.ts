@@ -1,246 +1,150 @@
 /**
- * Tests for the markdown outline importer (WP-06).
+ * Tests for the markdown outline importer (v0.2.0 — LLM-based).
  *
- * Uses the golden fixture LKY_Book_Outline_v0_2.md to verify parsing
- * correctness across parts, chapters, sections, beats, word targets,
- * placeholder chapters, epilogue, front/back matter, and structure generation.
+ * Two testing strategies:
+ *   a. `buildOutlineAndStructure` unit tests — construct mock LLMParsedOutline
+ *      inputs and verify correct ParsePreview assembly (ULID generation,
+ *      RichBlock conversion, structure building, edge cases).
+ *   b. `parseOutlineMarkdown` integration tests — mock globalThis.fetch to
+ *      provide known LLM responses and verify the full end-to-end pipeline.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-17
  */
 
-import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { parseOutlineMarkdown } from '../../main/services/outlineImporter';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  parseOutlineMarkdown,
+  buildOutlineAndStructure,
+  type LLMParsedOutline,
+} from '../../main/services/outlineImporter';
+import type { RichBlock } from '../../shared/schemas/outline';
 
-// ── Fixture ──────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const fixturePath = resolve(__dirname, '../fixtures/LKY_Book_Outline_v0_2.md');
-const fixture = readFileSync(fixturePath, 'utf-8');
+/** Create a minimal valid LLMParsedOutline for testing. */
+function minimalOutline(overrides?: Partial<LLMParsedOutline>): LLMParsedOutline {
+  return {
+    projectTitle: 'Test Book',
+    frontMatterText: [],
+    backMatterText: [],
+    parts: [],
+    ...overrides,
+  };
+}
 
-// ── Suite ────────────────────────────────────────────────────────────────────
+/** Extract all section IDs from a ParsePreview for structural assertion. */
+function allSectionIds(preview: ReturnType<typeof buildOutlineAndStructure>): string[] {
+  return preview.parts.flatMap((p) =>
+    p.chapters.flatMap((ch) => ch.sections.map((s) => s.id)),
+  );
+}
 
-describe('parseOutlineMarkdown (golden fixture)', () => {
-  const preview = parseOutlineMarkdown(fixture);
+// ── Suite: buildOutlineAndStructure ──────────────────────────────────────────
 
-  // ── 1. Project title ─────────────────────────────────────────────────────
-  it('parses the project title from the H1 line', () => {
-    expect(preview.projectTitle).toBe(
-      'Lee Kuan Yew: The Man Who Built a Nation — Book Outline v0.2',
-    );
+describe('buildOutlineAndStructure (pure assembly)', () => {
+  // ── 1. Empty outline ─────────────────────────────────────────────────────
+  it('handles an empty outline (no parts, no front/back matter)', () => {
+    const input = minimalOutline();
+    const result = buildOutlineAndStructure(input);
+
+    expect(result.projectTitle).toBe('Test Book');
+    expect(result.parts).toHaveLength(0);
+    expect(result.frontMatter).toHaveLength(0);
+    expect(result.backMatter).toHaveLength(0);
+    expect(result.structure).toHaveLength(0);
+    expect(result.outline.schemaVersion).toBe(1);
   });
 
-  // ── 2. Part count ────────────────────────────────────────────────────────
-  it('yields 4 parts (I–IV)', () => {
-    expect(preview.parts.length).toBe(4);
-  });
+  // ── 2. Parts and chapters ─────────────────────────────────────────────────
+  it('builds parts and chapters with generated ULIDs', () => {
+    const input = minimalOutline({
+      parts: [
+        {
+          title: 'ONE: The Fire That Carries Us',
+          chapters: [
+            {
+              title: 'Chapter 1: The Last Shore',
+              wordTargetMin: 7000,
+              wordTargetMax: 8000,
+              sections: [
+                {
+                  number: '1.1',
+                  title: 'The Myth of Fortress Singapore',
+                  wordTarget: 1200,
+                  beats: ['British propaganda about impregnability'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
 
-  // ── 3. Part titles are extracted correctly ──────────────────────────────
-  it('extracts correct part titles', () => {
-    const titles = preview.parts.map((p) => p.title);
-    expect(titles).toEqual([
-      'THE SHOCK (1942–1950)',
-      'THE BUILD (1959–1965)',
-      'THE SURVIVAL YEARS (1965–1980)',
-      'THE ELDER (1980–2015)',
-    ]);
-  });
+    const result = buildOutlineAndStructure(input);
 
-  // ── 4. Chapter count (11 + epilogue = 12) ────────────────────────────────
-  it('parses 11 chapters plus epilogue = 12 chapter entries across all parts', () => {
-    const allChapters = preview.parts.flatMap((p) => p.chapters);
-    expect(allChapters.length).toBe(12);
-  });
+    // Project title
+    expect(result.projectTitle).toBe('Test Book');
 
-  // ── 5. Chapter 1 word target ────────────────────────────────────────────
-  it('parses Chapter 1 word target as { min: 7000, max: 8000 }', () => {
-    const ch1 = preview.parts[0]!.chapters[0]!;
-    expect(ch1.title).toBe('Chapter 1: The Fall of Singapore');
-    expect(ch1.wordTarget).toEqual({ min: 7000, max: 8000 });
-  });
+    // Part count
+    expect(result.parts).toHaveLength(1);
+    expect(result.structure).toHaveLength(1);
 
-  // ── 6. Section 1.1 with 4 beats and 1,200-word target ───────────────────
-  it('parses Section 1.1 with correct number, beats, and word target', () => {
-    const ch1 = preview.parts[0]!.chapters[0]!;
-    const sec1_1 = ch1.sections.find((s) => s.number === '1.1');
-    expect(sec1_1).toBeDefined();
-    expect(sec1_1!.title).toBe('The Myth of Fortress Singapore');
-    expect(sec1_1!.wordTarget).toBe(1200);
-    expect(sec1_1!.beats.length).toBeGreaterThanOrEqual(4);
-    // First beat should mention British propaganda
-    expect(sec1_1!.beats[0]!).toMatch(/British propaganda/);
-  });
+    // Part
+    const part = result.parts[0]!;
+    expect(part.title).toBe('ONE: The Fire That Carries Us');
+    expect(part.id).toBeTruthy();
+    expect(part.id.length).toBeGreaterThan(10); // ULID
 
-  // ── 7. All chapter word targets across parts ────────────────────────────
-  it('parses word targets correctly for all chapters', () => {
-    const allChapters = preview.parts.flatMap((p) => p.chapters);
-    // Chapters 1–11 have 7,000–8,000; Epilogue has 3,000–4,000
-    for (let i = 0; i < allChapters.length; i++) {
-      const ch = allChapters[i]!;
-      if (ch.title.startsWith('Epilogue:')) {
-        expect(ch.wordTarget).toEqual({ min: 3000, max: 4000 });
-      } else {
-        expect(ch.wordTarget).toEqual({ min: 7000, max: 8000 });
-      }
+    // Chapter
+    expect(part.chapters).toHaveLength(1);
+    const ch = part.chapters[0]!;
+    expect(ch.title).toBe('Chapter 1: The Last Shore');
+    expect(ch.chapterId).toBeTruthy();
+    expect(ch.chapterId.length).toBeGreaterThan(10);
+    expect(ch.wordTarget).toEqual({ min: 7000, max: 8000 });
+
+    // Section
+    expect(ch.sections).toHaveLength(1);
+    const sec = ch.sections[0]!;
+    expect(sec.number).toBe('1.1');
+    expect(sec.title).toBe('The Myth of Fortress Singapore');
+    expect(sec.wordTarget).toBe(1200);
+    expect(sec.beats).toEqual(['British propaganda about impregnability']);
+    expect(sec.id).toBeTruthy();
+    expect(sec.id.length).toBeGreaterThan(10);
+
+    // Structure item (part kind)
+    const struct = result.structure[0]!;
+    expect(struct.kind).toBe('part');
+    if (struct.kind === 'part') {
+      expect(struct.title).toBe('ONE: The Fire That Carries Us');
+      expect(struct.chapters).toHaveLength(1);
+      expect(struct.chapters[0]!.id).toBe(ch.chapterId);
     }
   });
 
-  // ── 8. Placeholder chapter (Chapter 3) has empty sections ───────────────
-  it('parses Chapter 3 as a placeholder chapter with no sections', () => {
-    // Chapter 3 is in Part I (index 0), chapters[2]
-    const ch3 = preview.parts[0]!.chapters[2]!;
-    expect(ch3.title).toBe('Chapter 3: The Anti-Colonial Struggle');
-    expect(ch3.wordTarget).toEqual({ min: 7000, max: 8000 });
-    expect(ch3.sections.length).toBe(0);
-  });
-
-  // ── 9. Chapter 6 (in Part II) has beats but no sections ────────────────
-  it('parses Chapter 6 (The Expulsion) with beats directly under chapter', () => {
-    // Part II index 1
-    const part2 = preview.parts[1]!;
-    // Chapter 6 is chapters[2] in Part II: Ch4, Ch5, Ch6
-    const ch6 = part2.chapters[2]!;
-    expect(ch6.title).toBe('Chapter 6: The Expulsion');
-    // Chapter 6 has beats (4) but no sections — synthetic section created
-    expect(ch6.sections.length).toBe(1);
-    const synSection = ch6.sections[0]!;
-    expect(synSection.number).toBe('');
-    expect(synSection.beats.length).toBeGreaterThanOrEqual(4);
-    expect(synSection.beats[0]!).toMatch(/brief, turbulent union/);
-  });
-
-  // ── 10. Front matter detection ───────────────────────────────────────────
-  it('detects front matter with author note and estimated length', () => {
-    expect(preview.frontMatter.length).toBeGreaterThanOrEqual(1);
-    const hasAuthorNote = preview.frontMatter.some(
-      (b) => b.type === 'paragraph' && b.text.includes("Author's Note"),
-    );
-    expect(hasAuthorNote).toBe(true);
-  });
-
-  // ── 11. Back matter contains appendix headings and tables ────────────────
-  it('parses back matter with appendix headings and a timeline table', () => {
-    expect(preview.backMatter.length).toBeGreaterThan(0);
-
-    // Should have at least one heading (Appendix A / Appendix B)
-    const headings = preview.backMatter.filter((b) => b.type === 'heading');
-    expect(headings.length).toBeGreaterThanOrEqual(2);
-    expect(headings[0]!.text).toMatch(/Appendix A/);
-
-    // Should have at least one table block (word-count summary or timeline)
-    const tables = preview.backMatter.filter((b) => b.type === 'table');
-    expect(tables.length).toBeGreaterThanOrEqual(1);
-
-    // The word-count summary table should have headers
-    const wordCountTable = tables.find(
-      (t) => t.type === 'table' && t.headers.includes('Chapter'),
-    );
-    expect(wordCountTable).toBeDefined();
-    if (wordCountTable && wordCountTable.type === 'table') {
-      expect(wordCountTable.rows.length).toBeGreaterThanOrEqual(11);
-    }
-  });
-
-  // ── 12. Epilogue parsing ─────────────────────────────────────────────────
-  it('parses epilogue as a chapter with word target 3,000–4,000 and beats', () => {
-    // Epilogue is the last chapter in Part IV (which is the last part)
-    const lastPart = preview.parts[preview.parts.length - 1]!;
-    const epilogue = lastPart.chapters[lastPart.chapters.length - 1]!;
-    expect(epilogue.title).toBe('Epilogue: The Question Lee Left Behind');
-    expect(epilogue.wordTarget).toEqual({ min: 3000, max: 4000 });
-    expect(epilogue.sections.length).toBe(1);
-
-    const epilogueSection = epilogue.sections[0]!;
-    expect(epilogueSection.beats.length).toBeGreaterThanOrEqual(4);
-    expect(epilogueSection.beats[0]!).toMatch(/Singapore model survive/);
-  });
-
-  // ── 13. Structure generation ─────────────────────────────────────────────
-  it('generates structure with correct item kinds and chapter IDs', () => {
-    const { structure } = preview;
-
-    // All 4 parts from the fixture
-    const partItems = structure.filter((s) => s.kind === 'part');
-    expect(partItems.length).toBe(4);
-
-    // No standalone chapters — epilogue is inside Part IV
-    const chapterItems = structure.filter((s) => s.kind === 'chapter');
-    expect(chapterItems.length).toBe(0);
-
-    // Every chapter in every part should have an ID that's a valid string
-    for (const item of structure) {
-      if (item.kind === 'part') {
-        expect(item.chapters.length).toBeGreaterThan(0);
-        for (const ch of item.chapters) {
-          expect(ch.id).toBeTruthy();
-          expect(ch.wordTarget).toBeTruthy();
-        }
-      }
-    }
-  });
-
-  // ── 14. Content-hash coverage ────────────────────────────────────────────
-  it('content-hash: every significant line in the markdown is reflected in output', () => {
-    // Count meaningful structural lines in the markdown
-    const lines = fixture.split('\n');
-    let partHeadings = 0;
-    let chapterHeadings = 0;
-    let sectionHeadings = 0;
-    let beatLines = 0;
-    let tableHeaderLines = 0;
-
-    for (const line of lines) {
-      const t = line.trim();
-      if (t.startsWith('## PART')) partHeadings++;
-      else if (/^### (Chapter\s+\d+|Epilogue):/.test(t)) chapterHeadings++;
-      else if (/^#### \d+\.\d+/.test(t)) sectionHeadings++;
-      else if (t.startsWith('- ')) beatLines++;
-      else if (/^\|.+\|$/.test(t)) tableHeaderLines++;
-    }
-
-    // Verify counts match parse output
-    expect(partHeadings).toBe(4);
-    expect(preview.parts.length).toBe(4);
-
-    // Count chapters in the output
-    const allChapters = preview.parts.flatMap((p) => p.chapters);
-    // 12 chapter headings: 11 "Chapter N:" + 1 "Epilogue:"
-    expect(chapterHeadings).toBe(12);
-    expect(allChapters.length).toBe(12);
-
-    // Count sections in output
-    const allSections = allChapters.flatMap((ch) => ch.sections);
-    // Sections: Ch1 has 4 sections (1.1-1.4), Ch2 has 4 sections (2.1-2.4),
-    // Ch6 has 1 synthetic section, Epilogue has 1 synthetic section
-    // = 4 + 4 + 1 + 1 = 10
-    expect(sectionHeadings).toBe(8); // 8 actual #### section headings in markdown
-    expect(allSections.length).toBe(10); // 8 real + 2 synthetic (ch6, epilogue)
-
-    // Count beats
-    const allBeats = allSections.flatMap((s) => s.beats);
-    // Ch1: 16 beats (4 per section), Ch2: 16 beats, Ch6: 4 beats, Epilogue: 4 beats
-    expect(allBeats.length).toBeGreaterThanOrEqual(beatLines);
-    // Every beat line in the markdown should have a corresponding entry
-    // (there could be more if some content got parsed as beat-like, but not fewer)
-    expect(allBeats.length).toBeGreaterThanOrEqual(beatLines);
-
-    // Verify table coverage
-    const tables = preview.backMatter.filter((b) => b.type === 'table');
-    const tableRows = tables.reduce((sum, t) => {
-      if (t.type === 'table') return sum + t.rows.length;
-      return sum;
-    }, 0);
-    // Timeline table has 15 data rows + word-count has 12 data rows + header = 27 table lines
-    expect(tableRows).toBeGreaterThanOrEqual(15);
-  });
-
-  // ── 15. Outline validates against schema ─────────────────────────────────
+  // ── 3. Outline validates ─────────────────────────────────────────────────
   it('produces an outline that passes OutlineSchema validation', () => {
-    const { outline } = preview;
+    const input = minimalOutline({
+      parts: [
+        {
+          title: 'Part I',
+          chapters: [
+            {
+              title: 'Chapter 1: Start',
+              wordTargetMin: null,
+              wordTargetMax: null,
+              sections: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+    const { outline } = result;
+
     expect(outline.schemaVersion).toBe(1);
-    expect(outline.frontMatter).toEqual(preview.frontMatter);
-    expect(outline.backMatter).toEqual(preview.backMatter);
-    // Every part in the outline has chapters with sections
     for (const part of outline.parts) {
       expect(part.id).toBeTruthy();
       expect(part.title).toBeTruthy();
@@ -252,58 +156,358 @@ describe('parseOutlineMarkdown (golden fixture)', () => {
     }
   });
 
-  // ── 16. Empty content edge case ──────────────────────────────────────────
-  it('handles empty markdown gracefully', () => {
-    const result = parseOutlineMarkdown('');
-    expect(result.projectTitle).toBe('');
-    expect(result.parts.length).toBe(0);
-    expect(result.frontMatter.length).toBe(0);
-    expect(result.backMatter.length).toBe(0);
-    expect(result.structure.length).toBe(0);
-    expect(result.outline.schemaVersion).toBe(1);
+  // ── 4. Front matter conversion ────────────────────────────────────────────
+  it('converts frontMatterText lines into RichBlock paragraphs', () => {
+    const input = minimalOutline({
+      frontMatterText: [
+        "Author's Note",
+        '',
+        'This book is a work of historical fiction.',
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+
+    expect(result.frontMatter).toHaveLength(2);
+    const block0 = result.frontMatter[0]!;
+    expect(block0.type).toBe('paragraph');
+    if (block0.type === 'paragraph') {
+      expect(block0.text).toBe("Author's Note");
+    }
+    const block1 = result.frontMatter[1]!;
+    expect(block1.type).toBe('paragraph');
+    if (block1.type === 'paragraph') {
+      expect(block1.text).toBe('This book is a work of historical fiction.');
+    }
   });
 
-  // ── 17. Chapter number extraction ────────────────────────────────────────
-  it('captures section numbers as strings (e.g. "1.1", "2.3")', () => {
-    const allChapters = preview.parts.flatMap((p) => p.chapters);
-    const realSections = allChapters.flatMap((ch) =>
-      ch.sections.filter((s) => s.number !== ''),
-    );
-    const numbers = realSections.map((s) => s.number);
-    expect(numbers).toContain('1.1');
-    expect(numbers).toContain('1.2');
-    expect(numbers).toContain('2.3');
-    expect(numbers).toContain('1.4');
+  // ── 5. Back matter conversion ─────────────────────────────────────────────
+  it('converts backMatterText lines into RichBlock paragraphs', () => {
+    const input = minimalOutline({
+      backMatterText: [
+        '## Appendix A: Timeline',
+        '',
+        '1942 - Fall of Singapore',
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+
+    expect(result.backMatter.length).toBeGreaterThan(0);
+    // Back matter is passed as-is through linesToParagraphBlocks
+    const block0 = result.backMatter[0]!;
+    expect(block0.type).toBe('paragraph');
+  });
+
+  // ── 6. Epilogue standalone → unwrapped in structure ───────────────────────
+  it('unwraps a standalone Epilogue part in the structure', () => {
+    const input = minimalOutline({
+      parts: [
+        {
+          title: 'ONE: Beginning',
+          chapters: [
+            {
+              title: 'Chapter 1: Start',
+              sections: [],
+            },
+          ],
+        },
+        {
+          title: 'Epilogue',
+          chapters: [
+            {
+              title: 'Epilogue: The End',
+              wordTargetMin: 3000,
+              wordTargetMax: 4000,
+              sections: [
+                {
+                  number: '',
+                  title: '',
+                  beats: ['Final reflection'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+
+    // Structure should have 2 items: part + unwrapped chapter
+    expect(result.structure).toHaveLength(2);
+
+    // First item: part
+    expect(result.structure[0]!.kind).toBe('part');
+
+    // Second item: unwrapped chapter (not a part)
+    const epilogueItem = result.structure[1]!;
+    expect(epilogueItem.kind).toBe('chapter');
+    if (epilogueItem.kind === 'chapter') {
+      expect(epilogueItem.title).toBe('Epilogue: The End');
+      expect(epilogueItem.wordTarget).toEqual({ min: 3000, max: 4000 });
+    }
+
+    // Outline should still have the Epilogue part (not flattened)
+    const outlineParts = result.outline.parts;
+    expect(outlineParts).toHaveLength(2);
+    expect(outlineParts[1]!.title).toBe('Epilogue');
+  });
+
+  // ── 7. No word targets ────────────────────────────────────────────────────
+  it('handles null word targets for chapters and sections', () => {
+    const input = minimalOutline({
+      parts: [
+        {
+          title: 'Part I',
+          chapters: [
+            {
+              title: 'Chapter 1: Intro',
+              sections: [
+                {
+                  number: '1.1',
+                  title: 'Section One',
+                  beats: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+
+    const ch = result.parts[0]!.chapters[0]!;
+    expect(ch.wordTarget).toBeNull();
+
+    const sec = ch.sections[0]!;
+    expect(sec.wordTarget).toBeNull();
+  });
+
+  // ── 8. Empty project title ────────────────────────────────────────────────
+  it('defaults to empty string when projectTitle is missing', () => {
+    const input = minimalOutline({ projectTitle: '' });
+    const result = buildOutlineAndStructure(input);
+    expect(result.projectTitle).toBe('');
+  });
+
+  // ── 9. Multiple parts and chapters generate unique ULIDs ─────────────────
+  it('generates unique ULIDs for every structural node', () => {
+    const input = minimalOutline({
+      parts: [
+        {
+          title: 'Part I',
+          chapters: [
+            {
+              title: 'Ch 1',
+              sections: [
+                { number: '1.1', title: 'S1', beats: ['beat1'] },
+                { number: '1.2', title: 'S2', beats: [] },
+              ],
+            },
+            {
+              title: 'Ch 2',
+              sections: [{ number: '2.1', title: 'S3', beats: [] }],
+            },
+          ],
+        },
+        {
+          title: 'Part II',
+          chapters: [
+            {
+              title: 'Ch 3',
+              sections: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = buildOutlineAndStructure(input);
+
+    // Collect all IDs
+    const partIds = result.parts.map((p) => p.id);
+    const chapterIds = result.parts.flatMap((p) => p.chapters.map((c) => c.chapterId));
+    const sectionIds = allSectionIds(result);
+
+    const allIds = [...partIds, ...chapterIds, ...sectionIds];
+    expect(new Set(allIds).size).toBe(allIds.length); // all unique
   });
 });
 
-// ── Tether fixture regression (SL-002) ────────────────────────────────────────
+// ── Suite: parseOutlineMarkdown (mocked fetch) ───────────────────────────────
 
-describe('parseOutlineMarkdown (Tether fixture)', () => {
-  const tetherPath = resolve(__dirname, '../fixtures/Full_extended_outline.md');
-  const tetherMd = readFileSync(tetherPath, 'utf-8');
-  const preview = parseOutlineMarkdown(tetherMd);
+describe('parseOutlineMarkdown (mocked LLM)', () => {
+  const mockApiKey = 'sk-test-key-12345';
 
-  it('parses exactly 4 parts', () => {
-    expect(preview.parts.length).toBe(4);
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
   });
 
-  it('extracts correct part titles', () => {
-    const titles = preview.parts.map((p) => p.title);
-    expect(titles[0]).toContain('The Fire That Carries Us');
-    expect(titles[1]).toContain('The Measurement of Absence');
-    expect(titles[2]).toContain('What Remains');
-    expect(titles[3]).toContain('Landfall');
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
-  it('has a project title', () => {
-    expect(preview.projectTitle).toBeTruthy();
+  // ── 10. Successful parse ──────────────────────────────────────────────────
+  it('parses a known LLM response into a valid ParsePreview', async () => {
+    const llmResponse = {
+      projectTitle: 'Tether',
+      frontMatterText: ['A generation-ship story.'],
+      backMatterText: [],
+      parts: [
+        {
+          title: 'ONE: The Fire That Carries Us',
+          chapters: [
+            {
+              title: 'Chapter 1: The Last Shore',
+              wordTargetMin: null,
+              wordTargetMax: null,
+              sections: [
+                {
+                  number: '1.1',
+                  title: 'Departure',
+                  wordTarget: null,
+                  beats: ['Ship leaves Earth'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify(llmResponse),
+            },
+          },
+        ],
+      }),
+    } as unknown as Response);
+
+    const markdown = '# Tether\n\n## PART ONE: The Fire That Carries Us\n...';
+    const result = await parseOutlineMarkdown(markdown, mockApiKey);
+
+    expect(result.projectTitle).toBe('Tether');
+    expect(result.parts).toHaveLength(1);
+    expect(result.parts[0]!.title).toBe('ONE: The Fire That Carries Us');
+    expect(result.parts[0]!.chapters).toHaveLength(1);
+    expect(result.parts[0]!.chapters[0]!.title).toBe('Chapter 1: The Last Shore');
+
+    // Front matter should be converted
+    expect(result.frontMatter).toHaveLength(1);
+    const fm = result.frontMatter[0] as RichBlock;
+    expect(fm.type).toBe('paragraph');
+    if (fm.type === 'paragraph') {
+      expect(fm.text).toContain('generation-ship');
+    }
   });
 
-  it('parses 17 chapters across all parts (Tether)', () => {
-    const chapterCount = preview.parts.reduce(
-      (sum, p) => sum + p.chapters.length, 0,
-    );
-    expect(chapterCount).toBe(17);
+  // ── 11. Missing API key ───────────────────────────────────────────────────
+  it('throws when API key is empty', async () => {
+    await expect(
+      parseOutlineMarkdown('# test', ''),
+    ).rejects.toThrow('API key required for outline import');
+  });
+
+  // ── 12. HTTP error from API ───────────────────────────────────────────────
+  it('throws descriptive error on HTTP 401', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        error: { message: 'Invalid API key' },
+      }),
+    } as unknown as Response);
+
+    await expect(
+      parseOutlineMarkdown('# test', 'bad-key'),
+    ).rejects.toThrow('LLM API error (401)');
+  });
+
+  it('throws descriptive error on HTTP 500 with no body', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: async () => 'Internal Server Error',
+      json: async () => { throw new Error('not json'); },
+    } as unknown as Response);
+
+    await expect(
+      parseOutlineMarkdown('# test', mockApiKey),
+    ).rejects.toThrow('LLM API error (500)');
+  });
+
+  // ── 13. Empty/malformed LLM response ─────────────────────────────────────
+  it('throws when LLM response has no choices', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [] }),
+    } as unknown as Response);
+
+    await expect(
+      parseOutlineMarkdown('# test', mockApiKey),
+    ).rejects.toThrow('LLM response was empty or could not be parsed as JSON');
+  });
+
+  it('throws when LLM response content is not valid JSON', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: 'not-json-at-all' } }],
+      }),
+    } as unknown as Response);
+
+    await expect(
+      parseOutlineMarkdown('# test', mockApiKey),
+    ).rejects.toThrow('LLM response was empty or could not be parsed as JSON');
+  });
+
+  // ── 14. Missing parts array ───────────────────────────────────────────────
+  it('throws when LLM response lacks parts array', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ projectTitle: 'X' }) } }],
+      }),
+    } as unknown as Response);
+
+    await expect(
+      parseOutlineMarkdown('# test', mockApiKey),
+    ).rejects.toThrow('missing required "parts" array');
+  });
+
+  // ── 15. Custom baseUrl ────────────────────────────────────────────────────
+  it('uses custom baseUrl when provided', async () => {
+    let capturedUrl = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, _opts: unknown) => {
+      capturedUrl = url;
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(minimalOutline()) } }],
+        }),
+      };
+    });
+
+    await parseOutlineMarkdown('# test', mockApiKey, 'https://custom.api/v1');
+    expect(capturedUrl).toContain('custom.api');
+  });
+
+  // ── 16. Network failure ───────────────────────────────────────────────────
+  it('throws on network failure', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+
+    await expect(
+      parseOutlineMarkdown('# test', mockApiKey),
+    ).rejects.toThrow('Failed to reach LLM API');
   });
 });

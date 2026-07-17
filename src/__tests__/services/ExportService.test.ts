@@ -57,6 +57,7 @@ const MOCK_PROJECT_MANIFEST = {
       expand: { provider: 'openai', model: 'gpt-4' },
       write: { provider: 'openai', model: 'gpt-4' },
       iterate: { provider: 'openai', model: 'gpt-4' },
+      parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
     },
     inference: { baseUrl: 'https://api.openai.com/v1' },
   },

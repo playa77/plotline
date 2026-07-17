@@ -84,6 +84,7 @@ const ProjectSettingsSchema = z.object({
     expand: ModelRefSchema,
     write: ModelRefSchema,
     iterate: ModelRefSchema,
+    parse: ModelRefSchema,
   }),
   inference: z.object({
     baseUrl: z.string().url(),

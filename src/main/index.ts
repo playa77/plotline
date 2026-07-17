@@ -77,7 +77,7 @@ async function createWindow(): Promise<void> {
   registerPingHandler();
   const window = mainWindow;
   registerProjectHandlers(projectService, appStateService);
-  registerOutlineHandlers(projectService, stalenessService, appStateService);
+  registerOutlineHandlers(projectService, stalenessService, appStateService, secretsService);
   registerVariableHandlers(variableService, stalenessService);
   registerSecretsHandlers(secretsService);
   registerGenerationHandlers(generationService);

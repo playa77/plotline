@@ -33,6 +33,7 @@ function createMockProject(overrides?: Partial<Project>): Project {
         expand: { provider: 'openrouter', model: 'model-a' },
         write: { provider: 'openrouter', model: 'model-b' },
         iterate: { provider: 'openrouter', model: 'model-c' },
+        parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
       },
       inference: { baseUrl: 'https://openrouter.ai/api/v1' },
       theme: 'dark',

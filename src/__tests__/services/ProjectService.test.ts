@@ -390,6 +390,7 @@ describe('ProjectService', () => {
           expand: { provider: 'custom', model: 'model-x' },
           write: { provider: 'custom', model: 'model-y' },
           iterate: { provider: 'custom', model: 'model-z' },
+          parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
         },
         backupRemote: 'https://github.com/user/repo.git',
       });

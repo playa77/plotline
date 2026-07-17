@@ -53,6 +53,7 @@ async function seedManifest(
         expand: { provider: 'openrouter', model: 'test-model' },
         write: { provider: 'openrouter', model: 'test-model' },
         iterate: { provider: 'openrouter', model: 'test-model' },
+        parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
       },
       inference: { baseUrl: 'https://openrouter.ai/api/v1' },
     },
