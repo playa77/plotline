@@ -18,6 +18,7 @@ import { Workspace } from './Workspace';
 import type { WorkspaceSelection } from './Workspace';
 import { ContextRail } from './ContextRail';
 import { CommandPalette } from './CommandPalette';
+import { Toast } from './Toast';
 
 import {
   getAvailableActions,
@@ -27,6 +28,7 @@ import {
 import { useGenerationStore } from '../stores/generationStore';
 import { useVersionStore } from '../stores/versionStore';
 import { useVariableStore } from '../stores/variableStore';
+import { useToastStore } from '../stores/toastStore';
 import { invoke } from '../ipc/client';
 
 import { demoParts } from '../data/demoOutline';
@@ -267,28 +269,53 @@ export function AppShell(): JSX.Element {
       toggleRail: handleToggleRail,
 
       expand: async () => {
-        if (selectedChapterId)
-          await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId });
+        try {
+          if (selectedChapterId)
+            await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Expand failed', e.detail);
+        }
       },
 
       reExpand: async () => {
-        if (selectedChapterId)
-          await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId, asNewVersion: undefined });
+        try {
+          if (selectedChapterId)
+            await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId, asNewVersion: undefined });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Re-expand failed', e.detail);
+        }
       },
 
       write: async () => {
-        if (selectedChapterId)
-          await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+        try {
+          if (selectedChapterId)
+            await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Write failed', e.detail);
+        }
       },
 
       reWrite: async () => {
-        if (selectedChapterId)
-          await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+        try {
+          if (selectedChapterId)
+            await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Re-write failed', e.detail);
+        }
       },
 
       stopGeneration: async () => {
-        const jobId = genStore.activeJob?.jobId;
-        if (jobId) await invoke('generate:cancel', { jobId });
+        try {
+          const jobId = genStore.activeJob?.jobId;
+          if (jobId) await invoke('generate:cancel', { jobId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Stop generation failed', e.detail);
+        }
       },
 
       focusIterate: () => {
@@ -302,69 +329,160 @@ export function AppShell(): JSX.Element {
         }
       },
 
-      createVersion: (name) =>
-        versionStore.createVersion('demo', selectedChapterId ?? '', name),
-      selectVersion: (slug) =>
-        versionStore.selectVersion('demo', selectedChapterId ?? '', slug),
-      renameVersion: (slug, newName) =>
-        versionStore.renameVersion('demo', selectedChapterId ?? '', slug, newName),
-      archiveVersion: (slug) =>
-        versionStore.archiveVersion('demo', selectedChapterId ?? '', slug),
-
-      restoreRevision: (sha) => {
-        if (selectedChapterId)
-          invoke('history:restore', { projectId: 'demo', ref: selectedChapterId, sha });
+      createVersion: async (name) => {
+        try {
+          await versionStore.createVersion('demo', selectedChapterId ?? '', name);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Create version failed', e.detail);
+        }
+      },
+      selectVersion: async (slug) => {
+        try {
+          await versionStore.selectVersion('demo', selectedChapterId ?? '', slug);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Select version failed', e.detail);
+        }
+      },
+      renameVersion: async (slug, newName) => {
+        try {
+          await versionStore.renameVersion('demo', selectedChapterId ?? '', slug, newName);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Rename version failed', e.detail);
+        }
+      },
+      archiveVersion: async (slug) => {
+        try {
+          await versionStore.archiveVersion('demo', selectedChapterId ?? '', slug);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Archive version failed', e.detail);
+        }
       },
 
-      createVariable: (name) => {
-        variableStore.createVariable('demo', name);
+      restoreRevision: async (sha) => {
+        try {
+          if (selectedChapterId)
+            await invoke('history:restore', { projectId: 'demo', ref: selectedChapterId, sha });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Restore revision failed', e.detail);
+        }
       },
-      setVariableActive: (id, active) =>
-        variableStore.toggleActive('demo', id, active),
-      setVariableScope: (id, scope) =>
-        variableStore.updateScope('demo', id, scope),
 
-      addCard: (variableId, title) => {
-        variableStore.addCard('demo', title);
+      createVariable: async (name) => {
+        try {
+          await variableStore.createVariable('demo', name);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Create variable failed', e.detail);
+        }
+      },
+      setVariableActive: async (id, active) => {
+        try {
+          await variableStore.toggleActive('demo', id, active);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Toggle variable failed', e.detail);
+        }
+      },
+      setVariableScope: async (id, scope) => {
+        try {
+          await variableStore.updateScope('demo', id, scope);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Update variable scope failed', e.detail);
+        }
+      },
+
+      addCard: async (variableId, title) => {
+        try {
+          await variableStore.addCard('demo', title);
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Add card failed', e.detail);
+        }
       },
 
       acceptProposal: async () => {
-        const jobId = genStore.activeJob?.jobId;
-        if (jobId) await invoke('iterate:accept', { projectId: 'demo', jobId });
+        try {
+          const jobId = genStore.activeJob?.jobId;
+          if (jobId) await invoke('iterate:accept', { projectId: 'demo', jobId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'ITERATE_ERROR', e.message ?? 'Accept proposal failed', e.detail);
+        }
       },
 
       discardProposal: async () => {
-        const jobId = genStore.activeJob?.jobId;
-        if (jobId) await invoke('iterate:discard', { jobId });
+        try {
+          const jobId = genStore.activeJob?.jobId;
+          if (jobId) await invoke('iterate:discard', { jobId });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'ITERATE_ERROR', e.message ?? 'Discard proposal failed', e.detail);
+        }
       },
 
       acceptAsVersion: async (name) => {
-        const jobId = genStore.activeJob?.jobId;
-        if (jobId)
-          await invoke('iterate:acceptAsVersion', { projectId: 'demo', jobId, versionName: name });
+        try {
+          const jobId = genStore.activeJob?.jobId;
+          if (jobId)
+            await invoke('iterate:acceptAsVersion', { projectId: 'demo', jobId, versionName: name });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'ITERATE_ERROR', e.message ?? 'Accept as version failed', e.detail);
+        }
       },
 
       exportSubstack: async () => {
-        if (selectedChapterId)
-          await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'clipboard' });
+        try {
+          if (selectedChapterId)
+            await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'clipboard' });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export to Substack failed', e.detail);
+        }
       },
 
       exportHtml: async () => {
-        if (selectedChapterId)
-          await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'file', filePath: '' });
+        try {
+          if (selectedChapterId)
+            await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'file', filePath: '' });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export HTML failed', e.detail);
+        }
       },
 
       exportMarkdownChapter: async () => {
-        if (selectedChapterId)
-          await invoke('export:markdown', { projectId: 'demo', scope: 'chapter', chapterId: selectedChapterId, filePath: '' });
+        try {
+          if (selectedChapterId)
+            await invoke('export:markdown', { projectId: 'demo', scope: 'chapter', chapterId: selectedChapterId, filePath: '' });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export markdown chapter failed', e.detail);
+        }
       },
 
       exportMarkdownBook: async () => {
-        await invoke('export:markdown', { projectId: 'demo', scope: 'book', filePath: '' });
+        try {
+          await invoke('export:markdown', { projectId: 'demo', scope: 'book', filePath: '' });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export markdown book failed', e.detail);
+        }
       },
 
       exportPdf: async () => {
-        await invoke('export:pdf', { projectId: 'demo', templateId: 'trade-paperback', chapterIds: 'all', options: {}, outputPath: '' });
+        try {
+          await invoke('export:pdf', { projectId: 'demo', templateId: 'trade-paperback', chapterIds: 'all', options: {}, outputPath: '' });
+        } catch (err: unknown) {
+          const e = err as { code?: string; message?: string; detail?: string };
+          useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export PDF failed', e.detail);
+        }
       },
 
       promptInput: (placeholder) => window.prompt(placeholder),
@@ -461,6 +579,8 @@ export function AppShell(): JSX.Element {
           onClose={() => setPaletteOpen(false)}
         />
       )}
+
+      <Toast />
     </div>
   );
 }
