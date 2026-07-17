@@ -126,6 +126,11 @@ export function AppShell(): JSX.Element {
   // Outline parts — loaded from the project when projectId changes
   const [outlineParts, setOutlineParts] = useState<ParsedPart[]>([]);
 
+  // Refresh token: incremented to force outline reload even when
+  // projectId hasn't changed (e.g., importing an outline over the
+  // same project).
+  const [outlineRefresh, setOutlineRefresh] = useState(0);
+
   // Load the active project and recents on mount
   useEffect(() => {
     const load = async () => {
@@ -157,7 +162,7 @@ export function AppShell(): JSX.Element {
     load();
   }, []);
 
-  // Load the real outline whenever a project is opened
+  // Load the real outline whenever a project is opened or refreshed
   useEffect(() => {
     if (!projectId) {
       setOutlineParts([]);
@@ -166,7 +171,7 @@ export function AppShell(): JSX.Element {
     invoke('outline:get', { projectId })
       .then((outline) => setOutlineParts(outline.parts as ParsedPart[]))
       .catch(() => setOutlineParts([]));
-  }, [projectId]);
+  }, [projectId, outlineRefresh]);
 
   // Store hooks
   const genStore = useGenerationStore();
@@ -283,6 +288,7 @@ export function AppShell(): JSX.Element {
       setProjectTitle(project.title);
       const updated = await invoke('project:getRecents', {});
       setRecents(updated);
+      setOutlineRefresh((c) => c + 1);
     } catch (err: unknown) {
       const e = err as { message?: string };
       useToastStore.getState().error('PROJECT_ERROR', 'Failed to create project', e.message);
@@ -296,6 +302,9 @@ export function AppShell(): JSX.Element {
       setProjectTitle(project.title);
       const updated = await invoke('project:getRecents', {});
       setRecents(updated);
+      // Force outline reload even when projectId hasn't changed
+      // (e.g., importing an outline over the same project).
+      setOutlineRefresh((c) => c + 1);
     } catch (err: unknown) {
       const e = err as { message?: string };
       useToastStore.getState().error('PROJECT_ERROR', 'Failed to open project', e.message);
@@ -310,6 +319,7 @@ export function AppShell(): JSX.Element {
         setProjectTitle(result.title);
         const updated = await invoke('project:getRecents', {});
         setRecents(updated);
+        setOutlineRefresh((c) => c + 1);
       }
     } catch (err: unknown) {
       const e = err as { message?: string };
@@ -337,6 +347,7 @@ export function AppShell(): JSX.Element {
       setProjectTitle(project.title);
       const updated = await invoke('project:getRecents', {});
       setRecents(updated);
+      setOutlineRefresh((c) => c + 1);
     } catch (err: unknown) {
       const e = err as { message?: string };
       useToastStore.getState().error('PROJECT_ERROR', 'Failed to switch project', e.message);

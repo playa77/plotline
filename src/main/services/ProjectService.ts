@@ -79,13 +79,14 @@ export class ProjectService {
     const now = new Date().toISOString();
 
     const project: Project = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       projectId,
       title,
       createdAt: now,
       updatedAt: now,
       settings: {
         continuityContext: { enabled: true, words: 500 },
+        styleGuidance: 'per-chapter' as const,
         models: {
           expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
@@ -305,13 +306,14 @@ export class ProjectService {
     const now = new Date().toISOString();
 
     const project = {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       projectId,
       title,
       createdAt: now,
       updatedAt: now,
       settings: {
         continuityContext: { enabled: true, words: 500 },
+        styleGuidance: 'per-chapter' as const,
         models: {
           expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
           write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },

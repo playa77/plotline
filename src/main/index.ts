@@ -44,7 +44,8 @@ async function createWindow(): Promise<void> {
   const userDataPath = app.getPath('userData');
   const projectService = new ProjectService(userDataPath);
   const appStateService = new AppStateService(userDataPath);
-  const variableService = new VariableService(projectService);
+  const historyService = new HistoryService(projectService);
+  const variableService = new VariableService(projectService, historyService);
   const secretsService = new SecretsService(userDataPath);
   const templateEngine = new TemplateEngine(
     path.join(app.getAppPath(), 'src', 'main', 'templates'),
@@ -80,7 +81,6 @@ async function createWindow(): Promise<void> {
   registerSecretsHandlers(secretsService);
   registerGenerationHandlers(generationService);
   registerChapterHandlers(chapterService);
-  const historyService = new HistoryService(projectService);
   registerHistoryHandlers(historyService);
   const versionService = new VersionService(projectService);
   registerVersionHandlers(versionService);

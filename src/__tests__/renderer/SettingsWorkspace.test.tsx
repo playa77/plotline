@@ -21,13 +21,14 @@ import type { Project } from '../../shared/schemas/project';
 
 function createMockProject(overrides?: Partial<Project>): Project {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectId: 'test-project-123',
     title: 'Test Project',
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
     settings: {
       continuityContext: { enabled: true, words: 500 },
+      styleGuidance: 'per-chapter' as const,
       models: {
         expand: { provider: 'openrouter', model: 'model-a' },
         write: { provider: 'openrouter', model: 'model-b' },
@@ -138,11 +139,12 @@ describe('SettingsWorkspace', () => {
 
     const text = container.textContent ?? '';
 
-    // The seven section titles rendered as header buttons
+    // The eight section titles rendered as header buttons
     expect(text).toContain('API Key');
     expect(text).toContain('Models');
     expect(text).toContain('Inference');
     expect(text).toContain('Continuity Context');
+    expect(text).toContain('Writing Style');
     expect(text).toContain('Theme');
     expect(text).toContain('Editor');
     expect(text).toContain('Backup Remote');
@@ -451,6 +453,6 @@ describe('SettingsWorkspace', () => {
 
     // Every Section component uses defaultOpen={true}
     const bodies = container.querySelectorAll('.settings-section__body');
-    expect(bodies.length).toBe(8); // 8 sections, all open
+    expect(bodies.length).toBe(9); // 9 sections, all open
   });
 });

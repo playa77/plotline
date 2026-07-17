@@ -252,7 +252,7 @@ async function generate(): Promise<void> {
 
   // ── Create project.json manifest ──
   const project = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectId,
     title: 'Synthetic Benchmark Project',
     createdAt: now,

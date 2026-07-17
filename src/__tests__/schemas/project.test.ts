@@ -11,7 +11,7 @@ import { ProjectSchema, ChapterEntrySchema } from '../../shared/schemas/project'
 
 function validMinimalProject() {
   return {
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     projectId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
     title: 'My Novel',
     createdAt: '2026-07-16T10:00:00.000Z',
@@ -91,7 +91,7 @@ describe('ProjectSchema', () => {
   });
 
   it('rejects a project with wrong schemaVersion', () => {
-    const input = { ...validMinimalProject(), schemaVersion: 2 };
+    const input = { ...validMinimalProject(), schemaVersion: 1 };
     const result = ProjectSchema.safeParse(input);
     expect(result.success).toBe(false);
   });

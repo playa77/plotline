@@ -1,17 +1,17 @@
 /**
- * VariableService tests (WP-11).
+ * VariableService tests (WP-VARS-1).
  *
  * Each test creates a throwaway projects directory, exercises VariableService
  * methods against a ProjectService-backed Git repo, then cleans up.
  * No Electron dependency.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 2.0.0 | 2026-07-17
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectService } from '../../main/services/ProjectService';
-import { VariableService } from '../../main/services/VariableService';
-import type { Variable } from '../../shared/schemas/variable';
+import { VariableService, VariableError } from '../../main/services/VariableService';
+import type { StoryVariable } from '../../shared/schemas/variable';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -24,7 +24,7 @@ describe('VariableService', () => {
   let variableService: VariableService;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plotline-test-variables-'));
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'plotline-test-vars-'));
     projectService = new ProjectService(tmpDir);
     variableService = new VariableService(projectService);
   });
@@ -33,427 +33,427 @@ describe('VariableService', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  // ── create / list ──────────────────────────────────────────────────────
+  // ── seedBuiltins ──────────────────────────────────────────────────────
 
-  it('create returns a valid variable and list includes it', async () => {
-    const project = await projectService.create('Test');
-    const variable = await variableService.create(
-      project.projectId,
-      'My Tone',
-      'tone',
-    );
+  describe('seedBuiltins', () => {
+    it('creates the 4 builtins + 1 system variable', async () => {
+      const project = await projectService.create('Test');
+      await variableService.seedBuiltins(project.projectId);
+      const list = await variableService.list(project.projectId);
+      expect(list).toHaveLength(5);
 
-    expect(variable.id).toMatch(
-      /^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/,
-    );
-    expect(variable.name).toBe('My Tone');
-    expect(variable.core).toBe('tone');
-    expect(variable.scope).toBe('always');
-    expect(variable.active).toBe(true);
-    expect(variable.order).toBe(0);
-    expect(variable.schemaVersion).toBe(1);
+      // System first: global-constraints
+      expect(list[0]!.id).toBe('global-constraints');
+      expect(list[0]!.kind).toBe('system');
+      expect(list[0]!.scopeLocked).toBe(true);
 
-    const list = await variableService.list(project.projectId);
-    expect(list).toHaveLength(1);
-    expect(list[0]!.id).toBe(variable.id);
+      // Then builtins in slug order
+      expect(list[1]!.id).toBe('tone');
+      expect(list[1]!.name).toBe('Tone');
+      expect(list[1]!.kind).toBe('builtin');
+
+      expect(list[2]!.id).toBe('style');
+      expect(list[2]!.name).toBe('Writing Style');
+
+      expect(list[3]!.id).toBe('constraints');
+      expect(list[3]!.name).toBe('Plot Constraints');
+
+      expect(list[4]!.id).toBe('characters');
+      expect(list[4]!.name).toBe('Character / Voice Sheets');
+    });
+
+    it('is idempotent', async () => {
+      const project = await projectService.create('Test');
+      await variableService.seedBuiltins(project.projectId);
+      await variableService.seedBuiltins(project.projectId);
+
+      const list = await variableService.list(project.projectId);
+      expect(list).toHaveLength(5);
+    });
+
+    it('creates variables with empty content', async () => {
+      const project = await projectService.create('Test');
+      await variableService.seedBuiltins(project.projectId);
+      const pid = project.projectId;
+
+      for (const v of await variableService.list(pid)) {
+        const { content } = await variableService.get(pid, v.id);
+        expect(content).toBe('');
+      }
+    });
   });
 
-  it('create for core type that already exists throws', async () => {
-    const project = await projectService.create('Dup Test');
-    await variableService.create(project.projectId, 'First Tone', 'tone');
+  // ── create / list ─────────────────────────────────────────────────────
 
-    await expect(
-      variableService.create(project.projectId, 'Second Tone', 'tone'),
-    ).rejects.toThrow(/Core variable "tone" already exists/i);
+  describe('create', () => {
+    it('create returns a valid custom variable', async () => {
+      const project = await projectService.create('Test');
+      await variableService.seedBuiltins(project.projectId);
+      const variable = await variableService.create(
+        project.projectId,
+        'My Custom Var',
+      );
+
+      expect(variable.id).toMatch(
+        /^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/,
+      );
+      expect(variable.name).toBe('My Custom Var');
+      expect(variable.kind).toBe('custom');
+      expect(variable.scope).toBe('manual');
+      expect(variable.deletable).toBe(true);
+      expect(variable.renamable).toBe(true);
+      expect(variable.scopeLocked).toBe(false);
+      expect(variable.schemaVersion).toBe(2);
+      expect(variable.position).toBeGreaterThanOrEqual(0);
+    });
+
+    it('rejects reserved names', async () => {
+      const project = await projectService.create('Test');
+      await expect(
+        variableService.create(project.projectId, 'tone'),
+      ).rejects.toMatchObject({ code: 'NAME_RESERVED' });
+      await expect(
+        variableService.create(project.projectId, 'TONE'),
+      ).rejects.toMatchObject({ code: 'NAME_RESERVED' });
+      await expect(
+        variableService.create(project.projectId, 'Global-Constraints'),
+      ).rejects.toMatchObject({ code: 'NAME_RESERVED' });
+    });
+
+    it('rejects duplicate names (case-insensitive)', async () => {
+      const project = await projectService.create('Test');
+      await variableService.create(project.projectId, 'My Var');
+      await expect(
+        variableService.create(project.projectId, 'my var'),
+      ).rejects.toMatchObject({ code: 'NAME_TAKEN' });
+    });
+
+    it('accepts explicit scope', async () => {
+      const project = await projectService.create('Test');
+      const variable = await variableService.create(
+        project.projectId,
+        'Write Var',
+        'write',
+      );
+      expect(variable.scope).toBe('write');
+    });
+
+    it('list includes created variable', async () => {
+      const project = await projectService.create('Test');
+      const variable = await variableService.create(
+        project.projectId,
+        'Test Var',
+      );
+
+      const list = await variableService.list(project.projectId);
+      expect(list.some((v) => v.id === variable.id)).toBe(true);
+    });
   });
 
-  it('create with no core creates a custom variable with manual scope', async () => {
-    const project = await projectService.create('Custom Test');
-    const variable = await variableService.create(
-      project.projectId,
-      'Custom Var',
-    );
+  // ── List sorting ─────────────────────────────────────────────────────
 
-    expect(variable.core).toBeNull();
-    expect(variable.scope).toBe('manual');
-  });
+  describe('list sorting', () => {
+    it('sorts system first, then builtins by slug, then custom by position', async () => {
+      const project = await projectService.create('Sort Test');
+      const pid = project.projectId;
 
-  it('create with explicit scope persists it', async () => {
-    const project = await projectService.create('Scope Test');
-    const variable = await variableService.create(
-      project.projectId,
-      'Write Var',
-      'style',
-      'write',
-    );
+      // Seed builtins
+      await variableService.seedBuiltins(pid);
 
-    expect(variable.core).toBe('style');
-    expect(variable.scope).toBe('write');
-  });
+      // Add custom variables
+      const customA = await variableService.create(pid, 'Custom A');
+      const customB = await variableService.create(pid, 'Custom B');
 
-  // ── Order auto-increment ─────────────────────────────────────────────
+      const list = await variableService.list(pid);
+      expect(list).toHaveLength(7);
 
-  it('order auto-increments on create', async () => {
-    const project = await projectService.create('Order Test');
-    const v1 = await variableService.create(project.projectId, 'Var 1');
-    const v2 = await variableService.create(project.projectId, 'Var 2');
-    const v3 = await variableService.create(project.projectId, 'Var 3');
-
-    expect(v1.order).toBe(0);
-    expect(v2.order).toBe(1);
-    expect(v3.order).toBe(2);
-
-    // Verify list order matches creation order
-    const list = await variableService.list(project.projectId);
-    expect(list).toHaveLength(3);
-    expect(list[0]!.order).toBe(0);
-    expect(list[1]!.order).toBe(1);
-    expect(list[2]!.order).toBe(2);
-  });
-
-  // ── List sorting: core first ─────────────────────────────────────────
-
-  it('list sorts core variables first in canonical order', async () => {
-    const project = await projectService.create('Sort Test');
-    const pid = project.projectId;
-
-    // Create them out of canonical order
-    const style = await variableService.create(pid, 'Style', 'style');
-    const characters = await variableService.create(pid, 'Characters', 'characters');
-    const constraints = await variableService.create(pid, 'Constraints', 'constraints');
-    const tone = await variableService.create(pid, 'Tone', 'tone');
-
-    const list = await variableService.list(pid);
-
-    // Core variables come first in canonical order: tone, style, constraints, characters
-    expect(list[0]!.core).toBe('tone');
-    expect(list[1]!.core).toBe('style');
-    expect(list[2]!.core).toBe('constraints');
-    expect(list[3]!.core).toBe('characters');
-  });
-
-  it('list puts custom variables after core variables', async () => {
-    const project = await projectService.create('Mixed Sort');
-    const pid = project.projectId;
-
-    const custom1 = await variableService.create(pid, 'Custom A');
-    const tone = await variableService.create(pid, 'Tone', 'tone');
-    const custom2 = await variableService.create(pid, 'Custom B');
-
-    const list = await variableService.list(pid);
-    expect(list).toHaveLength(3);
-
-    // Core first (tone), then custom sorted by order
-    expect(list[0]!.core).toBe('tone');
-    expect(list[1]!.core).toBeNull();
-    expect(list[2]!.core).toBeNull();
+      // System first
+      expect(list[0]!.kind).toBe('system');
+      // Then builtins
+      expect(list[1]!.kind).toBe('builtin');
+      expect(list[1]!.id).toBe('tone');
+      expect(list[2]!.id).toBe('style');
+      expect(list[3]!.id).toBe('constraints');
+      expect(list[4]!.id).toBe('characters');
+      // Then custom by position
+      expect(list[5]!.kind).toBe('custom');
+      expect(list[6]!.kind).toBe('custom');
+    });
   });
 
   // ── get ───────────────────────────────────────────────────────────────
 
-  it('get returns variable.json + content.html', async () => {
-    const project = await projectService.create('Get Test');
-    const pid = project.projectId;
+  describe('get', () => {
+    it('returns variable metadata + content', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-    const variable = await variableService.create(pid, 'Tone Variable', 'tone');
-    await variableService.save(pid, variable.id, '<p>Tone content</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setContent(pid, tone.id, '<p>Tone content</p>');
 
-    const result = await variableService.get(pid, variable.id);
-    expect(result.variable.id).toBe(variable.id);
-    expect(result.variable.name).toBe('Tone Variable');
-    expect(result.variable.core).toBe('tone');
-    expect(result.content).toBe('<p>Tone content</p>');
+      const result = await variableService.get(pid, tone.id);
+      expect(result.variable.id).toBe('tone');
+      expect(result.variable.name).toBe('Tone');
+      expect(result.content).toBe('<p>Tone content</p>');
+    });
+
+    it('throws VariableError for nonexistent variable', async () => {
+      const project = await projectService.create('Test');
+      await expect(
+        variableService.get(project.projectId, 'nonexistent'),
+      ).rejects.toThrow(VariableError);
+    });
   });
 
-  it('get on nonexistent variable throws', async () => {
-    const project = await projectService.create('Get Error');
-    await expect(
-      variableService.get(project.projectId, '01ARZ3NDEKTSV4RRFFQ69G5FAV'),
-    ).rejects.toThrow(/Variable not found/i);
+  // ── setContent ──────────────────────────────────────────────────────
+
+  describe('setContent', () => {
+    it('saves content and returns sha', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      const result = await variableService.setContent(pid, tone.id, 'Updated content');
+
+      expect(result.sha).toBeTruthy();
+      expect(typeof result.sha).toBe('string');
+
+      // Verify via get
+      const gotten = await variableService.get(pid, tone.id);
+      expect(gotten.content).toBe('Updated content');
+    });
   });
 
-  // ── save ──────────────────────────────────────────────────────────────
+  // ── rename ───────────────────────────────────────────────────────────
 
-  it('save updates content.html and returns sha', async () => {
-    const project = await projectService.create('Save Test');
-    const pid = project.projectId;
+  describe('rename', () => {
+    it('renames a renamable variable', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      const variable = await variableService.create(pid, 'Old Name');
 
-    const variable = await variableService.create(pid, 'Save Var');
-    const result = await variableService.save(
-      pid,
-      variable.id,
-      'Updated content',
-    );
+      const renamed = await variableService.rename(pid, variable.id, 'New Name');
+      expect(renamed.name).toBe('New Name');
+      expect(renamed.updatedAt).not.toBe(variable.updatedAt);
+    });
 
-    expect(result.sha).toBeTruthy();
-    expect(typeof result.sha).toBe('string');
+    it('rejects rename on non-renamable variable (builtin)', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-    // Verify via get
-    const gotten = await variableService.get(pid, variable.id);
-    expect(gotten.content).toBe('Updated content');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await expect(
+        variableService.rename(pid, tone.id, 'New Tone'),
+      ).rejects.toThrow(VariableError);
+      await expect(
+        variableService.rename(pid, tone.id, 'New Tone'),
+      ).rejects.toMatchObject({ code: 'NOT_RENAMABLE' });
+    });
+
+    it('rejects reserved names', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      const variable = await variableService.create(pid, 'My Var');
+
+      await expect(
+        variableService.rename(pid, variable.id, 'tone'),
+      ).rejects.toMatchObject({ code: 'NAME_RESERVED' });
+    });
+
+    it('rejects duplicate names', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.create(pid, 'Existing Var');
+      const variable = await variableService.create(pid, 'My Var');
+
+      await expect(
+        variableService.rename(pid, variable.id, 'Existing Var'),
+      ).rejects.toMatchObject({ code: 'NAME_TAKEN' });
+    });
   });
 
-  it('save on nonexistent variable throws', async () => {
-    const project = await projectService.create('Save Error');
-    await expect(
-      variableService.save(
-        project.projectId,
-        '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-        'content',
-      ),
-    ).rejects.toThrow(/Variable not found/i);
+  // ── setScope ─────────────────────────────────────────────────────────
+
+  describe('setScope', () => {
+    it('updates scope on non-scopeLocked variable', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      const variable = await variableService.create(pid, 'Scope Var');
+      expect(variable.scope).toBe('manual');
+
+      const updated = await variableService.setScope(pid, variable.id, 'write');
+      expect(updated.scope).toBe('write');
+    });
+
+    it('rejects SCOPE_LOCKED on system variable', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const gc = (await variableService.list(pid)).find((v) => v.id === 'global-constraints')!;
+      await expect(
+        variableService.setScope(pid, gc.id, 'write'),
+      ).rejects.toMatchObject({ code: 'SCOPE_LOCKED' });
+    });
   });
 
-  // ── setScope / setActive ─────────────────────────────────────────────
+  // ── reorder ──────────────────────────────────────────────────────────
 
-  it('setScope updates and returns variable', async () => {
-    const project = await projectService.create('Scope Change');
-    const pid = project.projectId;
+  describe('reorder', () => {
+    it('renumbers custom variables to maintain consecutive positions', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-    const variable = await variableService.create(pid, 'Scope Var', 'style');
-    expect(variable.scope).toBe('always');
+      const a = await variableService.create(pid, 'A');
+      const b = await variableService.create(pid, 'B');
+      const c = await variableService.create(pid, 'C');
 
-    const updated = await variableService.setScope(pid, variable.id, 'write');
-    expect(updated.scope).toBe('write');
-    expect(updated.core).toBe('style');
+      // Move C to position 0
+      const result = await variableService.reorder(pid, c.id, 0);
+      const customVars = result.filter((v) => v.kind === 'custom');
 
-    // Verify persistence
-    const gotten = await variableService.get(pid, variable.id);
-    expect(gotten.variable.scope).toBe('write');
+      expect(customVars[0]!.name).toBe('C');
+      expect(customVars[0]!.position).toBe(0);
+      expect(customVars[1]!.name).toBe('A');
+      expect(customVars[1]!.position).toBe(1);
+      expect(customVars[2]!.name).toBe('B');
+      expect(customVars[2]!.position).toBe(2);
+    });
+
+    it('rejects reorder on non-custom variable', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await expect(
+        variableService.reorder(pid, tone.id, 0),
+      ).rejects.toThrow();
+    });
   });
 
-  it('setActive updates and returns variable', async () => {
-    const project = await projectService.create('Active Change');
-    const pid = project.projectId;
+  // ── delete ───────────────────────────────────────────────────────────
 
-    const variable = await variableService.create(pid, 'Active Var');
-    expect(variable.active).toBe(true);
+  describe('delete', () => {
+    it('moves deletable variable to archive', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      const variable = await variableService.create(pid, 'Delete Me');
 
-    const deactivated = await variableService.setActive(pid, variable.id, false);
-    expect(deactivated.active).toBe(false);
+      const deleted = await variableService.delete(pid, variable.id);
+      expect(deleted.id).toBe(variable.id);
 
-    const reactivated = await variableService.setActive(pid, variable.id, true);
-    expect(reactivated.active).toBe(true);
+      // Not in list
+      const list = await variableService.list(pid);
+      expect(list.find((v) => v.id === variable.id)).toBeUndefined();
 
-    // Verify persistence
-    const gotten = await variableService.get(pid, variable.id);
-    expect(gotten.variable.active).toBe(true);
-  });
+      // Archived file exists
+      const service = projectService.getOpenProject(pid)!;
+      const tree = await service.readTree('refs/heads/main');
+      const archivedKey = `variables/archived/${variable.id}/variable.json`;
+      expect(tree[archivedKey]).toBeDefined();
+      expect(tree[`variables/${variable.id}/variable.json`]).toBeUndefined();
+    });
 
-  // ── archive ───────────────────────────────────────────────────────────
+    it('rejects delete on non-deletable variable (builtin)', async () => {
+      const project = await projectService.create('Test');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-  it('archive moves to archived path and sets active=false', async () => {
-    const project = await projectService.create('Archive Test');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(pid, 'Archive Me');
-    const archived = await variableService.archive(pid, variable.id);
-
-    expect(archived.active).toBe(false);
-
-    // Not in list
-    const list = await variableService.list(pid);
-    expect(list.find((v) => v.id === variable.id)).toBeUndefined();
-
-    // Archived file exists with active=false
-    const service = projectService.getOpenProject(pid)!;
-    const tree = await service.readTree('refs/heads/main');
-    const archivedKey = `variables/archived/${variable.id}/variable.json`;
-    expect(tree[archivedKey]).toBeDefined();
-    expect(tree[`variables/${variable.id}/variable.json`]).toBeUndefined();
-
-    const buf = await service.readBlob('refs/heads/main', archivedKey);
-    const archivedVar = JSON.parse(buf.toString('utf-8'));
-    expect(archivedVar.active).toBe(false);
-    expect(archivedVar.name).toBe('Archive Me');
-  });
-
-  it('archive on already-archived variable throws', async () => {
-    const project = await projectService.create('Double Archive');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(pid, 'To Archive');
-    await variableService.archive(pid, variable.id);
-
-    await expect(
-      variableService.archive(pid, variable.id),
-    ).rejects.toThrow(/Variable already archived/i);
-  });
-
-  it('archive on nonexistent variable throws', async () => {
-    const project = await projectService.create('Archive Error');
-    await expect(
-      variableService.archive(
-        project.projectId,
-        '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-      ),
-    ).rejects.toThrow(/Variable not found/i);
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await expect(
+        variableService.delete(pid, tone.id),
+      ).rejects.toMatchObject({ code: 'NOT_DELETABLE' });
+    });
   });
 
   // ── Card CRUD ────────────────────────────────────────────────────────
 
-  it('addCard creates a card for characters variable', async () => {
-    const project = await projectService.create('Card Add');
-    const pid = project.projectId;
+  describe('cards', () => {
+    it('addCard creates a card for characters variable', async () => {
+      const project = await projectService.create('Card Add');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-    const variable = await variableService.create(
-      pid,
-      'Characters',
-      'characters',
-    );
-    const result = await variableService.addCard(
-      pid,
-      variable.id,
-      'Alice',
-    );
+      const chars = (await variableService.list(pid)).find((v) => v.id === 'characters')!;
+      const result = await variableService.addCard(pid, chars.id, 'Alice');
 
-    expect(result.cardId).toBeTruthy();
+      expect(result.cardId).toBeTruthy();
 
-    const cards = await variableService.listCards(pid, variable.id);
-    expect(cards).toHaveLength(1);
-    expect(cards[0]!.cardId).toBe(result.cardId);
-    expect(cards[0]!.title).toBe('Alice');
+      const cards = await variableService.listCards(pid, chars.id);
+      expect(cards).toHaveLength(1);
+      expect(cards[0]!.title).toBe('Alice');
+    });
+
+    it('addCard on non-characters variable throws', async () => {
+      const project = await projectService.create('Card Error');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await expect(
+        variableService.addCard(pid, tone.id, 'Should Fail'),
+      ).rejects.toThrow(/Cards are only available/);
+    });
+
+    it('saveCard updates card content', async () => {
+      const project = await projectService.create('Card Save');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const chars = (await variableService.list(pid)).find((v) => v.id === 'characters')!;
+      const { cardId } = await variableService.addCard(pid, chars.id, 'Bob');
+      await variableService.saveCard(pid, chars.id, cardId, '<h3>Bob Updated</h3>\n<p>New bio</p>');
+
+      const cards = await variableService.listCards(pid, chars.id);
+      const card = cards.find((c) => c.cardId === cardId);
+      expect(card).toBeDefined();
+      expect(card!.title).toBe('Bob Updated');
+    });
+
+    it('removeCard deletes the card', async () => {
+      const project = await projectService.create('Card Remove');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const chars = (await variableService.list(pid)).find((v) => v.id === 'characters')!;
+      const { cardId } = await variableService.addCard(pid, chars.id, 'Charlie');
+
+      let cards = await variableService.listCards(pid, chars.id);
+      expect(cards).toHaveLength(1);
+
+      const result = await variableService.removeCard(pid, chars.id, cardId);
+      expect(result).toEqual({ ok: true });
+
+      cards = await variableService.listCards(pid, chars.id);
+      expect(cards).toHaveLength(0);
+    });
+
+    it('listCards returns empty array when no cards exist', async () => {
+      const project = await projectService.create('Empty Cards');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      const chars = (await variableService.list(pid)).find((v) => v.id === 'characters')!;
+      const cards = await variableService.listCards(pid, chars.id);
+      expect(cards).toEqual([]);
+    });
   });
 
-  it('addCard on non-characters variable throws', async () => {
-    const project = await projectService.create('Card Error');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(pid, 'Tone', 'tone');
-    await expect(
-      variableService.addCard(pid, variable.id, 'Should Fail'),
-    ).rejects.toThrow(
-      /Cards are only available for Character\/Voice Sheet variables/i,
-    );
-  });
-
-  it('saveCard updates card content', async () => {
-    const project = await projectService.create('Card Save');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(
-      pid,
-      'Characters',
-      'characters',
-    );
-    const { cardId } = await variableService.addCard(pid, variable.id, 'Bob');
-
-    await variableService.saveCard(
-      pid,
-      variable.id,
-      cardId,
-      '<h3>Bob Updated</h3>\n<p>New bio</p>',
-    );
-
-    const cards = await variableService.listCards(pid, variable.id);
-    const card = cards.find((c) => c.cardId === cardId);
-    expect(card).toBeDefined();
-    expect(card!.title).toBe('Bob Updated');
-  });
-
-  it('removeCard deletes the card', async () => {
-    const project = await projectService.create('Card Remove');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(
-      pid,
-      'Characters',
-      'characters',
-    );
-    const { cardId } = await variableService.addCard(pid, variable.id, 'Charlie');
-
-    // Verify it exists
-    let cards = await variableService.listCards(pid, variable.id);
-    expect(cards).toHaveLength(1);
-
-    // Remove it
-    const result = await variableService.removeCard(pid, variable.id, cardId);
-    expect(result).toEqual({ ok: true });
-
-    // Verify it's gone
-    cards = await variableService.listCards(pid, variable.id);
-    expect(cards).toHaveLength(0);
-  });
-
-  it('removeCard on nonexistent card throws', async () => {
-    const project = await projectService.create('Card Remove Error');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(
-      pid,
-      'Characters',
-      'characters',
-    );
-    await expect(
-      variableService.removeCard(
-        pid,
-        variable.id,
-        '01ARZ3NDEKTSV4RRFFQ69G5FAV',
-      ),
-    ).rejects.toThrow(/Card not found/i);
-  });
-
-  it('listCards returns empty array when no cards exist', async () => {
-    const project = await projectService.create('Empty Cards');
-    const pid = project.projectId;
-
-    const variable = await variableService.create(
-      pid,
-      'Characters',
-      'characters',
-    );
-    const cards = await variableService.listCards(pid, variable.id);
-    expect(cards).toEqual([]);
-  });
-
-  // ── Multiple variables with different scopes ─────────────────────────
-
-  it('variables with different scopes persist correctly', async () => {
-    const project = await projectService.create('Multi Scope');
-    const pid = project.projectId;
-
-    await variableService.create(pid, 'Always Var', 'tone', 'always');
-    await variableService.create(pid, 'Expand Var', 'style', 'expand');
-    await variableService.create(pid, 'Write Var', 'constraints', 'write');
-    await variableService.create(pid, 'Manual Var', 'characters', 'manual');
-
-    const list = await variableService.list(pid);
-    expect(list).toHaveLength(4);
-
-    const scopes = list.map((v) => v.scope);
-    expect(scopes).toContain('always');
-    expect(scopes).toContain('expand');
-    expect(scopes).toContain('write');
-    expect(scopes).toContain('manual');
-
-    // Verify via get
-    for (const v of list) {
-      const result = await variableService.get(pid, v.id);
-      expect(result.variable.scope).toBe(v.scope);
-    }
-  });
-
-  // ── Error: project not open ──────────────────────────────────────────
-
-  it('throws when project is not open', async () => {
-    await expect(
-      variableService.list('nonexistent'),
-    ).rejects.toThrow(/Project not open/i);
-
-    await expect(
-      variableService.create('nonexistent', 'Test'),
-    ).rejects.toThrow(/Project not open/i);
-  });
-
-  // ── assemble(step) (WP-12) ───────────────────────────────────────────
+  // ── assemble ─────────────────────────────────────────────────────────
 
   describe('assemble', () => {
     it('selects always-scope variables for all steps', async () => {
       const project = await projectService.create('Assemble Always');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const v = await variableService.create(pid, 'Tone', 'tone', 'always');
-      await variableService.save(pid, v.id, '<p>Formal tone</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setContent(pid, tone.id, '<p>Formal tone</p>');
 
       const expandResult = await variableService.assemble('expand', pid);
       const writeResult = await variableService.assemble('write', pid);
@@ -467,94 +467,88 @@ describe('VariableService', () => {
     it('selects expand-scope variables only for expand step', async () => {
       const project = await projectService.create('Assemble Expand');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const v = await variableService.create(pid, 'Tone', 'tone', 'expand');
-      await variableService.save(pid, v.id, '<p>Expand only</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setScope(pid, tone.id, 'expand');
+      await variableService.setContent(pid, tone.id, '<p>Expand only</p>');
 
       const expandResult = await variableService.assemble('expand', pid);
       const writeResult = await variableService.assemble('write', pid);
       const iterateResult = await variableService.assemble('iterate', pid);
 
       expect(expandResult).toContain('Expand only');
-      expect(writeResult).toBe('');
-      expect(iterateResult).toBe('');
+      expect(writeResult).not.toContain('Expand only');
+      expect(iterateResult).not.toContain('Expand only');
     });
 
     it('selects write-scope variables only for write step', async () => {
       const project = await projectService.create('Assemble Write');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const v = await variableService.create(pid, 'Style', 'style', 'write');
-      await variableService.save(pid, v.id, '<p>Write scope</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setScope(pid, tone.id, 'write');
+      await variableService.setContent(pid, tone.id, '<p>Write scope</p>');
 
       const expandResult = await variableService.assemble('expand', pid);
       const writeResult = await variableService.assemble('write', pid);
       const iterateResult = await variableService.assemble('iterate', pid);
 
-      expect(expandResult).toBe('');
+      expect(expandResult).not.toContain('Write scope');
       expect(writeResult).toContain('Write scope');
-      expect(iterateResult).toBe('');
+      expect(iterateResult).not.toContain('Write scope');
     });
 
     it('iterate step only selects always-scope variables', async () => {
       const project = await projectService.create('Assemble Iterate');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      // No variable has scope 'iterate' — the iterate step should only match always-scope vars
-      const always = await variableService.create(pid, 'Always', 'tone', 'always');
-      await variableService.save(pid, always.id, '<p>Always content</p>');
-      const expand = await variableService.create(pid, 'Expand', 'style', 'expand');
-      await variableService.save(pid, expand.id, '<p>Expand content</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setContent(pid, tone.id, '<p>Always content</p>');
+
+      const style = (await variableService.list(pid)).find((v) => v.id === 'style')!;
+      await variableService.setScope(pid, style.id, 'expand');
+      await variableService.setContent(pid, style.id, '<p>Expand content</p>');
 
       const iterateResult = await variableService.assemble('iterate', pid);
-
-      // Only the always-scoped variable appears in iterate step
       expect(iterateResult).toContain('Always content');
       expect(iterateResult).not.toContain('Expand content');
     });
 
-    it('manual-scope variables never appear in any step', async () => {
+    it('manual-scope variables only appear when in manualVariableIds', async () => {
       const project = await projectService.create('Assemble Manual');
       const pid = project.projectId;
+      const variable = await variableService.create(pid, 'Manual Var', 'manual');
+      await variableService.setContent(pid, variable.id, '<p>Manual content</p>');
 
-      const v = await variableService.create(pid, 'Custom', null, 'manual');
-      await variableService.save(pid, v.id, '<p>Manual only</p>');
+      const withoutManual = await variableService.assemble('expand', pid);
+      expect(withoutManual).not.toContain('Manual content');
 
-      const expandResult = await variableService.assemble('expand', pid);
-      const writeResult = await variableService.assemble('write', pid);
-      const iterateResult = await variableService.assemble('iterate', pid);
-
-      expect(expandResult).toBe('');
-      expect(writeResult).toBe('');
-      expect(iterateResult).toBe('');
-    });
-
-    it('excludes inactive variables', async () => {
-      const project = await projectService.create('Assemble Inactive');
-      const pid = project.projectId;
-
-      const v = await variableService.create(pid, 'Tone', 'tone', 'always');
-      await variableService.save(pid, v.id, '<p>Active content</p>');
-      await variableService.setActive(pid, v.id, false);
-
-      const result = await variableService.assemble('expand', pid);
-      expect(result).toBe('');
+      const withManual = await variableService.assemble('expand', pid, {
+        manualVariableIds: [variable.id],
+      });
+      expect(withManual).toContain('Manual content');
     });
 
     it('respects excludeVariableIds', async () => {
       const project = await projectService.create('Assemble Exclude');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const v1 = await variableService.create(pid, 'Tone', 'tone', 'always');
-      const v2 = await variableService.create(pid, 'Style', 'style', 'always');
-      await variableService.save(pid, v1.id, '<p>Tone content</p>');
-      await variableService.save(pid, v2.id, '<p>Style content</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      const style = (await variableService.list(pid)).find((v) => v.id === 'style')!;
+      await variableService.setContent(pid, tone.id, '<p>Tone content</p>');
+      await variableService.setContent(pid, style.id, '<p>Style content</p>');
 
       const full = await variableService.assemble('expand', pid);
       expect(full).toContain('Tone content');
       expect(full).toContain('Style content');
 
-      const filtered = await variableService.assemble('expand', pid, [v1.id]);
+      const filtered = await variableService.assemble('expand', pid, {
+        excludeVariableIds: [tone.id],
+      });
       expect(filtered).not.toContain('Tone content');
       expect(filtered).toContain('Style content');
     });
@@ -565,39 +559,52 @@ describe('VariableService', () => {
       expect(result).toBe('');
     });
 
-    it('emits fenced blocks with core/custom labels', async () => {
-      const project = await projectService.create('Assemble Blocks');
+    it('uses clean Markdown sections (not fenced blocks)', async () => {
+      const project = await projectService.create('Assemble Format');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const core = await variableService.create(pid, 'Tone', 'tone', 'always');
-      await variableService.save(pid, core.id, '<p>Core content</p>');
-
-      const custom = await variableService.create(pid, 'CustomVar', null, 'always');
-      await variableService.save(pid, custom.id, '<p>Custom content</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setContent(pid, tone.id, '<p>Tone content</p>');
 
       const result = await variableService.assemble('expand', pid);
+      expect(result).toContain('## Tone');
+      expect(result).toContain('Tone content');
+      expect(result).not.toMatch(/=== STORY VARIABLE/);
+      expect(result).not.toMatch(/=== END VARIABLE/);
+    });
 
-      // Both variables appear
-      expect(result).toContain('Core content');
-      expect(result).toContain('Custom content');
+    it('uses special heading for Global Constraints', async () => {
+      const project = await projectService.create('Assemble GC');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      // Core labeled (core), custom labeled (custom)
-      expect(result).toContain('=== STORY VARIABLE: Tone (core) ===');
-      expect(result).toContain('=== STORY VARIABLE: CustomVar (custom) ===');
+      const gc = (await variableService.list(pid)).find((v) => v.id === 'global-constraints')!;
+      await variableService.setContent(pid, gc.id, '<p>Book invariants</p>');
 
-      // Fenced with END VARIABLE
-      const blocks = result.split('=== END VARIABLE ===');
-      expect(blocks.length - 1).toBe(2);
+      const result = await variableService.assemble('expand', pid);
+      expect(result).toContain('## Global Constraints (book-wide invariants — always apply)');
+    });
+
+    it('skips variables with empty content', async () => {
+      const project = await projectService.create('Assemble Empty Content');
+      const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
+
+      // Builtins have empty content by default — assemble should return nothing
+      const result = await variableService.assemble('expand', pid);
+      expect(result).toBe('');
     });
 
     it('strips HTML from content', async () => {
       const project = await projectService.create('Assemble Strip');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      const v = await variableService.create(pid, 'Tone', 'tone', 'always');
-      await variableService.save(
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      await variableService.setContent(
         pid,
-        v.id,
+        tone.id,
         '<p><strong>Bold</strong> and <em>italic</em></p><br><p>Line two</p>',
       );
 
@@ -608,36 +615,39 @@ describe('VariableService', () => {
       expect(result).not.toContain('<p>');
     });
 
-    it('sorts core variables first, then custom by order', async () => {
-      const project = await projectService.create('Assemble Sort');
+    it('outputs system first, then builtins, then custom', async () => {
+      const project = await projectService.create('Assemble Order');
       const pid = project.projectId;
+      await variableService.seedBuiltins(pid);
 
-      // Create in reverse order
-      const customB = await variableService.create(pid, 'ZCustom', null, 'always');
-      await variableService.save(pid, customB.id, '<p>ZCustom</p>');
-      const characters = await variableService.create(pid, 'Characters', 'characters', 'always');
-      await variableService.save(pid, characters.id, '<p>Characters</p>');
-      const tone = await variableService.create(pid, 'Tone', 'tone', 'always');
-      await variableService.save(pid, tone.id, '<p>Tone</p>');
-      const customA = await variableService.create(pid, 'ACustom', null, 'always');
-      await variableService.save(pid, customA.id, '<p>ACustom</p>');
+      const tone = (await variableService.list(pid)).find((v) => v.id === 'tone')!;
+      const gc = (await variableService.list(pid)).find((v) => v.id === 'global-constraints')!;
+      await variableService.setContent(pid, gc.id, '<p>GC content</p>');
+      await variableService.setContent(pid, tone.id, '<p>Tone content</p>');
+
+      const custom = await variableService.create(pid, 'Custom Var', 'always');
+      await variableService.setContent(pid, custom.id, '<p>Custom content</p>');
 
       const result = await variableService.assemble('expand', pid);
 
-      // Core variables (tone, characters) should appear before custom
+      const gcIdx = result.indexOf('Global Constraints');
       const toneIdx = result.indexOf('Tone');
-      const charsIdx = result.indexOf('Characters');
-      const customAIdx = result.indexOf('ACustom');
-      const customBIdx = result.indexOf('ZCustom');
+      const customIdx = result.indexOf('Custom content');
 
-      // Core comes first
-      expect(toneIdx).toBeLessThan(customAIdx);
-      expect(toneIdx).toBeLessThan(customBIdx);
-      expect(charsIdx).toBeLessThan(customAIdx);
-      expect(charsIdx).toBeLessThan(customBIdx);
-
-      // Characters after tone in canonical order
-      expect(toneIdx).toBeLessThan(charsIdx);
+      expect(gcIdx).toBeLessThan(toneIdx);
+      expect(toneIdx).toBeLessThan(customIdx);
     });
+  });
+
+  // ── Error: project not open ──────────────────────────────────────────
+
+  it('throws when project is not open', async () => {
+    await expect(
+      variableService.list('nonexistent'),
+    ).rejects.toThrow(/Project not open/i);
+
+    await expect(
+      variableService.create('nonexistent', 'Test'),
+    ).rejects.toThrow(/Project not open/i);
   });
 });

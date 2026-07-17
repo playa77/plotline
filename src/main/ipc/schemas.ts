@@ -8,6 +8,7 @@
  */
 import { z } from 'zod';
 import { ModelRefSchema } from '../../shared/schemas/project';
+import { VARIABLE_SCOPES } from '../../shared/schemas/variable';
 import type { ParsePreview, OutlineMutation } from '../../shared/schemas/outline';
 import type { IpcCommandMap } from '../../shared/ipc';
 
@@ -50,6 +51,7 @@ export const UpdateSettingsRequestSchema = z.object({
       baseUrl: z.string().url().optional(),
     }).optional(),
     theme: z.enum(['dark', 'light']).optional(),
+    styleGuidance: z.enum(['per-project', 'per-chapter']).optional(),
     editor: z.object({
       fontMode: z.enum(['serif', 'mono']).optional(),
     }).optional(),
@@ -100,7 +102,7 @@ export const OutlineMutateRequestSchema: z.ZodType<{ projectId: string; mutation
   ).min(1, 'At least one mutation is required'),
 });
 
-// ── Variable schemas (WP-11) ─────────────────────────────────────────────
+// ── Variable schemas (WP-VARS-1) ─────────────────────────────────────────────
 
 /** Validates variables:list request. */
 export const VariablesListRequestSchema = z.object({
@@ -113,37 +115,43 @@ export const VariablesGetRequestSchema = z.object({
   variableId: z.string().min(1),
 });
 
-/** Validates variables:save request. */
-export const VariablesSaveRequestSchema = z.object({
-  projectId: z.string().min(1),
-  variableId: z.string().min(1),
-  content: z.string(),
-});
-
 /** Validates variables:create request. */
 export const VariablesCreateRequestSchema = z.object({
   projectId: z.string().min(1),
   name: z.string().min(1),
-  core: z.enum(['tone', 'style', 'constraints', 'characters']).nullable().optional(),
-  scope: z.enum(['always', 'expand', 'write', 'manual']).optional(),
+  scope: z.enum(VARIABLE_SCOPES).optional(),
+});
+
+/** Validates variables:rename request. */
+export const VariablesRenameRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  name: z.string().min(1),
 });
 
 /** Validates variables:setScope request. */
 export const VariablesSetScopeRequestSchema = z.object({
   projectId: z.string().min(1),
   variableId: z.string().min(1),
-  scope: z.enum(['always', 'expand', 'write', 'manual']),
+  scope: z.enum(VARIABLE_SCOPES),
 });
 
-/** Validates variables:setActive request. */
-export const VariablesSetActiveRequestSchema = z.object({
+/** Validates variables:setContent request. */
+export const VariablesSetContentRequestSchema = z.object({
   projectId: z.string().min(1),
   variableId: z.string().min(1),
-  active: z.boolean(),
+  content: z.string(),
 });
 
-/** Validates variables:archive request. */
-export const VariablesArchiveRequestSchema = z.object({
+/** Validates variables:reorder request. */
+export const VariablesReorderRequestSchema = z.object({
+  projectId: z.string().min(1),
+  variableId: z.string().min(1),
+  newPosition: z.number().int().min(0),
+});
+
+/** Validates variables:delete request. */
+export const VariablesDeleteRequestSchema = z.object({
   projectId: z.string().min(1),
   variableId: z.string().min(1),
 });
@@ -217,6 +225,7 @@ const GenerateOptionsSchema = z.object({
   chapterId: z.string().min(1, 'Chapter ID is required'),
   versionSlug: z.string().optional(),
   excludeVariableIds: z.array(z.string()).optional(),
+  manualVariableIds: z.array(z.string()).optional(),
   asNewVersion: z.string().optional(),
 });
 
@@ -231,6 +240,7 @@ export const GenerateIterateRequestSchema = z.object({
   versionSlug: z.string().optional(),
   instruction: z.string().min(1, 'Instruction is required'),
   excludeVariableIds: z.array(z.string()).optional(),
+  manualVariableIds: z.array(z.string()).optional(),
 });
 
 export const GenerateCancelRequestSchema = z.object({

@@ -21,7 +21,7 @@ import type { ProjectService } from './ProjectService';
 import type { VariableService } from './VariableService';
 import type { GenRecord, Meta } from '../../shared/schemas/meta';
 import type { Outline, OutlineChapter } from '../../shared/schemas/outline';
-import type { Variable, VariableScope } from '../../shared/schemas/variable';
+import type { StoryVariable, VariableScope } from '../../shared/schemas/variable';
 
 // ── Exported types ──────────────────────────────────────────────────────────
 
@@ -280,10 +280,10 @@ export class StalenessService {
     scopes: VariableScope[],
   ): Promise<Array<{ variableId: string; contentSha: string }>> {
     const allVariables = await this.variableService.list(projectId);
-    const active = allVariables.filter((v) => v.active && scopes.includes(v.scope));
+    const matching = allVariables.filter((v) => scopes.includes(v.scope));
 
     const result: Array<{ variableId: string; contentSha: string }> = [];
-    for (const v of active) {
+    for (const v of matching) {
       let content = '';
       try {
         const buf = await service.readBlob(

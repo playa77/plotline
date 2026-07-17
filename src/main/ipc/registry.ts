@@ -101,9 +101,13 @@ export function initIpcRegistry(): void {
         const result = await entry.handler(parsed.data, win);
         return { data: result };
       } catch (err) {
+        const code =
+          err && typeof err === 'object' && 'code' in err
+            ? (err as { code: string }).code
+            : 'HANDLER_ERROR';
         return {
           error: {
-            code: 'HANDLER_ERROR',
+            code,
             message: err instanceof Error ? err.message : 'Unknown handler error',
           },
         };

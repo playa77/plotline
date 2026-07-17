@@ -1,117 +1,212 @@
 /**
- * VariableService — story variable lifecycle management.
+ * VariableService — unified story variable lifecycle management.
  *
  * Manages CRUD for story variables stored as Git objects under
- * `variables/<variableId>/` on `refs/heads/main`. Variables are global
- * (not per-chapter). Cards (for Character/Voice Sheet variables) live
- * under `variables/<variableId>/cards/<cardId>.html`.
+ * `variables/<variableId>/` on `refs/heads/main`. All variables — builtin,
+ * system, and custom — live in one registry with one schema.
+ *
+ * Storage layout:
+ *   variables/<id>/variable.json      — StoryVariable metadata (schemaVersion: 2)
+ *   variables/<id>/content.html       — HTML content (stored separately)
+ *   variables/<id>/cards/<cardId>.html — cards (Character / Voice Sheets only)
+ *   variables/archived/<id>/           — deleted (moved here, not destroyed)
  *
  * Every durable operation flows through StorageService.commit() — there
  * is no direct filesystem access or working tree manipulation.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 2.0.0 | 2026-07-17
  */
 
 import { StorageService } from '../storage/StorageService';
 import type { ProjectService } from './ProjectService';
-import { VariableSchema, CORE_VARIABLE_TYPES } from '../../shared/schemas/variable';
-import type { Variable, VariableScope, CoreVariableType } from '../../shared/schemas/variable';
+import type { HistoryService } from './HistoryService';
+import {
+  StoryVariableSchema,
+  BUILTIN_SLUGS,
+  RESERVED_NAMES,
+  RESERVED_DISPLAY_NAMES,
+  isReservedName,
+} from '../../shared/schemas/variable';
+import type { StoryVariable, VariableScope } from '../../shared/schemas/variable';
 import { generateULID } from '../../shared/utils/ulid';
 
-// ── VariableService ──────────────────────────────────────────────────────
+// ── Built-in / system definitions ───────────────────────────────────────────
+
+interface BuiltinDef {
+  slug: string;
+  name: string;
+  kind: 'builtin' | 'system';
+  scope: VariableScope;
+  scopeLocked: boolean;
+  position: number;
+}
+
+const BUILTIN_DEFS: BuiltinDef[] = [
+  { slug: 'tone', name: 'Tone', kind: 'builtin', scope: 'always', scopeLocked: false, position: 0 },
+  { slug: 'style', name: 'Writing Style', kind: 'builtin', scope: 'always', scopeLocked: false, position: 1 },
+  { slug: 'constraints', name: 'Plot Constraints', kind: 'builtin', scope: 'always', scopeLocked: false, position: 2 },
+  { slug: 'characters', name: 'Character / Voice Sheets', kind: 'builtin', scope: 'always', scopeLocked: false, position: 3 },
+];
+
+const SYSTEM_DEFS: BuiltinDef[] = [
+  { slug: 'global-constraints', name: 'Global Constraints', kind: 'system', scope: 'always', scopeLocked: true, position: 0 },
+];
+
+// ── Error types ─────────────────────────────────────────────────────────────
+
+export class VariableError extends Error {
+  constructor(
+    public code: 'SCOPE_LOCKED' | 'NOT_DELETABLE' | 'NOT_RENAMABLE' | 'NAME_TAKEN' | 'NAME_RESERVED' | 'NOT_FOUND',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'VariableError';
+  }
+}
+
+// ── VariableService ─────────────────────────────────────────────────────────
 
 export class VariableService {
-  constructor(private projectService: ProjectService) {}
+  constructor(
+    private projectService: ProjectService,
+    private historyService?: HistoryService,
+  ) {}
 
   // ── Private helpers ────────────────────────────────────────────────────
 
-  /**
-   * Resolve the StorageService for an open project.
-   * @throws If the project is not open.
-   */
   private getService(projectId: string): StorageService {
     const service = this.projectService.getOpenProject(projectId);
     if (!service) throw new Error(`Project not open: ${projectId}`);
     return service;
   }
 
-  // ── List ───────────────────────────────────────────────────────────────
+  private now(): string {
+    return new Date().toISOString();
+  }
+
+  // ── seedBuiltins ────────────────────────────────────────────────────────
 
   /**
-   * List all (non-archived) variables.
+   * Seed the four built-in variables for a project. Idempotent — if any
+   * builtin already exists, does nothing.
    *
-   * Reads the `variables/` directory tree from `refs/heads/main`, parses
-   * each `variable.json`, and returns a sorted array (core types first
-   * in canonical order, then by `order` within each group).
-   *
-   * Archived variables (under `variables/archived/`) are excluded.
+   * Builtin variables use their slug as the variable ID for deterministic
+   * addressing. They are created with empty content.
    */
-  async list(projectId: string): Promise<Variable[]> {
+  async seedBuiltins(projectId: string): Promise<StoryVariable[]> {
     const service = this.getService(projectId);
     const tree = await service.readTree('refs/heads/main');
 
-    // Collect variable IDs from paths like `variables/<id>/variable.json`
+    // Check if any builtin already exists
+    const existing = new Set<string>();
+    for (const filepath of Object.keys(tree)) {
+      const match = filepath.match(/^variables\/([^/]+)\/variable\.json$/);
+      if (match) existing.add(match[1]!);
+    }
+
+    const allDefs = [...SYSTEM_DEFS, ...BUILTIN_DEFS];
+    const created: StoryVariable[] = [];
+
+    for (const def of allDefs) {
+      if (existing.has(def.slug)) continue;
+
+      const variable: StoryVariable = StoryVariableSchema.parse({
+        schemaVersion: 2,
+        id: def.slug,
+        name: def.name,
+        kind: def.kind,
+        scope: def.scope,
+        scopeLocked: def.scopeLocked,
+        deletable: false,
+        renamable: false,
+        position: def.position,
+        createdAt: this.now(),
+        updatedAt: this.now(),
+      });
+
+      await service.commit(
+        'refs/heads/main',
+        {
+          [`variables/${def.slug}/variable.json`]: Buffer.from(
+            JSON.stringify(variable, null, 2),
+            'utf-8',
+          ),
+          [`variables/${def.slug}/content.html`]: Buffer.from('', 'utf-8'),
+        },
+        { label: `Seeded variable: ${def.name}`, kind: 'manual' },
+      );
+
+      created.push(variable);
+    }
+
+    return created;
+  }
+
+  // ── list ───────────────────────────────────────────────────────────────
+
+  /**
+   * Return all non-archived variables, sorted:
+   *   system by position → builtins by slug order → custom by position.
+   */
+  async list(projectId: string): Promise<StoryVariable[]> {
+    const service = this.getService(projectId);
+    const tree = await service.readTree('refs/heads/main');
+
     const variableIds = new Set<string>();
     for (const filepath of Object.keys(tree)) {
       const match = filepath.match(/^variables\/([^/]+)\/variable\.json$/);
-      if (match) {
+      if (match && !filepath.startsWith('variables/archived/')) {
         variableIds.add(match[1]!);
       }
     }
 
-    // Parse each variable.json
-    const variables: Variable[] = [];
+    const variables: StoryVariable[] = [];
     for (const id of variableIds) {
       try {
         const buf = await service.readBlob(
           'refs/heads/main',
           `variables/${id}/variable.json`,
         );
-        const parsed = VariableSchema.parse(JSON.parse(buf.toString('utf-8')));
-        variables.push(parsed);
+        variables.push(StoryVariableSchema.parse(JSON.parse(buf.toString('utf-8'))));
       } catch {
         // Skip malformed entries
       }
     }
 
-    // Sort: core first (in CORE_VARIABLE_TYPES order), then by order field
+    // Sort: system first (by position), then builtins (by slug order),
+    // then custom (by position)
+    const builtinSlugs: string[] = [...BUILTIN_SLUGS];
     variables.sort((a, b) => {
-      if (a.core && !b.core) return -1;
-      if (!a.core && b.core) return 1;
-      if (a.core && b.core) {
-        const ai = CORE_VARIABLE_TYPES.indexOf(a.core);
-        const bi = CORE_VARIABLE_TYPES.indexOf(b.core);
-        if (ai !== bi) return ai - bi;
-      }
-      return a.order - b.order;
+      // Kind-group order: system (0), builtin (1), custom (2)
+      const kindOrder: Record<string, number> = { system: 0, builtin: 1, custom: 2 };
+      const ka = kindOrder[a.kind] ?? 2;
+      const kb = kindOrder[b.kind] ?? 2;
+      if (ka !== kb) return ka - kb;
+
+      // Within same kind group, sort by position
+      return a.position - b.position;
     });
 
     return variables;
   }
 
-  // ── Get ────────────────────────────────────────────────────────────────
+  // ── get ────────────────────────────────────────────────────────────────
 
-  /**
-   * Get a single variable's metadata (`variable.json`) and content
-   * (`content.html`).
-   *
-   * @throws If the variable does not exist.
-   */
   async get(
     projectId: string,
     variableId: string,
-  ): Promise<{ variable: Variable; content: string }> {
+  ): Promise<{ variable: StoryVariable; content: string }> {
     const service = this.getService(projectId);
 
-    let variable: Variable;
+    let variable: StoryVariable;
     try {
       const buf = await service.readBlob(
         'refs/heads/main',
         `variables/${variableId}/variable.json`,
       );
-      variable = VariableSchema.parse(JSON.parse(buf.toString('utf-8')));
+      variable = StoryVariableSchema.parse(JSON.parse(buf.toString('utf-8')));
     } catch {
-      throw new Error(`Variable not found: ${variableId}`);
+      throw new VariableError('NOT_FOUND', `Variable not found: ${variableId}`);
     }
 
     let content = '';
@@ -128,87 +223,53 @@ export class VariableService {
     return { variable, content };
   }
 
-  // ── Save ───────────────────────────────────────────────────────────────
+  // ── create ─────────────────────────────────────────────────────────────
 
   /**
-   * Save (overwrite) the content of a variable's `content.html`.
+   * Create a custom variable.
    *
-   * @throws If the variable does not exist.
-   */
-  async save(
-    projectId: string,
-    variableId: string,
-    content: string,
-  ): Promise<{ sha: string }> {
-    const service = this.getService(projectId);
-
-    // Verify variable exists before committing
-    try {
-      await service.readBlob(
-        'refs/heads/main',
-        `variables/${variableId}/variable.json`,
-      );
-    } catch {
-      throw new Error(`Variable not found: ${variableId}`);
-    }
-
-    const sha = await service.commit(
-      'refs/heads/main',
-      {
-        [`variables/${variableId}/content.html`]: Buffer.from(content, 'utf-8'),
-      },
-      { label: 'Saved variable content', kind: 'manual' },
-    );
-
-    return { sha };
-  }
-
-  // ── Create ─────────────────────────────────────────────────────────────
-
-  /**
-   * Create a new variable.
-   *
-   * Generates a ULID for the variable ID, writes `variable.json` and
-   * `content.html`, and commits to `refs/heads/main`.
-   *
-   * For core variables, throws if a variable of that core type already
-   * exists. Sets `order` = max existing order + 1.
-   *
-   * @throws If a core variable of the same type already exists.
+   * @throws VariableError if the name is reserved or taken.
    */
   async create(
     projectId: string,
     name: string,
-    core?: CoreVariableType | null,
     scope?: VariableScope,
-  ): Promise<Variable> {
+  ): Promise<StoryVariable> {
     const id = generateULID();
-    const resolvedCore: CoreVariableType | null = core ?? null;
-    const resolvedScope: VariableScope =
-      scope ?? (resolvedCore ? 'always' : 'manual');
+    const resolvedScope: VariableScope = scope ?? 'manual';
 
-    // Check for duplicate core type and compute max order in one pass
-    const existing = await this.list(projectId);
-
-    if (resolvedCore) {
-      const duplicate = existing.find((v) => v.core === resolvedCore);
-      if (duplicate) {
-        throw new Error(`Core variable "${resolvedCore}" already exists`);
-      }
+    // Reject reserved names
+    if (isReservedName(name)) {
+      throw new VariableError('NAME_RESERVED', `Name "${name}" is reserved and cannot be used for custom variables`);
     }
 
-    const maxOrder =
-      existing.length > 0 ? Math.max(...existing.map((v) => v.order)) : -1;
-    const order = maxOrder + 1;
+    // Check for duplicate name (case-insensitive)
+    const existing = await this.list(projectId);
+    const nameLower = name.toLowerCase().trim();
+    const duplicate = existing.find((v) => v.name.toLowerCase().trim() === nameLower);
+    if (duplicate) {
+      throw new VariableError('NAME_TAKEN', `Variable name "${name}" is already in use`);
+    }
 
-    const variable: Variable = VariableSchema.parse({
-      schemaVersion: 1,
+    // Compute position: max custom position + 1
+    const customVars = existing.filter((v) => v.kind === 'custom');
+    const maxPosition = customVars.length > 0
+      ? Math.max(...customVars.map((v) => v.position))
+      : -1;
+    const position = maxPosition + 1;
+
+    const variable: StoryVariable = StoryVariableSchema.parse({
+      schemaVersion: 2,
       id,
-      name,
-      core: resolvedCore,
+      name: name.trim(),
+      kind: 'custom',
       scope: resolvedScope,
-      active: true,
-      order,
+      scopeLocked: false,
+      deletable: true,
+      renamable: true,
+      position,
+      createdAt: this.now(),
+      updatedAt: this.now(),
     });
 
     const service = this.getService(projectId);
@@ -222,28 +283,82 @@ export class VariableService {
         ),
         [`variables/${id}/content.html`]: Buffer.from('', 'utf-8'),
       },
-      { label: `Created variable: ${name}`, kind: 'manual' },
+      { label: `Created variable: ${variable.name}`, kind: 'manual' },
     );
 
     return variable;
   }
 
+  // ── rename ─────────────────────────────────────────────────────────────
+
+  async rename(
+    projectId: string,
+    variableId: string,
+    name: string,
+  ): Promise<StoryVariable> {
+    const service = this.getService(projectId);
+    const variable = await this.readVariableOrThrow(service, variableId);
+
+    if (!variable.renamable) {
+      throw new VariableError('NOT_RENAMABLE', `Variable "${variable.name}" cannot be renamed`);
+    }
+
+    const trimmed = name.trim();
+
+    // Reject reserved names
+    if (isReservedName(trimmed)) {
+      throw new VariableError('NAME_RESERVED', `Name "${trimmed}" is reserved`);
+    }
+
+    // Check for duplicate name (case-insensitive, excluding self)
+    const existing = await this.list(projectId);
+    const nameLower = trimmed.toLowerCase();
+    const duplicate = existing.find(
+      (v) => v.id !== variableId && v.name.toLowerCase().trim() === nameLower,
+    );
+    if (duplicate) {
+      throw new VariableError('NAME_TAKEN', `Variable name "${trimmed}" is already in use`);
+    }
+
+    const updated: StoryVariable = {
+      ...variable,
+      name: trimmed,
+      updatedAt: this.now(),
+    };
+
+    await service.commit(
+      'refs/heads/main',
+      {
+        [`variables/${variableId}/variable.json`]: Buffer.from(
+          JSON.stringify(updated, null, 2),
+          'utf-8',
+        ),
+      },
+      { label: `Renamed variable: ${variable.name} → ${trimmed}`, kind: 'manual' },
+    );
+
+    return updated;
+  }
+
   // ── setScope ───────────────────────────────────────────────────────────
 
-  /**
-   * Update a variable's scope.
-   *
-   * @throws If the variable does not exist.
-   */
   async setScope(
     projectId: string,
     variableId: string,
     scope: VariableScope,
-  ): Promise<Variable> {
+  ): Promise<StoryVariable> {
     const service = this.getService(projectId);
-
     const variable = await this.readVariableOrThrow(service, variableId);
-    const updated: Variable = { ...variable, scope };
+
+    if (variable.scopeLocked) {
+      throw new VariableError('SCOPE_LOCKED', `Scope of variable "${variable.name}" is locked`);
+    }
+
+    const updated: StoryVariable = {
+      ...variable,
+      scope,
+      updatedAt: this.now(),
+    };
 
     await service.commit(
       'refs/heads/main',
@@ -253,103 +368,149 @@ export class VariableService {
           'utf-8',
         ),
       },
-      { label: 'Changed variable scope', kind: 'manual' },
+      { label: `Changed variable scope: ${variable.name} → ${scope}`, kind: 'manual' },
     );
 
     return updated;
   }
 
-  // ── setActive ──────────────────────────────────────────────────────────
+  // ── setContent ─────────────────────────────────────────────────────────
 
-  /**
-   * Set a variable's active/inactive state.
-   *
-   * @throws If the variable does not exist.
-   */
-  async setActive(
+  async setContent(
     projectId: string,
     variableId: string,
-    active: boolean,
-  ): Promise<Variable> {
+    content: string,
+  ): Promise<{ sha: string }> {
     const service = this.getService(projectId);
 
-    const variable = await this.readVariableOrThrow(service, variableId);
-    const updated: Variable = { ...variable, active };
+    // Verify variable exists
+    await this.readVariableOrThrow(service, variableId);
 
-    await service.commit(
+    const sha = await service.commit(
       'refs/heads/main',
       {
-        [`variables/${variableId}/variable.json`]: Buffer.from(
-          JSON.stringify(updated, null, 2),
-          'utf-8',
-        ),
+        [`variables/${variableId}/content.html`]: Buffer.from(content, 'utf-8'),
       },
-      { label: active ? 'Activated variable' : 'Deactivated variable', kind: 'manual' },
+      { label: 'Saved variable content', kind: 'manual' },
     );
 
-    return updated;
+    return { sha };
   }
 
-  // ── Archive ────────────────────────────────────────────────────────────
+  // ── reorder ────────────────────────────────────────────────────────────
 
   /**
-   * Archive a variable.
-   *
-   * Deletes all files under `variables/<variableId>/` and writes a new
-   * `variables/archived/<variableId>/variable.json` with `active: false`.
-   *
-   * @throws If the variable does not exist or is already archived.
+   * Reorder a custom variable. Renumbers all custom variables to maintain
+   * consecutive positions starting from 0.
    */
-  async archive(
+  async reorder(
     projectId: string,
     variableId: string,
-  ): Promise<Variable> {
+    newPosition: number,
+  ): Promise<StoryVariable[]> {
+    const service = this.getService(projectId);
+    const variable = await this.readVariableOrThrow(service, variableId);
+
+    // Only custom variables can be reordered
+    if (variable.kind !== 'custom') {
+      throw new VariableError('SCOPE_LOCKED', 'Only custom variables can be reordered');
+    }
+
+    const all = await this.list(projectId);
+    const customVars = all
+      .filter((v) => v.kind === 'custom')
+      .sort((a, b) => a.position - b.position);
+
+    // Remove the target from its current position
+    const idx = customVars.findIndex((v) => v.id === variableId);
+    if (idx === -1) throw new VariableError('NOT_FOUND', `Variable not found: ${variableId}`);
+
+    const moved = customVars.splice(idx, 1)[0]!;
+    const clampedPosition = Math.max(0, Math.min(newPosition, customVars.length));
+    customVars.splice(clampedPosition, 0, moved);
+
+    // Renumber
+    const updatedVars: StoryVariable[] = [];
+    for (let i = 0; i < customVars.length; i++) {
+      if (customVars[i]!.position !== i) {
+        const updated: StoryVariable = {
+          ...customVars[i]!,
+          position: i,
+          updatedAt: this.now(),
+        };
+        updatedVars.push(updated);
+      } else {
+        updatedVars.push(customVars[i]!);
+      }
+    }
+
+    // Commit changes
+    const files: Record<string, Buffer> = {};
+    for (const v of updatedVars) {
+      files[`variables/${v.id}/variable.json`] = Buffer.from(
+        JSON.stringify(v, null, 2),
+        'utf-8',
+      );
+    }
+
+    if (Object.keys(files).length > 0) {
+      await service.commit(
+        'refs/heads/main',
+        files,
+        { label: 'Reordered variables', kind: 'manual' },
+      );
+    }
+
+    return this.list(projectId);
+  }
+
+  // ── delete (archive) ──────────────────────────────────────────────────
+
+  /**
+   * Delete a deletable variable by moving it to the archived/ path.
+   */
+  async delete(projectId: string, variableId: string): Promise<StoryVariable> {
     const service = this.getService(projectId);
     const tree = await service.readTree('refs/heads/main');
 
-    // Check if already archived
-    const archivedPath = `variables/archived/${variableId}/variable.json`;
-    if (archivedPath in tree) {
-      throw new Error(`Variable already archived: ${variableId}`);
-    }
-
     const variable = await this.readVariableOrThrow(service, variableId);
+
+    if (!variable.deletable) {
+      throw new VariableError('NOT_DELETABLE', `Variable "${variable.name}" cannot be deleted`);
+    }
 
     // Collect all files under variables/<variableId>/ to delete
     const deletePrefix = `variables/${variableId}/`;
     const filesToDelete: Record<string, null> = {};
+    const filesToArchive: Record<string, Buffer> = {};
     for (const filepath of Object.keys(tree)) {
       if (filepath.startsWith(deletePrefix)) {
         filesToDelete[filepath] = null;
+        // Copy to archive
+        const archivePath = filepath.replace(
+          `variables/${variableId}/`,
+          `variables/archived/${variableId}/`,
+        );
+        try {
+          const buf = await service.readBlob('refs/heads/main', filepath);
+          filesToArchive[archivePath] = buf;
+        } catch {
+          // Skip unreadable files
+        }
       }
     }
 
-    const updated: Variable = { ...variable, active: false };
-
     await service.commit(
       'refs/heads/main',
-      {
-        ...filesToDelete,
-        [archivedPath]: Buffer.from(
-          JSON.stringify(updated, null, 2),
-          'utf-8',
-        ),
-      },
-      { label: `Archived variable: ${variable.name}`, kind: 'manual' },
+      { ...filesToDelete, ...filesToArchive },
+      { label: `Deleted variable: ${variable.name}`, kind: 'manual' },
     );
 
-    return updated;
+    return variable;
   }
 
   // ── Card operations ────────────────────────────────────────────────────
 
-  /**
-   * List all cards for a variable.
-   *
-   * Cards are HTML files under `variables/<variableId>/cards/<cardId>.html`.
-   * The title is extracted from the first `<h3>` tag or a
-   * `<!-- title: ... -->` metadata comment.
-   */
   async listCards(
     projectId: string,
     variableId: string,
@@ -379,27 +540,18 @@ export class VariableService {
     return cards;
   }
 
-  /**
-   * Add a new card to a Character/Voice Sheet variable.
-   *
-   * Creates `variables/<variableId>/cards/<cardId>.html` with the title
-   * as the first `<h3>` element.
-   *
-   * @throws If the variable is not a Character/Voice Sheet (core !== 'characters').
-   * @throws If the variable does not exist.
-   */
   async addCard(
     projectId: string,
     variableId: string,
     title: string,
   ): Promise<{ cardId: string }> {
     const service = this.getService(projectId);
-
     const variable = await this.readVariableOrThrow(service, variableId);
 
-    if (variable.core !== 'characters') {
+    // Cards are only available for the 'characters' builtin variable
+    if (variable.id !== 'characters') {
       throw new Error(
-        'Cards are only available for Character/Voice Sheet variables',
+        'Cards are only available for Character / Voice Sheet variables',
       );
     }
 
@@ -417,11 +569,6 @@ export class VariableService {
     return { cardId };
   }
 
-  /**
-   * Save (overwrite) the content of a card.
-   *
-   * @throws If the card does not exist.
-   */
   async saveCard(
     projectId: string,
     variableId: string,
@@ -448,11 +595,6 @@ export class VariableService {
     return { sha };
   }
 
-  /**
-   * Remove a card.
-   *
-   * @throws If the card does not exist.
-   */
   async removeCard(
     projectId: string,
     variableId: string,
@@ -481,51 +623,45 @@ export class VariableService {
   // ── assemble ───────────────────────────────────────────────────────────
 
   /**
-   * Assemble story variables for injection into a generation prompt (TS §4.3).
+   * Assemble story variables for prompt injection.
    *
-   * Selects variables where: `active` AND (`scope === 'always'` OR
-   * `scope === step`) AND not in `excludeVariableIds`.
+   * Selection rules (AD-4):
+   *   - always → all steps
+   *   - expand → expand only
+   *   - write  → write only
+   *   - manual → only when variableId is in manualVariableIds
    *
-   * Ordering: core variables first (in canonical order: tone, style,
-   * constraints, characters), then custom variables by their `order` field.
+   * Ordering (AD-5): system first → builtins → customs, each by position.
    *
-   * Each variable is emitted as a fenced, labeled data block:
-   * ```
-   * === STORY VARIABLE: Name (core|custom) ===
-   * <plain text content (HTML stripped)>
-   * === END VARIABLE ===
-   * ```
-   *
-   * @param step               - The workflow step determining scope filtering.
-   * @param projectId          - The open project.
-   * @param excludeVariableIds - Optional variable IDs to exclude.
-   * @returns Assembled variable blocks string (empty string if none match).
+   * Output format: clean Markdown sections (not fenced blocks).
+   * Empty content produces nothing (no empty headings).
    */
   async assemble(
     step: 'expand' | 'write' | 'iterate',
     projectId: string,
-    excludeVariableIds?: string[],
+    opts?: { excludeVariableIds?: string[]; manualVariableIds?: string[] },
   ): Promise<string> {
     const allVariables = await this.list(projectId);
 
-    // Filter: active, matching scope, not excluded
-    const matches = allVariables.filter(
-      (v) =>
-        v.active &&
-        (v.scope === 'always' || v.scope === step) &&
-        !excludeVariableIds?.includes(v.id),
-    );
+    const matches = allVariables.filter((v) => {
+      // Exclude filter
+      if (opts?.excludeVariableIds?.includes(v.id)) return false;
 
-    // Sort: core first (canonical order), then custom by order
+      // Scope matching (AD-4)
+      if (v.scope === 'always') return true;
+      if (v.scope === 'expand') return step === 'expand';
+      if (v.scope === 'write') return step === 'write';
+      if (v.scope === 'manual') return opts?.manualVariableIds?.includes(v.id) ?? false;
+      return false;
+    });
+
+    // Sort: system → builtin → custom, each by position
+    const kindOrder: Record<string, number> = { system: 0, builtin: 1, custom: 2 };
     matches.sort((a, b) => {
-      if (a.core && !b.core) return -1;
-      if (!a.core && b.core) return 1;
-      if (a.core && b.core) {
-        const ai = CORE_VARIABLE_TYPES.indexOf(a.core);
-        const bi = CORE_VARIABLE_TYPES.indexOf(b.core);
-        if (ai !== bi) return ai - bi;
-      }
-      return a.order - b.order;
+      const ka = kindOrder[a.kind] ?? 2;
+      const kb = kindOrder[b.kind] ?? 2;
+      if (ka !== kb) return ka - kb;
+      return a.position - b.position;
     });
 
     if (matches.length === 0) return '';
@@ -533,45 +669,45 @@ export class VariableService {
     const blocks: string[] = [];
     for (const v of matches) {
       const { content } = await this.get(projectId, v.id);
-      const label = v.core ? '(core)' : '(custom)';
       const plainText = stripHtml(content);
 
-      blocks.push(
-        `=== STORY VARIABLE: ${v.name} ${label} ===\n${plainText}\n=== END VARIABLE ===`,
-      );
+      // Skip empty content
+      if (!plainText) continue;
+
+      // Build the heading
+      let heading: string;
+      if (v.id === 'global-constraints') {
+        heading = '## Global Constraints (book-wide invariants — always apply)';
+      } else {
+        heading = `## ${v.name}`;
+      }
+
+      blocks.push(`${heading}\n\n${plainText}`);
     }
 
-    return blocks.join('\n\n');
+    return blocks.join('\n');
   }
 
   // ── Internal ───────────────────────────────────────────────────────────
 
-  /**
-   * Read and parse a variable.json from the repo.
-   *
-   * @throws `Error('Variable not found: <id>')` if the file cannot be read.
-   */
   private async readVariableOrThrow(
     service: StorageService,
     variableId: string,
-  ): Promise<Variable> {
+  ): Promise<StoryVariable> {
     try {
       const buf = await service.readBlob(
         'refs/heads/main',
         `variables/${variableId}/variable.json`,
       );
-      return VariableSchema.parse(JSON.parse(buf.toString('utf-8')));
+      return StoryVariableSchema.parse(JSON.parse(buf.toString('utf-8')));
     } catch {
-      throw new Error(`Variable not found: ${variableId}`);
+      throw new VariableError('NOT_FOUND', `Variable not found: ${variableId}`);
     }
   }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
-/**
- * Escape HTML special characters for safe insertion into HTML content.
- */
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -580,23 +716,12 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/**
- * Extract the card title from card HTML content.
- *
- * Precedence:
- * 1. `<!-- title: ... -->` metadata comment
- * 2. First `<h3>...</h3>` tag content
- *
- * Returns `null` if neither is found.
- */
 function extractCardTitle(html: string): string | null {
-  // Try metadata comment first
   const metaMatch = html.match(/<!--\s*title:\s*(.+?)\s*-->/);
   if (metaMatch?.[1]) {
     return metaMatch[1].trim();
   }
 
-  // Fall back to first h3
   const h3Match = html.match(/<h3[^>]*>([\s\S]*?)<\/h3>/i);
   if (h3Match?.[1]) {
     return h3Match[1].trim();
@@ -605,13 +730,6 @@ function extractCardTitle(html: string): string | null {
   return null;
 }
 
-/**
- * Strip HTML tags and decode common entities to produce plain text.
- *
- * - Converts `<br>` to newlines.
- * - Removes all other HTML tags.
- * - Decodes `&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&nbsp;`.
- */
 function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, '\n')

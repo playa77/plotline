@@ -1,112 +1,163 @@
 /**
- * Tests for the variable schema.
+ * Tests for the StoryVariableSchema.
  *
  * @group schemas
  */
 
 import { describe, it, expect } from 'vitest';
-import { VariableSchema } from '../../shared/schemas/variable';
+import { StoryVariableSchema, isReservedName, RESERVED_NAMES, VARIABLE_SCOPES, VARIABLE_KINDS } from '../../shared/schemas/variable';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
-function validCoreVariable() {
+function validBuiltinVariable() {
   return {
-    schemaVersion: 1 as const,
-    id: '01ARZ3NDEKTSV4RRFFQ69G5FB1',
+    schemaVersion: 2 as const,
+    id: 'tone',
     name: 'Tone',
-    core: 'tone' as const,
+    kind: 'builtin' as const,
     scope: 'always' as const,
-    active: true,
-    order: 0,
+    scopeLocked: false,
+    deletable: false,
+    renamable: false,
+    position: 0,
+    createdAt: '2026-07-17T10:00:00.000Z',
+    updatedAt: '2026-07-17T10:00:00.000Z',
   };
 }
 
 function validCustomVariable() {
   return {
-    schemaVersion: 1 as const,
-    id: '01ARZ3NDEKTSV4RRFFQ69G5FB2',
+    schemaVersion: 2 as const,
+    id: '01ARZ3NDEKTSV4RRFFQ69G5FB1',
     name: 'Character: Alice',
-    core: null,
+    kind: 'custom' as const,
     scope: 'manual' as const,
-    active: true,
-    order: 5,
+    scopeLocked: false,
+    deletable: true,
+    renamable: true,
+    position: 5,
+    createdAt: '2026-07-17T10:00:00.000Z',
+    updatedAt: '2026-07-17T10:00:00.000Z',
+  };
+}
+
+function validSystemVariable() {
+  return {
+    schemaVersion: 2 as const,
+    id: 'global-constraints',
+    name: 'Global Constraints',
+    kind: 'system' as const,
+    scope: 'always' as const,
+    scopeLocked: true,
+    deletable: false,
+    renamable: false,
+    position: 0,
+    createdAt: '2026-07-17T10:00:00.000Z',
+    updatedAt: '2026-07-17T10:00:00.000Z',
   };
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('VariableSchema', () => {
-  it('validates a core variable (tone, always scope)', () => {
-    const result = VariableSchema.safeParse(validCoreVariable());
+describe('StoryVariableSchema', () => {
+  it('validates a builtin variable', () => {
+    const result = StoryVariableSchema.safeParse(validBuiltinVariable());
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.core).toBe('tone');
+      expect(result.data.kind).toBe('builtin');
       expect(result.data.scope).toBe('always');
     }
   });
 
-  it('validates a custom variable (null core, manual scope)', () => {
-    const result = VariableSchema.safeParse(validCustomVariable());
+  it('validates a custom variable', () => {
+    const result = StoryVariableSchema.safeParse(validCustomVariable());
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.core).toBeNull();
+      expect(result.data.kind).toBe('custom');
       expect(result.data.scope).toBe('manual');
+      expect(result.data.deletable).toBe(true);
+      expect(result.data.renamable).toBe(true);
     }
   });
 
-  it('round-trips a core variable', () => {
-    const input = validCoreVariable();
-    const parsed = VariableSchema.parse(input);
+  it('validates a system variable', () => {
+    const result = StoryVariableSchema.safeParse(validSystemVariable());
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.kind).toBe('system');
+      expect(result.data.scopeLocked).toBe(true);
+      expect(result.data.deletable).toBe(false);
+    }
+  });
+
+  it('round-trips a builtin variable', () => {
+    const input = validBuiltinVariable();
+    const parsed = StoryVariableSchema.parse(input);
     const serialized = JSON.parse(JSON.stringify(parsed));
-    const result = VariableSchema.safeParse(serialized);
+    const result = StoryVariableSchema.safeParse(serialized);
     expect(result.success).toBe(true);
     expect(result.data).toEqual(parsed);
   });
 
-  it('defaults active to true', () => {
-    const input = {
-      schemaVersion: 1 as const,
-      id: '01ARZ3NDEKTSV4RRFFQ69G5FB3',
-      name: 'Style',
-      core: 'style' as const,
-      scope: 'expand' as const,
-      order: 1,
-    };
-    const parsed = VariableSchema.parse(input);
-    expect(parsed.active).toBe(true);
+  it('rejects an invalid kind value', () => {
+    const input = { ...validBuiltinVariable(), kind: 'unknown' };
+    const result = StoryVariableSchema.safeParse(input);
+    expect(result.success).toBe(false);
   });
 
   it('rejects an invalid scope value', () => {
-    const input = { ...validCoreVariable(), scope: 'never' };
-    const result = VariableSchema.safeParse(input);
+    const input = { ...validBuiltinVariable(), scope: 'never' };
+    const result = StoryVariableSchema.safeParse(input);
     expect(result.success).toBe(false);
   });
 
-  it('rejects a negative order', () => {
-    const input = { ...validCoreVariable(), order: -1 };
-    const result = VariableSchema.safeParse(input);
+  it('rejects a negative position', () => {
+    const input = { ...validBuiltinVariable(), position: -1 };
+    const result = StoryVariableSchema.safeParse(input);
     expect(result.success).toBe(false);
   });
 
-  it('rejects an invalid core value', () => {
-    const input = { ...validCoreVariable(), core: 'pacing' };
-    const result = VariableSchema.safeParse(input);
-    expect(result.success).toBe(false);
-  });
-
-  it('allows all four core types', () => {
-    const cores = ['tone', 'style', 'constraints', 'characters'] as const;
-    for (const core of cores) {
-      const result = VariableSchema.safeParse({ ...validCoreVariable(), core });
+  it('accepts all valid kinds', () => {
+    for (const kind of VARIABLE_KINDS) {
+      const result = StoryVariableSchema.safeParse({ ...validBuiltinVariable(), kind });
       expect(result.success).toBe(true);
     }
   });
 
-  it('allows all four scope types', () => {
-    const scopes = ['always', 'expand', 'write', 'manual'] as const;
-    for (const scope of scopes) {
-      const result = VariableSchema.safeParse({ ...validCoreVariable(), scope });
+  it('accepts all valid scopes', () => {
+    for (const scope of VARIABLE_SCOPES) {
+      const result = StoryVariableSchema.safeParse({ ...validBuiltinVariable(), scope });
       expect(result.success).toBe(true);
     }
+  });
+
+  it('schemaVersion must be exactly 2', () => {
+    const input = { ...validBuiltinVariable(), schemaVersion: 1 };
+    const result = StoryVariableSchema.safeParse(input);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('isReservedName', () => {
+  it('returns true for all reserved slug names', () => {
+    for (const name of RESERVED_NAMES) {
+      expect(isReservedName(name)).toBe(true);
+    }
+  });
+
+  it('is case-insensitive', () => {
+    expect(isReservedName('TONE')).toBe(true);
+    expect(isReservedName('Style')).toBe(true);
+    expect(isReservedName('GLOBAL-CONSTRAINTS')).toBe(true);
+  });
+
+  it('returns false for non-reserved names', () => {
+    expect(isReservedName('custom-name')).toBe(false);
+    expect(isReservedName('My Variable')).toBe(false);
+    expect(isReservedName('')).toBe(false);
+  });
+
+  it('trims whitespace before matching', () => {
+    expect(isReservedName('  tone  ')).toBe(true);
   });
 });

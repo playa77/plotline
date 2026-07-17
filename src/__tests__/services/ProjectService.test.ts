@@ -42,7 +42,7 @@ describe('ProjectService', () => {
 
     expect(project.title).toBe('My Novel');
     expect(project.projectId).toMatch(/^[0123456789ABCDEFGHJKMNPQRSTVWXYZ]{26}$/);
-    expect(project.schemaVersion).toBe(1);
+    expect(project.schemaVersion).toBe(2);
     expect(project.structure).toEqual([]);
     expect(project.settings.inference.baseUrl).toBe('https://openrouter.ai/api/v1');
     expect(project.settings.continuityContext.enabled).toBe(true);

@@ -42,7 +42,7 @@ async function seedManifest(
   versionName = 'Main',
 ): Promise<void> {
   const manifest = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectId: 'test-project',
     title: 'Test Book',
     createdAt: '2026-01-01T00:00:00.000Z',

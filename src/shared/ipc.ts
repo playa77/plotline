@@ -14,7 +14,7 @@
 import type { Project, ProjectSummary } from './schemas/project';
 import type { ModelRef } from './schemas/project';
 import type { ParsePreview, Outline, OutlineMutation } from './schemas/outline';
-import type { Variable, VariableScope, CoreVariableType } from './schemas/variable';
+import type { StoryVariable, VariableScope } from './schemas/variable';
 import type { GenRecord } from './schemas/meta';
 
 export interface IpcError {
@@ -61,6 +61,7 @@ export interface IpcCommandMap {
         models?: { expand?: ModelRef; write?: ModelRef; iterate?: ModelRef };
         inference?: { baseUrl?: string };
         theme?: 'dark' | 'light';
+        styleGuidance?: 'per-project' | 'per-chapter';
         editor?: { fontMode?: 'serif' | 'mono' };
         typography?: { uiScale?: number; editorFontSize?: number };
         backupRemote?: string | null;
@@ -95,31 +96,35 @@ export interface IpcCommandMap {
   // ── Variables (§7.1) ──────────────────────────────────────────
   'variables:list': {
     request: { projectId: string };
-    response: Variable[];
+    response: StoryVariable[];
   };
   'variables:get': {
     request: { projectId: string; variableId: string };
-    response: { variable: Variable; content: string };
-  };
-  'variables:save': {
-    request: { projectId: string; variableId: string; content: string };
-    response: { sha: string };
+    response: { variable: StoryVariable; content: string };
   };
   'variables:create': {
-    request: { projectId: string; name: string; core?: CoreVariableType | null; scope?: VariableScope };
-    response: Variable;
+    request: { projectId: string; name: string; scope?: VariableScope };
+    response: StoryVariable;
+  };
+  'variables:rename': {
+    request: { projectId: string; variableId: string; name: string };
+    response: StoryVariable;
   };
   'variables:setScope': {
     request: { projectId: string; variableId: string; scope: VariableScope };
-    response: Variable;
+    response: StoryVariable;
   };
-  'variables:setActive': {
-    request: { projectId: string; variableId: string; active: boolean };
-    response: Variable;
+  'variables:setContent': {
+    request: { projectId: string; variableId: string; content: string };
+    response: { sha: string };
   };
-  'variables:archive': {
+  'variables:reorder': {
+    request: { projectId: string; variableId: string; newPosition: number };
+    response: StoryVariable[];
+  };
+  'variables:delete': {
     request: { projectId: string; variableId: string };
-    response: Variable;
+    response: StoryVariable;
   };
   // ── Variable cards (Character / Voice Sheets) ─────────────────
   'variables:listCards': {
@@ -153,15 +158,15 @@ export interface IpcCommandMap {
   };
   // ── Generation (§7.6) ─────────────────────────────────
   'generate:expand': {
-    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; asNewVersion?: string };
+    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; manualVariableIds?: string[]; asNewVersion?: string };
     response: { jobId: string };
   };
   'generate:write': {
-    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; asNewVersion?: string };
+    request: { projectId: string; chapterId: string; versionSlug?: string; excludeVariableIds?: string[]; manualVariableIds?: string[]; asNewVersion?: string };
     response: { jobId: string };
   };
   'generate:iterate': {
-    request: { projectId: string; chapterId: string; stage: 'expanded' | 'chapter'; versionSlug?: string; instruction: string; excludeVariableIds?: string[] };
+    request: { projectId: string; chapterId: string; stage: 'expanded' | 'chapter'; versionSlug?: string; instruction: string; excludeVariableIds?: string[]; manualVariableIds?: string[] };
     response: { jobId: string };
   };
   'generate:cancel': {
@@ -197,6 +202,14 @@ export interface IpcCommandMap {
       selectedVersion: string;
       versionNames: Array<{ slug: string; name: string; selected: boolean }>;
     };
+  };
+  'chapter:getStyleInstruction': {
+    request: { projectId: string; chapterId: string; versionSlug?: string };
+    response: { text: string };
+  };
+  'chapter:saveStyleInstruction': {
+    request: { projectId: string; chapterId: string; text: string; versionSlug?: string };
+    response: { sha: string };
   };
   // ── History (§7.1) ──────────────────────────────────────────
   'history:list': {

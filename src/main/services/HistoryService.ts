@@ -1,18 +1,34 @@
 /**
  * HistoryService — revision history browsing, preview, and restore.
  *
- * Provides the backend for the history panel: listing commits on a chapter
- * ref, previewing artifact HTML from any point in the log, and restoring a
+ * Provides the backend for the history panel: listing commits on a ref,
+ * previewing artifact HTML from any point in the log, and restoring a
  * previous tree as a new 'restore' commit on the same ref.
  *
- * Every durable operation flows through StorageService.commit() — there is
- * no direct filesystem access or working tree manipulation.
+ * Variable mutations (create, rename, reorder, delete, content change)
+ * are recorded as Git commits via StorageService.commit() with descriptive
+ * labels — no separate event recording method is needed. The commit
+ * messages serve as the history log.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-17
  */
 
 import { StorageService } from '../storage/StorageService';
 import type { ProjectService } from './ProjectService';
+
+// ── History event types ──────────────────────────────────────────────────────
+
+/** All history event kinds used in commit labels across the app. */
+export type HistoryEventType =
+  | 'manual'
+  | 'restore'
+  | 'expand'
+  | 'write'
+  | 'variable:created'
+  | 'variable:renamed'
+  | 'variable:reordered'
+  | 'variable:deleted'
+  | 'variable:content-changed';
 
 // ── HistoryService ──────────────────────────────────────────────────────────
 

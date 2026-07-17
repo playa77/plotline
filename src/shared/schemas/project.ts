@@ -79,6 +79,7 @@ const ProjectSettingsSchema = z.object({
     enabled: z.boolean().default(true),
     words: z.number().int().positive().default(500),
   }),
+  styleGuidance: z.enum(['per-project', 'per-chapter']).default('per-chapter'),
   models: z.object({
     expand: ModelRefSchema,
     write: ModelRefSchema,
@@ -103,7 +104,7 @@ export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 // ── Top-level project manifest ────────────────────────────────────────────────
 
 export const ProjectSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   projectId: z.string(),
   title: z.string(),
   createdAt: z.string(), // ISO 8601

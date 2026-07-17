@@ -54,6 +54,7 @@ export interface GenerationJob {
 interface JobOptions {
   versionSlug?: string;
   excludeVariableIds?: string[];
+  manualVariableIds?: string[];
   asNewVersion?: string;
   instruction?: string;
   stage?: 'expanded' | 'chapter';
@@ -121,7 +122,7 @@ export class GenerationService {
     const storyVariables = await this.variableService.assemble(
       'expand',
       projectId,
-      excludeVariableIds,
+      { excludeVariableIds, manualVariableIds: options.manualVariableIds },
     );
 
     // Build context and prompt (using snake_case keys matching template placeholders)
@@ -253,11 +254,27 @@ export class GenerationService {
     }
 
     // Assemble variables
-    const storyVariables = await this.variableService.assemble(
+    let storyVariables = await this.variableService.assemble(
       'write',
       projectId,
-      excludeVariableIds,
+      { excludeVariableIds, manualVariableIds: options.manualVariableIds },
     );
+
+    // Read per-chapter style instruction (extended outlines only)
+    // Only inject per-chapter style when the setting allows it
+    const styleGuidance = project.settings.styleGuidance ?? 'per-chapter';
+    if (styleGuidance === 'per-chapter') {
+      try {
+        const buf = await service.readBlob(refPath, 'style-instruction.txt');
+        const chapterStyleInstruction = buf.toString('utf-8');
+        const styleBlock = `=== STORY VARIABLE: Per-Chapter Style Guidance ===\n${chapterStyleInstruction}\n=== END VARIABLE ===`;
+        storyVariables = storyVariables
+          ? `${storyVariables}\n${styleBlock}`
+          : styleBlock;
+      } catch {
+        // No per-chapter style instruction — use variables as-is
+      }
+    }
 
     // API key
     const apiKey = await this.secretsService.getApiKey();
@@ -506,14 +523,14 @@ export class GenerationService {
     chapterId: string,
     stage: 'expanded' | 'chapter',
     instruction: string,
-    options: { versionSlug?: string; excludeVariableIds?: string[] } = {},
+    options: { versionSlug?: string; excludeVariableIds?: string[]; manualVariableIds?: string[] } = {},
     window: BrowserWindow,
   ): Promise<string> {
     this.assertNoRunningJob(chapterId);
 
     const project = await this.readProject(projectId);
     const service = this.getService(projectId);
-    const { versionSlug, excludeVariableIds } = options;
+    const { versionSlug, excludeVariableIds, manualVariableIds } = options;
 
     const versionSlugResolved = versionSlug ?? 'main';
     const refPath = this.chapterRef(chapterId, versionSlugResolved);
@@ -537,7 +554,7 @@ export class GenerationService {
     const storyVariables = await this.variableService.assemble(
       'iterate',
       projectId,
-      excludeVariableIds,
+      { excludeVariableIds, manualVariableIds: options.manualVariableIds },
     );
 
     const context: Record<string, string> = {

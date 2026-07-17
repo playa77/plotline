@@ -93,16 +93,19 @@ async function seedVariable(
   name: string,
   scope: 'always' | 'expand' | 'write' | 'manual',
   content: string,
-  active = true,
 ): Promise<void> {
   const variable = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: variableId,
     name,
-    core: null,
+    kind: 'custom' as const,
     scope,
-    active,
-    order: 0,
+    scopeLocked: false,
+    deletable: true,
+    renamable: true,
+    position: 0,
+    createdAt: '2026-07-17T00:00:00.000Z',
+    updatedAt: '2026-07-17T00:00:00.000Z',
   };
   await service.commit(
     'refs/heads/main',
@@ -437,7 +440,7 @@ describe('StalenessService', () => {
       expect(result.chapter).toBe('fresh');
     });
 
-    it('leaves fresh when variable is deactivated (removed from comparison)', async () => {
+    it('correctly tracks variables when content changes', async () => {
       await seedOutline(service);
       await seedVariable(service, 'v_tone', 'Tone', 'always', 'Light');
       const expandFps: GenRecord['fingerprints'] = {
@@ -450,11 +453,11 @@ describe('StalenessService', () => {
       };
       await seedChapter(service, 'ch_001', { expanded: true, chapter: false, expandedFingerprints: expandFps });
 
-      // Deactivate the variable — it is removed from comparison (per task spec)
-      await seedVariable(service, 'v_tone', 'Tone', 'always', 'Light', false);
+      // Change the variable content — should mark stale
+      await seedVariable(service, 'v_tone', 'Tone', 'always', 'Dark');
 
       const result = await stalenessService.computeStaleness(projectId, 'ch_001');
-      expect(result.expanded).toBe('fresh');
+      expect(result.expanded).toBe('stale');
       expect(result.chapter).toBe('fresh');
     });
   });

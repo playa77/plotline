@@ -489,8 +489,9 @@ describe('Fault Injection — VariableService (corrupt content)', () => {
     const project = await projectService.create('Corrupt Var Test');
     const pid = project.projectId;
 
-    // Create a normal variable
-    const variable = await variableService.create(pid, 'Tone', 'tone', 'always');
+    // Seed builtins then create a custom variable
+    await variableService.seedBuiltins(pid);
+    const variable = await variableService.create(pid, 'Custom Tone', 'always');
 
     // Directly corrupt the content.html in the repo with binary garbage
     const service = projectService.getOpenProject(pid)!;
@@ -544,7 +545,7 @@ describe('Fault Injection — VariableService (corrupt content)', () => {
 
     let result: { sha: string };
     try {
-      result = await variableService.save(pid, variable.id, malformedContent);
+      result = await variableService.setContent(pid, variable.id, malformedContent);
     } catch (err) {
       // If rejected, the error should be structured
       expect(err).toBeInstanceOf(Error);
