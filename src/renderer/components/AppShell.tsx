@@ -646,6 +646,9 @@ export function AppShell(): JSX.Element {
         case 'close-project':
           void handleCloseProject();
           break;
+        case 'open-recent':
+          void handleOpenProjectById(String(payload.value!));
+          break;
         case 'find-in-chapter':
           setPaletteOpen(true);
           break;
@@ -661,7 +664,7 @@ export function AppShell(): JSX.Element {
       }
     });
     return cleanup;
-  }, [handleCreateProject, handlePickAndOpen, handleCloseProject]);
+  }, [handleCreateProject, handleOpenProjectById, handlePickAndOpen, handleCloseProject]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 

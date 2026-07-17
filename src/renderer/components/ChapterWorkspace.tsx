@@ -508,6 +508,14 @@ export function ChapterWorkspace({
               </button>
             </div>
           )}
+          <button
+            type="button"
+            className="chapter-workspace__expand-btn"
+            onClick={() => handleExpand()}
+            disabled={genStatus === 'streaming'}
+          >
+            Re-expand
+          </button>
           <Editor
             content={artifactHtml}
             readOnly={true}
@@ -634,6 +642,14 @@ export function ChapterWorkspace({
               <span className="chapter-workspace__wc-target">Target: {targetRange}</span>
             )}
           </div>
+          <button
+            type="button"
+            className="chapter-workspace__write-btn"
+            onClick={() => handleWrite()}
+            disabled={genStatus === 'streaming'}
+          >
+            Re-write
+          </button>
           {/* Export action bar — primary action for written chapters per DD §5.3 */}
           <div className="chapter-workspace__export-bar">
             <button

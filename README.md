@@ -62,6 +62,44 @@ npm run build      # produce a packaged desktop build (deb, AppImage, Squirrel)
 3. Fill in **Tone** and **Writing Style** in the Story Variables studio (two minutes well spent — every generation reads them).
 4. Select a chapter → **Expand** → **Write**. That's the whole loop.
 
+## Building (Linux)
+
+Plotline ships as a `.deb` package and an AppImage. Builds are produced via Electron Forge with Vite.
+
+**Prerequisites:** Node.js ≥ 20, npm ≥ 10. Git on PATH is optional (the app bundles `isomorphic-git`), but `npm run build` shells out to `git` indirectly via one of Forge's makers, so `git` must be available at build time.
+
+### Quick build (one-shot)
+
+```bash
+npm install
+bash scripts/download-tectonic.sh   # fetches Tectonic into vendor/tectonic/ (PDF export)
+npm run build
+```
+
+The `build` script runs `electron-forge make`, which:
+1. Compiles TypeScript (main + preload) and bundles the renderer via Vite into `.vite/`.
+2. Packages the Electron app under `out/`.
+3. Produces a `.deb` via `@electron-forge/maker-deb` and an AppImage via `@reforged/maker-appimage`.
+
+### Outputs
+
+| Package | Path | Size |
+|---|---|---|
+| Debian | `out/make/deb/x64/plotline_0.2.0_amd64.deb` | ~82 MB |
+| AppImage | `out/make/AppImage/x64/Plotline-0.2.0-x64.AppImage` | ~111 MB |
+
+Install the `.deb` with `sudo dpkg -i plotline_0.2.0_amd64.deb` or make the AppImage executable and run it directly.
+
+### Package structure notes
+
+- **Chromium sandbox:** Electron's Chromium sandbox cannot execute inside the AppImage's read-only squashfs. The build hook in `forge.config.js` renames the binary to `plotline.bin` and writes a shell wrapper that passes `--no-sandbox`. This is safe for a local-first desktop app; the renderer is sandboxed by Electron's context isolation regardless.
+- **Production dependencies:** Vite build externalizes transitive dependencies (e.g. `@mixmark-io/domino` from `turndown` → `linkedom`). The build hook runs `npm install --omit=dev` inside the packaged `resources/app/` so the runtime can resolve them.
+- **Renderer output:** `vite.renderer.config.ts` writes to `.vite/renderer/main_window/`, the path the Forge Vite plugin expects at runtime. If you change the renderer build, keep the `outDir` in sync with this convention.
+
+### Build artifacts (not committed)
+
+All build outputs are gitignored: `out/`, `.vite/`, `dist/`, `vendor/tectonic/`, `*.AppImage`, `*.deb`, `*.tar.gz`, and any other packaging format. When uploading a release to GitHub, attach the binaries from `out/make/` — they exist only on your machine after a build.
+
 ## Configuration
 
 Per-project settings (in-app, persisted in the project manifest): model per workflow step (Expand / Write / Iterate), inference base URL, continuity context toggle and word budget, theme, editor font mode. Custom LaTeX templates: drop a template into the project's `latex/` folder and it appears in the PDF export picker.

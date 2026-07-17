@@ -9,15 +9,18 @@ node_modules/
 
 # --- Build output ---
 dist/
+src/dist/
 out/
 build/
 release/
 *.tsbuildinfo
 .vite/
 .parcel-cache/
+.eslintcache
+.cache/
 
 # --- Electron packaging ---
-# electron-builder / forge outputs
+# electron-forge / electron-builder outputs
 *.dmg
 *.AppImage
 *.deb
@@ -25,11 +28,18 @@ release/
 *.exe
 *.msi
 *.blockmap
+*.tar.gz
+*.zip
 app-builds/
+latest*.yml
 
 # --- Bundled third-party binaries (fetched at build time, never committed) ---
 vendor/tectonic/
 .tectonic-cache/
+
+# --- Worktrees (AGENTS.md §7 and §10) ---
+.worktrees/
+.slim/worktrees/
 
 # --- Tests & coverage ---
 coverage/

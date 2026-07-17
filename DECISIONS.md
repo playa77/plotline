@@ -512,3 +512,36 @@ would require `transform-origin` gymnastics. Using `font-size` on `html` as a
 changing the application mechanism is a SettingsWorkspace + Editor.css edit.
 
 ---
+
+## Build System
+
+### D0XX — AppImage Chromium sandbox workaround implementation (R1)
+
+**Context:** AGENTS.md §11 prescribes using `scripts/apprun.sh` as the `runtime`
+option in `@reforged/maker-appimage` to work around the Electron Chromium SUID
+sandbox crash inside the read-only squashfs. The `runtime` option, however,
+replaces the outer AppImage ELF runtime binary with the shell script — the script
+runs *before* the squashfs is mounted, so `$HERE/plotline` resolves to the
+AppImage file's directory (no binary present) rather than the mount point.
+
+**Chosen:** Remove the `runtime` config and instead use
+`packagerConfig.afterComplete` to rename the Electron binary (`plotline` →
+`plotline.bin`) and write a shell wrapper script (`plotline`) that execs the real
+binary with `--no-sandbox`. The `AppRun` symlink (→ `usr/bin/plotline` →
+`usr/lib/plotline/plotline`) resolves to the wrapper, which passes `--no-sandbox`
+to the real binary via `readlink -f` to handle the symlink chain correctly.
+
+**Why this works:** The `AppRun` is a standard symlink inside the squashfs; the
+standard ELF runtime mounts the squashfs, executes `AppRun`, which follows the
+symlink chain to the wrapper script. The wrapper runs inside the mounted
+filesystem and launches the real binary. The `afterComplete` hook runs after all
+files (including the Electron binary) are in place.
+
+**Impact:** The `scripts/apprun.sh` file remains in the repo as documentation but
+is no longer referenced in `forge.config.js`. The sandbox workaround is
+functionally identical — `--no-sandbox` is always applied on AppImage launch.
+
+**R1:** Trivially reversible — swapping between approaches requires only
+`forge.config.js` edits and a rebuild.
+
+---
