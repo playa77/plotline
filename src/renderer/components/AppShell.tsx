@@ -17,7 +17,7 @@ import { ManuscriptTree } from './ManuscriptTree';
 import { Workspace } from './Workspace';
 import type { WorkspaceSelection } from './Workspace';
 import { ContextRail } from './ContextRail';
-import { CommandPalette } from './CommandPalette';
+import { CommandPalette, type GenAction } from './CommandPalette';
 import { ImportDialog } from './ImportDialog';
 import { Toast } from './Toast';
 import { ProjectLauncher } from './ProjectLauncher';
@@ -855,6 +855,19 @@ export function AppShell(): JSX.Element {
         <CommandPalette
           open={paletteOpen}
           actions={getAvailableActions(actionContext, actionCallbacks)}
+          genActions={useMemo<GenAction[]>(() => {
+            const isGenIdle = genStore.status === 'idle' || genStore.status === 'done' || genStore.status === 'error';
+            const hasChapter = selectedChapterId !== null;
+            const available = hasChapter && isGenIdle;
+            const expandModel = projectModels.expand;
+            const writeModel = projectModels.write;
+            return [
+              { label: 'Expand', modelName: expandModel, shortcut: 'Cmd+Shift+E', available, execute: actionCallbacks.expand },
+              { label: 'Write', modelName: writeModel, shortcut: 'Cmd+Shift+W', available, execute: actionCallbacks.write },
+              { label: 'Re-expand', modelName: expandModel, shortcut: '', available, execute: actionCallbacks.reExpand },
+              { label: 'Re-write', modelName: writeModel, shortcut: '', available, execute: actionCallbacks.reWrite },
+            ];
+          }, [projectModels, selectedChapterId, genStore.status, actionCallbacks])}
           onClose={() => setPaletteOpen(false)}
         />
       )}

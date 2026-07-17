@@ -202,3 +202,75 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
 }
+
+/* ── Generate action bar ─────────────────────────────────────────────────── */
+
+.command-palette__gen-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.command-palette__gen-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.command-palette__gen-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent);
+}
+
+.command-palette__gen-btn--disabled,
+.command-palette__gen-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.command-palette__gen-btn-label {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.command-palette__gen-btn-model {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.command-palette__gen-btn:hover:not(:disabled) .command-palette__gen-btn-model {
+  color: var(--color-bg-primary);
+  opacity: 0.75;
+}
+
+.command-palette__gen-btn-shortcut {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  font-family: var(--font-chrome);
+  white-space: nowrap;
+}
+
+.command-palette__gen-btn:hover:not(:disabled) .command-palette__gen-btn-shortcut {
+  color: var(--color-bg-primary);
+  opacity: 0.6;
+}

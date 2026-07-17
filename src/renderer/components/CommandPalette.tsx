@@ -24,11 +24,22 @@ import { filterActions, groupActions, CATEGORY_LABELS } from '../actions';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+/** A generation action button shown in the palette's bottom bar. */
+export interface GenAction {
+  label: string;
+  modelName: string;
+  shortcut: string;
+  available: boolean;
+  execute: () => void;
+}
+
 export interface CommandPaletteProps {
   /** Whether the palette is visible. */
   open: boolean;
   /** Full list of available actions (pre-filtered for availability). */
   actions: CommandAction[];
+  /** Generation actions shown as always-visible buttons at the bottom. */
+  genActions?: GenAction[];
   /** Called when the palette should close. */
   onClose: () => void;
 }
@@ -78,6 +89,7 @@ function shortcutDisplay(shortcut: string): string {
 export function CommandPalette({
   open,
   actions,
+  genActions,
   onClose,
 }: CommandPaletteProps): JSX.Element | null {
   const [query, setQuery] = useState<string>('');
@@ -274,6 +286,31 @@ export function CommandPalette({
             ))
           )}
         </div>
+
+        {/* Generate action bar (always visible at bottom) */}
+        {genActions && genActions.length > 0 && (
+          <div className="command-palette__gen-bar">
+            {genActions.map((ga) => (
+              <button
+                key={ga.label}
+                type="button"
+                className={`command-palette__gen-btn${!ga.available ? ' command-palette__gen-btn--disabled' : ''}`}
+                disabled={!ga.available}
+                onClick={() => {
+                  if (ga.available) {
+                    ga.execute();
+                    onClose();
+                  }
+                }}
+                title={`${ga.label} — ${ga.shortcut}`}
+              >
+                <span className="command-palette__gen-btn-label">{ga.label}</span>
+                <span className="command-palette__gen-btn-model">{ga.modelName}</span>
+                <span className="command-palette__gen-btn-shortcut">{ga.shortcut}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Footer hint */}
         <div className="command-palette__footer">
