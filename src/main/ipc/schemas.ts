@@ -7,6 +7,7 @@
  * Version: 0.2.0 | 2026-07-16
  */
 import { z } from 'zod';
+import { ModelRefSchema } from '../../shared/schemas/project';
 import type { ParsePreview, OutlineMutation } from '../../shared/schemas/outline';
 import type { IpcCommandMap } from '../../shared/ipc';
 
@@ -31,6 +32,29 @@ export const ListProjectsRequestSchema = z.object({});
 /** Validates project:close request. */
 export const CloseProjectRequestSchema = z.object({
   projectId: z.string().optional(),
+});
+
+export const UpdateSettingsRequestSchema = z.object({
+  projectId: z.string().min(1),
+  settings: z.object({
+    continuityContext: z.object({
+      enabled: z.boolean().optional(),
+      words: z.number().int().positive().optional(),
+    }).optional(),
+    models: z.object({
+      expand: ModelRefSchema.optional(),
+      write: ModelRefSchema.optional(),
+      iterate: ModelRefSchema.optional(),
+    }).optional(),
+    inference: z.object({
+      baseUrl: z.string().url().optional(),
+    }).optional(),
+    theme: z.enum(['dark', 'light']).optional(),
+    editor: z.object({
+      fontMode: z.enum(['serif', 'mono']).optional(),
+    }).optional(),
+    backupRemote: z.string().url().nullable().optional(),
+  }),
 });
 
 /** Validates project:importOutline request. */
@@ -141,6 +165,8 @@ export const SecretsSetApiKeyRequestSchema = z.object({
 });
 
 export const SecretsHasApiKeyRequestSchema = z.object({});
+
+export const SecretsDeleteApiKeyRequestSchema = z.object({});
 
 // ── History schemas (WP-17) ──────────────────────────────────────────────────────
 

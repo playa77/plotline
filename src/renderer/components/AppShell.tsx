@@ -11,12 +11,23 @@
  * Version: 0.1.0 | 2026-07-16
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 
 import { ManuscriptTree } from './ManuscriptTree';
 import { Workspace } from './Workspace';
 import type { WorkspaceSelection } from './Workspace';
 import { ContextRail } from './ContextRail';
+import { CommandPalette } from './CommandPalette';
+
+import {
+  getAvailableActions,
+  type ActionContext,
+  type ActionCallbacks,
+} from '../actions';
+import { useGenerationStore } from '../stores/generationStore';
+import { useVersionStore } from '../stores/versionStore';
+import { useVariableStore } from '../stores/variableStore';
+import { invoke } from '../ipc/client';
 
 import { demoParts } from '../data/demoOutline';
 
@@ -221,7 +232,7 @@ export function AppShell(): JSX.Element {
           <button
             type="button"
             className="library-action-btn"
-            onClick={() => setSelection({ type: 'none' })}
+            onClick={() => setSelection({ type: 'settings' })}
           >
             Settings
           </button>

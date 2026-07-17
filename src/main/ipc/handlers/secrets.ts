@@ -10,6 +10,7 @@ import { registerCommand } from '../registry';
 import {
   SecretsSetApiKeyRequestSchema,
   SecretsHasApiKeyRequestSchema,
+  SecretsDeleteApiKeyRequestSchema,
 } from '../schemas';
 import type { SecretsService } from '../../services/SecretsService';
 
@@ -35,6 +36,15 @@ export function registerSecretsHandlers(secretsService: SecretsService): void {
     async () => {
       const hasKey = await secretsService.hasApiKey();
       return { hasKey };
+    },
+  );
+
+  registerCommand(
+    'secrets:deleteApiKey',
+    SecretsDeleteApiKeyRequestSchema,
+    async () => {
+      await secretsService.deleteApiKey();
+      return { ok: true };
     },
   );
 }

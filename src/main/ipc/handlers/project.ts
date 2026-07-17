@@ -14,8 +14,10 @@ import {
   OpenProjectRequestSchema,
   ListProjectsRequestSchema,
   CloseProjectRequestSchema,
+  UpdateSettingsRequestSchema,
 } from '../schemas';
 import type { ProjectService } from '../../services/ProjectService';
+import type { Project } from '../../../shared/schemas/project';
 import { emitEvent } from '../events';
 
 /**
@@ -76,6 +78,19 @@ export function registerProjectHandlers(projectService: ProjectService): void {
         });
       }
       return { ok: true };
+    },
+  );
+
+  // ── project:updateSettings ───────────────────────────────────────
+  registerCommand(
+    'project:updateSettings',
+    UpdateSettingsRequestSchema,
+    async (payload) => {
+      const updated = await projectService.updateSettings(
+        payload.projectId,
+        payload.settings as Partial<Project['settings']>,
+      );
+      return updated;
     },
   );
 }

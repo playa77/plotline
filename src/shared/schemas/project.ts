@@ -87,7 +87,14 @@ const ProjectSettingsSchema = z.object({
   inference: z.object({
     baseUrl: z.string().url(),
   }),
+  theme: z.enum(['dark', 'light']).default('dark'),
+  editor: z.object({
+    fontMode: z.enum(['serif', 'mono']).default('serif'),
+  }).default({}),
+  backupRemote: z.string().url().nullable().default(null),
 });
+
+export type ProjectSettings = z.infer<typeof ProjectSettingsSchema>;
 
 // ── Top-level project manifest ────────────────────────────────────────────────
 

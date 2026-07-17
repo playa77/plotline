@@ -12,6 +12,7 @@
 // Never throw across IPC — always return structured errors via IpcResult.
 
 import type { Project, ProjectSummary } from './schemas/project';
+import type { ModelRef } from './schemas/project';
 import type { ParsePreview, Outline, OutlineMutation } from './schemas/outline';
 import type { Variable, VariableScope, CoreVariableType } from './schemas/variable';
 import type { GenRecord } from './schemas/meta';
@@ -51,6 +52,20 @@ export interface IpcCommandMap {
   'project:close': {
     request: { projectId?: string };
     response: { ok: true };
+  };
+  'project:updateSettings': {
+    request: {
+      projectId: string;
+      settings: {
+        continuityContext?: { enabled?: boolean; words?: number };
+        models?: { expand?: ModelRef; write?: ModelRef; iterate?: ModelRef };
+        inference?: { baseUrl?: string };
+        theme?: 'dark' | 'light';
+        editor?: { fontMode?: 'serif' | 'mono' };
+        backupRemote?: string | null;
+      };
+    };
+    response: Project;
   };
   'project:importOutline': {
     request: { projectId: string; markdown: string };
@@ -122,6 +137,10 @@ export interface IpcCommandMap {
   'secrets:hasApiKey': {
     request: {};
     response: { hasKey: boolean };
+  };
+  'secrets:deleteApiKey': {
+    request: {};
+    response: { ok: boolean };
   };
   // ── Generation (§7.6) ─────────────────────────────────
   'generate:expand': {

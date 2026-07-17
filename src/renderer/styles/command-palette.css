@@ -1,0 +1,206 @@
+/**
+ * Command palette styles — Raycast-inspired overlay.
+ *
+ * Dense, monospace, dark theme, tool-like aesthetic.
+ * No decoration, no emojis, no wasted space.
+ *
+ * Version: 0.1.0 | 2026-07-17
+ */
+
+/* ── Backdrop ──────────────────────────────────────────────────────────── */
+
+.command-palette__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  animation: palette-fade-in 80ms ease-out;
+}
+
+@keyframes palette-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+
+.command-palette {
+  width: 560px;
+  max-width: 90vw;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 0 1px var(--color-border);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  overflow: hidden;
+  animation: palette-slide-in 100ms ease-out;
+}
+
+@keyframes palette-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Search ────────────────────────────────────────────────────────────── */
+
+.command-palette__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.command-palette__search-icon {
+  color: var(--color-accent);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+.command-palette__input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  outline: none;
+  caret-color: var(--color-accent);
+}
+
+.command-palette__input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ── List ──────────────────────────────────────────────────────────────── */
+
+.command-palette__list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-sm) 0;
+}
+
+.command-palette__list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.command-palette__list::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────── */
+
+.command-palette__empty {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* ── Group ─────────────────────────────────────────────────────────────── */
+
+.command-palette__group {
+  padding-bottom: var(--space-sm);
+}
+
+.command-palette__group + .command-palette__group {
+  /* border-top handled implicitly by spacing */
+}
+
+.command-palette__group-label {
+  padding: var(--space-xs) var(--space-xl);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  user-select: none;
+}
+
+/* ── Item ──────────────────────────────────────────────────────────────── */
+
+.command-palette__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 var(--space-xl);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.command-palette__item:hover,
+.command-palette__item--selected {
+  background: var(--color-bg-selected);
+}
+
+.command-palette__item--selected {
+  /* accent left border for selected item */
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.command-palette__item-label {
+  flex: 1;
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: var(--space-md);
+}
+
+.command-palette__item-shortcut {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  padding: 1px 5px;
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
+  font-family: var(--font-chrome);
+  white-space: nowrap;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+
+.command-palette__footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-sm) var(--space-xl);
+  border-top: 1px solid var(--color-border);
+}
+
+.command-palette__footer-hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}

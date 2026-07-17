@@ -128,6 +128,19 @@ versions follow the document suite version (currently `0.1.0-dev`).
   export:progress event for streaming Tectonic output, download script at
   scripts/download-tectonic.sh. 33 new tests (17 htmlToLatex + 6
   TectonicRunner + 6 ExportService PDF). (this commit)
+- **2026-07-17** — WP-27: Settings surface — Full settings workspace with
+  collapsible sections for API Key (keychain-backed set/check/delete),
+  Models (per-role model selectors for Expand/Write/Iterate), Inference URL,
+  Continuity Context (toggle + word budget), Theme (dark/light radio with
+  `data-theme` attribute switching), Editor font mode (serif/mono), and
+  Backup Remote (nullable git URL). Added `theme`, `editor`, `backupRemote`
+  to `ProjectSettingsSchema` with defaults. New `project:updateSettings` IPC
+  command with `UpdateSettingsRequestSchema` and `ProjectService.updateSettings`
+  method (deep-merge+commit pattern). New `secrets:deleteApiKey` IPC command.
+  Light theme color tokens in `tokens.css`. Settings button in AppShell now
+  selects `{ type: 'settings' }`. 1 new file (SettingsWorkspace.tsx),
+  1 new stylesheet (settings-workspace.css), 9 files modified.
+  `tsc --noEmit` clean, all 576 existing tests pass. (this commit)
 
 ### Changed
 - **2026-07-16** — Replaced project `AGENTS.md` (previously a verbatim

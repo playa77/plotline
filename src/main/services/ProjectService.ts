@@ -92,6 +92,9 @@ export class ProjectService {
           iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
         },
         inference: { baseUrl: 'https://openrouter.ai/api/v1' },
+        theme: 'dark',
+        editor: { fontMode: 'serif' },
+        backupRemote: null,
       },
       structure: [],
     };
@@ -310,7 +313,50 @@ export class ProjectService {
     });
   }
 
-  // ── Outline read / mutate ─────────────────────────────────────────────
+  // ── Settings ──────────────────────────────────────────────────────────
+
+  /**
+   * Update project settings by merging partial settings into the current manifest.
+   *
+   * 1. Reads the current project manifest.
+   * 2. Deep-merges the partial settings into existing settings.
+   * 3. Validates the result against ProjectSchema.
+   * 4. Writes `project.json` and commits to `refs/heads/main`.
+   *
+   * @returns The updated project manifest.
+   * @throws If the project is not open or validation fails.
+   */
+  async updateSettings(
+    projectId: string,
+    partialSettings: Partial<Project['settings']>,
+  ): Promise<Project> {
+    const service = this.openProjects.get(projectId);
+    if (!service) {
+      throw new Error(`Project not open: ${projectId}`);
+    }
+
+    // 1. Read current manifest
+    const raw = await service.readBlob('refs/heads/main', 'project.json');
+    const manifest = ProjectSchema.parse(JSON.parse(raw.toString('utf-8')));
+
+    // 2. Deep-merge settings
+    manifest.settings = deepMergeSettings(manifest.settings, partialSettings);
+    manifest.updatedAt = new Date().toISOString();
+
+    // 3. Validate the merged result
+    const validated = ProjectSchema.parse(manifest);
+
+    // 4. Write and commit
+    const manifestJson = Buffer.from(JSON.stringify(validated, null, 2), 'utf-8');
+    await service.commit('refs/heads/main', {
+      'project.json': manifestJson,
+    }, {
+      label: 'Update settings',
+      kind: 'manual',
+    });
+
+    return validated;
+  }
 
   /**
    * Read the current outline from `outline/outline.json` on `refs/heads/main`.
@@ -527,6 +573,45 @@ function countChapters(structure: Project['structure']): number {
     }
   }
   return count;
+}
+
+/**
+ * Deep-merge partial settings into existing settings.
+ *
+ * Performs a shallow merge at each key level so that nested objects (e.g.
+ * `models`, `continuityContext`, `editor`) are merged rather than replaced
+ * wholesale. Explicit `null` values are accepted (for nullable fields like
+ * `backupRemote`).
+ */
+function deepMergeSettings(
+  existing: Project['settings'],
+  partial: Partial<Project['settings']>,
+): Project['settings'] {
+  const result = { ...existing };
+
+  for (const key of Object.keys(partial) as Array<keyof Project['settings']>) {
+    const value = partial[key];
+    if (value === undefined) continue;
+
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      typeof result[key] === 'object' &&
+      result[key] !== null
+    ) {
+      // Nested object merge (continuityContext, models, inference, editor)
+      (result as Record<string, unknown>)[key] = {
+        ...(result[key] as Record<string, unknown>),
+        ...(value as Record<string, unknown>),
+      };
+    } else {
+      // Scalar value or null
+      (result as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  return result;
 }
 
 // ── Outline mutation applicator ───────────────────────────────────────────────
