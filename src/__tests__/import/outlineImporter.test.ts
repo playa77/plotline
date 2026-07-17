@@ -299,4 +299,11 @@ describe('parseOutlineMarkdown (Tether fixture)', () => {
   it('has a project title', () => {
     expect(preview.projectTitle).toBeTruthy();
   });
+
+  it('parses 17 chapters across all parts (Tether)', () => {
+    const chapterCount = preview.parts.reduce(
+      (sum, p) => sum + p.chapters.length, 0,
+    );
+    expect(chapterCount).toBe(17);
+  });
 });

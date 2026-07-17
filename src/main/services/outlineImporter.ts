@@ -332,7 +332,7 @@ export function parseOutlineMarkdown(markdown: string): ParsePreview {
 
     // ── Chapter detection ─────────────────────────────────────────
     const chapterMatch = plain.match(
-      /^### (Chapter\s+\d+|Epilogue):\s*(.*)$/,
+      /^###\s*(Chapter\s+\d+|Epilogue)\s*[:—–-]?\s*(.+)$/,
     );
     if (chapterMatch) {
       closeChapter();
