@@ -18,6 +18,7 @@ import './styles/workspace.css';
 import './styles/context-rail.css';
 import './styles/outline-workspace.css';
 import './styles/variable-workspace.css';
+import './styles/command-palette.css';
 
 function App(): JSX.Element {
   return <AppShell />;

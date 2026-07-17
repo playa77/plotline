@@ -13,13 +13,14 @@
 import { ChapterWorkspace } from './ChapterWorkspace';
 import { OutlineWorkspace } from './OutlineWorkspace';
 import { VariableWorkspace } from './VariableWorkspace';
+import { SettingsWorkspace } from './SettingsWorkspace';
 import { demoParts } from '../data/demoOutline';
 import type { Outline } from '../../shared/schemas/outline';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface WorkspaceSelection {
-  type: 'none' | 'outline' | 'chapter' | 'variables';
+  type: 'none' | 'outline' | 'chapter' | 'variables' | 'settings';
   /** Only set when type === 'chapter'. */
   chapterId?: string;
   /** Only set when type === 'chapter'. */
@@ -118,5 +119,7 @@ export function Workspace({ selection }: WorkspaceProps): JSX.Element {
       );
     case 'variables':
       return <VariableWorkspace projectId="demo" />;
+    case 'settings':
+      return <SettingsWorkspace projectId="demo" />;
   }
 }

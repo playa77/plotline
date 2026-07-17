@@ -81,3 +81,38 @@
   --transition-fast: 100ms ease;
   --transition-normal: 150ms ease;
 }
+
+/* ── Light theme ─────────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: #ebebeb;
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  --color-bg-active: rgba(0, 0, 0, 0.06);
+  --color-bg-selected: rgba(59, 110, 204, 0.1);
+
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #555570;
+  --color-text-muted: #8888a0;
+
+  --color-accent: #3b6ecc;
+  --color-accent-hover: #5588e6;
+  --color-accent-muted: rgba(59, 110, 204, 0.12);
+
+  --color-stale: #cc8800;
+  --color-stale-muted: rgba(204, 136, 0, 0.12);
+
+  --color-danger: #cc3333;
+  --color-danger-muted: rgba(204, 51, 51, 0.12);
+
+  --color-on-target: #2b8a3e;
+  --color-under-target: #e67700;
+
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-strong: rgba(0, 0, 0, 0.15);
+
+  --color-stage-dot-empty: rgba(0, 0, 0, 0.15);
+  --color-stage-dot-filled: var(--color-accent);
+  --color-stage-dot-stale: var(--color-stale);
+}

@@ -27,6 +27,7 @@ import { DOMParser } from '@tiptap/pm/model';
 import type { EditorView } from '@tiptap/pm/view';
 
 import { sanitize } from '../../shared/sanitize/sanitizer';
+import { setActiveEditor } from '../editorRef';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -162,6 +163,14 @@ export function Editor({
       },
     },
   });
+
+  // Publish the active editor ref so CommandPalette can execute editor actions
+  useEffect(() => {
+    setActiveEditor(editor ?? null);
+    return () => {
+      setActiveEditor(null);
+    };
+  }, [editor]);
 
   // Sync readOnly without re-creating the editor
   useEffect(() => {

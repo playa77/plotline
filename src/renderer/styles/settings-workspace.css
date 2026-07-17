@@ -1,0 +1,406 @@
+/**
+ * SettingsWorkspace styles — full-pane settings form.
+ *
+ * BEM convention: `.settings-workspace` is the root block.
+ * Depends on tokens.css for all color/spacing/typography variables.
+ *
+ * Version: 0.1.0 | 2026-07-17
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Root container
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--color-bg-primary);
+}
+
+.settings-workspace__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl) var(--space-2xl);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  flex-shrink: 0;
+}
+
+.settings-workspace__title {
+  margin: 0;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: 0.3px;
+}
+
+.settings-workspace__status {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.settings-workspace__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--space-2xl) var(--space-2xl);
+}
+
+.settings-workspace__body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.settings-workspace__body::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 2px;
+}
+
+.settings-workspace__loading,
+.settings-workspace__error {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Collapsible section
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-section {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-section__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: var(--space-lg) 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  text-align: left;
+  transition: color var(--transition-fast);
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+.settings-section__header:hover {
+  color: var(--color-accent);
+}
+
+.settings-section__chevron {
+  display: inline-block;
+  font-size: 8px;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.settings-section__chevron--open {
+  transform: rotate(90deg);
+}
+
+.settings-section__body {
+  padding: 0 0 var(--space-lg) var(--space-xl);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Form fields
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md) 0;
+}
+
+.settings-field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.settings-field__label {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.settings-field__value {
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-field__value--none {
+  font-style: italic;
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.settings-field__indicator {
+  font-size: 10px;
+}
+
+.settings-field__indicator--configured {
+  color: var(--color-on-target);
+}
+
+.settings-field__actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.settings-field__inline-form {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Input fields
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-input {
+  padding: 6px var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 200px;
+}
+
+.settings-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent-muted);
+}
+
+.settings-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.settings-input--sm {
+  min-width: 120px;
+  flex: 1;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Buttons
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px var(--space-lg);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+
+.settings-btn--sm {
+  padding: 4px var(--space-md);
+  font-size: var(--font-size-xs);
+}
+
+.settings-btn--primary {
+  background: var(--color-accent);
+  color: var(--color-bg-primary);
+  border-color: var(--color-accent);
+}
+
+.settings-btn--primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.settings-btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-btn--secondary {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-strong);
+}
+
+.settings-btn--secondary:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+.settings-btn--danger {
+  background: transparent;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.settings-btn--danger:hover {
+  background: var(--color-danger);
+  color: var(--color-bg-primary);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Toggle switch
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-md);
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-toggle__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-toggle__track {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.settings-toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.settings-toggle__input:checked + .settings-toggle__track {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent);
+}
+
+.settings-toggle__input:checked + .settings-toggle__track .settings-toggle__thumb {
+  transform: translateX(14px);
+  background: var(--color-accent);
+}
+
+.settings-toggle__input:focus-visible + .settings-toggle__track {
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Radio group
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+.settings-radio-group {
+  display: flex;
+  gap: var(--space-lg);
+  margin-top: var(--space-xs);
+}
+
+.settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.settings-radio:hover {
+  color: var(--color-text-primary);
+}
+
+.settings-radio--selected {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
+.settings-radio__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-radio__dot {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border-strong);
+  position: relative;
+  transition: border-color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.settings-radio__dot::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+
+.settings-radio__input:checked ~ .settings-radio__dot {
+  border-color: var(--color-accent);
+}
+
+.settings-radio__input:checked ~ .settings-radio__dot::after {
+  background: var(--color-accent);
+}
+
+.settings-radio__input:focus-visible ~ .settings-radio__dot {
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
