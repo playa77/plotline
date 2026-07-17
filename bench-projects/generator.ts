@@ -263,6 +263,7 @@ async function generate(): Promise<void> {
         expand: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
         write: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
         iterate: { provider: 'openrouter', model: 'anthropic/claude-sonnet-4-20250514' },
+        parse: { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
       },
       inference: { baseUrl: 'https://openrouter.ai/api/v1' },
       theme: 'dark',

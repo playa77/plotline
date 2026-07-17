@@ -55,6 +55,8 @@ function findImportMentions(content: string, filePath: string): string[] {
       if (/className="[^"]*import-dialog[^"]*"/i.test(line)) continue;
       // Skip IPC call sites (these are functional, not user-facing)
       if (/invoke\(.*importOutline|invoke\(.*confirmImport|invoke\(.*pickAndImport/i.test(line)) continue;
+      // Skip form field labels with descriptive text (e.g. label="Parse (outline import)")
+      if (/\blabel="[^"]*import[^"]*"/i.test(line)) continue;
 
       results.push(`${filePath}:${lineNum}`);
     }
@@ -93,7 +95,9 @@ describe('Dead-instruction audit (WP-34)', () => {
           // Check if "import" appears only in a className attribute
           const withoutClassName = line.replace(/className="[^"]*"/g, '');
           const withoutInvoke = withoutClassName.replace(/invoke\([^)]*import[^)]*\)/gi, '');
-          if (!/\bimport\b/i.test(withoutInvoke)) continue;
+          // Skip form field labels with descriptive text (e.g. label="Parse (outline import)")
+          const withoutLabels = withoutInvoke.replace(/\blabel="[^"]*import[^"]*"/gi, '');
+          if (!/\bimport\b/i.test(withoutLabels)) continue;
 
           // Check context window (3 lines before/after) for a button or control
           const start = Math.max(0, i - 3);

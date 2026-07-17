@@ -203,14 +203,6 @@ export interface IpcCommandMap {
       versionNames: Array<{ slug: string; name: string; selected: boolean }>;
     };
   };
-  'chapter:getStyleInstruction': {
-    request: { projectId: string; chapterId: string; versionSlug?: string };
-    response: { text: string };
-  };
-  'chapter:saveStyleInstruction': {
-    request: { projectId: string; chapterId: string; text: string; versionSlug?: string };
-    response: { sha: string };
-  };
   // ── History (§7.1) ──────────────────────────────────────────
   'history:list': {
     request: { projectId: string; ref: string; limit?: number; before?: string };
