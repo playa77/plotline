@@ -12,6 +12,7 @@
 import { create } from 'zustand';
 import type { Variable, VariableScope } from '../../shared/schemas/variable';
 import { invoke } from '../ipc/client';
+import { useToastStore } from './toastStore';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       const variables = await invoke('variables:list', { projectId });
       set({ variables, loading: false });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variables');
       console.warn(
         `[variableStore] variables:list failed (IPC may not be wired yet):`,
         err,
@@ -151,6 +154,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
           });
           set({ cards });
         } catch (cardErr) {
+          const e2 = cardErr as { code?: string; message?: string };
+          useToastStore.getState().error(e2.code ?? 'VARIABLE_ERROR', e2.message ?? 'Failed to load character cards');
           console.warn(
             `[variableStore] variables:listCards failed:`,
             cardErr,
@@ -159,6 +164,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         }
       }
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variable');
       console.warn(
         `[variableStore] variables:get failed (IPC may not be wired yet):`,
         err,
@@ -186,6 +193,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
       return variable;
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to create variable');
       console.warn(
         `[variableStore] variables:create failed:`,
         err,
@@ -209,6 +218,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         ),
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to update scope');
       console.warn(
         `[variableStore] variables:setScope failed:`,
         err,
@@ -231,6 +242,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         ),
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to toggle variable');
       console.warn(
         `[variableStore] variables:setActive failed:`,
         err,
@@ -251,6 +264,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
     try {
       await invoke('variables:save', { projectId, variableId, content });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to save content');
       console.warn(
         `[variableStore] variables:save failed (content held in memory):`,
         err,
@@ -271,6 +286,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
             : state.selectedVariableId,
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to archive variable');
       console.warn(
         `[variableStore] variables:archive failed:`,
         err,
@@ -293,6 +310,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         },
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variable');
       console.warn(
         `[variableStore] variables:get failed:`,
         err,
@@ -310,6 +329,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       });
       set({ cards, selectedCardId: null, cardContent: {} });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load cards');
       console.warn(
         `[variableStore] variables:listCards failed:`,
         err,
@@ -338,6 +359,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         }));
       }
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to select card');
       console.warn(
         `[variableStore] selectCard failed:`,
         err,
@@ -364,6 +387,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         },
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to add card');
       console.warn(
         `[variableStore] variables:addCard failed:`,
         err,
@@ -391,6 +416,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         content,
       });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to save card content');
       console.warn(
         `[variableStore] variables:saveCard failed (content held in memory):`,
         err,
@@ -414,6 +441,8 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
           state.selectedCardId === cardId ? null : state.selectedCardId,
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to remove card');
       console.warn(
         `[variableStore] variables:removeCard failed:`,
         err,

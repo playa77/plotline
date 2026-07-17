@@ -10,6 +10,7 @@
 
 import { create } from 'zustand';
 import { invoke } from '../ipc/client';
+import { useToastStore } from './toastStore';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,8 @@ export const useHistoryStore = create<HistoryStore>()((set, get) => ({
       });
       set({ commits, loading: false });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Failed to load revision history.');
       console.warn(
         `[historyStore] history:list failed:`,
         err,
@@ -88,6 +91,8 @@ export const useHistoryStore = create<HistoryStore>()((set, get) => ({
         loading: false,
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Failed to load more history entries.');
       console.warn(
         `[historyStore] history:list (loadMore) failed:`,
         err,
@@ -111,6 +116,8 @@ export const useHistoryStore = create<HistoryStore>()((set, get) => ({
       const { html } = await invoke('history:preview', { projectId, ref, sha });
       set({ previewHtml: html, previewLoading: false });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Failed to load revision preview.');
       console.warn(
         `[historyStore] history:preview failed (sha=${sha}):`,
         err,
@@ -127,6 +134,8 @@ export const useHistoryStore = create<HistoryStore>()((set, get) => ({
       // Refresh the commit list — the restored revision becomes the newest
       await get().loadCommits(projectId, ref);
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'HISTORY_ERROR', e.message ?? 'Failed to restore revision.');
       console.warn(
         `[historyStore] history:restore failed (sha=${sha}):`,
         err,

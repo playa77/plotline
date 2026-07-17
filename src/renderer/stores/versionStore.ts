@@ -11,6 +11,7 @@
 
 import { create } from 'zustand';
 import { invoke } from '../ipc/client';
+import { useToastStore } from './toastStore';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,8 @@ export const useVersionStore = create<VersionStore>()((set, get) => ({
       const result = await invoke('versions:list', { projectId, chapterId });
       set({ versions: result.versions, loading: false });
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Failed to load versions');
       console.warn('[versionStore] versions:list failed:', err);
       set({
         loading: false,
@@ -99,6 +102,8 @@ export const useVersionStore = create<VersionStore>()((set, get) => ({
       // Refresh the full list so sort order and metadata are correct
       await get().loadVersions(projectId, chapterId);
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Failed to create version');
       console.warn('[versionStore] versions:create failed:', err);
       throw err; // rethrow so UI can show inline error
     }
@@ -115,6 +120,8 @@ export const useVersionStore = create<VersionStore>()((set, get) => ({
         })),
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Failed to select version');
       console.warn('[versionStore] versions:select failed:', err);
     }
   },
@@ -134,6 +141,8 @@ export const useVersionStore = create<VersionStore>()((set, get) => ({
         ),
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Failed to rename version');
       console.warn('[versionStore] versions:rename failed:', err);
       throw err;
     }
@@ -147,6 +156,8 @@ export const useVersionStore = create<VersionStore>()((set, get) => ({
         versions: state.versions.filter((v) => v.slug !== slug),
       }));
     } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(e.code ?? 'VERSION_ERROR', e.message ?? 'Failed to archive version');
       console.warn('[versionStore] versions:archive failed:', err);
       throw err;
     }
