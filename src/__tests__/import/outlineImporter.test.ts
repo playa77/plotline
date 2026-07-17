@@ -276,3 +276,27 @@ describe('parseOutlineMarkdown (golden fixture)', () => {
     expect(numbers).toContain('1.4');
   });
 });
+
+// ── Tether fixture regression (SL-002) ────────────────────────────────────────
+
+describe('parseOutlineMarkdown (Tether fixture)', () => {
+  const tetherPath = resolve(__dirname, '../fixtures/Full_extended_outline.md');
+  const tetherMd = readFileSync(tetherPath, 'utf-8');
+  const preview = parseOutlineMarkdown(tetherMd);
+
+  it('parses exactly 4 parts', () => {
+    expect(preview.parts.length).toBe(4);
+  });
+
+  it('extracts correct part titles', () => {
+    const titles = preview.parts.map((p) => p.title);
+    expect(titles[0]).toContain('The Fire That Carries Us');
+    expect(titles[1]).toContain('The Measurement of Absence');
+    expect(titles[2]).toContain('What Remains');
+    expect(titles[3]).toContain('Landfall');
+  });
+
+  it('has a project title', () => {
+    expect(preview.projectTitle).toBeTruthy();
+  });
+});
