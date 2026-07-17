@@ -1,0 +1,180 @@
+/**
+ * Toast notification styles — BEM convention, single-position stack.
+ *
+ * Renders a fixed-position stack of toasts in the bottom-right corner.
+ * Each toast has a colored indicator bar, code/message/detail body, and a
+ * dismiss button. Animates in from the right, fades out when dismissed.
+ *
+ * References design tokens from tokens.css for theming (dark + light).
+ * All text uses the chrome font stack (IBM Plex Mono).
+ *
+ * Version: 0.1.0 | 2026-07-17
+ */
+
+/* ── Container (fixed bottom-right stack) ───────────────────────────────── */
+
+.toast-container {
+  position: fixed;
+  bottom: var(--space-xl);
+  right: var(--space-xl);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  pointer-events: none;
+  max-height: calc(100vh - var(--space-2xl) * 2);
+  overflow-y: auto;
+}
+
+/* ── Individual toast item ──────────────────────────────────────────────── */
+
+.toast-container__item {
+  display: flex;
+  min-width: 300px;
+  max-width: 420px;
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  pointer-events: auto;
+  animation: toastSlideIn 200ms ease-out forwards;
+  overflow: hidden;
+}
+
+/* Dismissing state: fade out */
+.toast-container__item--dismissing {
+  animation: toastFadeOut 200ms ease-in forwards;
+}
+
+/* ── Type modifiers ─────────────────────────────────────────────────────── */
+
+.toast-container__item--error {
+  border-left: none;
+}
+
+.toast-container__item--info {
+  border-left: none;
+}
+
+.toast-container__item--success {
+  border-left: none;
+}
+
+/* ── Colored indicator bar ──────────────────────────────────────────────── */
+
+.toast__bar {
+  flex-shrink: 0;
+  width: 3px;
+  border-radius: 1.5px;
+  margin-right: var(--space-lg);
+  align-self: stretch;
+}
+
+.toast-container__item--error .toast__bar {
+  background: var(--color-danger);
+}
+
+.toast-container__item--info .toast__bar {
+  background: var(--color-accent);
+}
+
+.toast-container__item--success .toast__bar {
+  background: var(--color-on-target);
+}
+
+/* ── Body (code + message + detail) ─────────────────────────────────────── */
+
+.toast__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.toast__code {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+}
+
+.toast__message {
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+
+.toast__detail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  word-wrap: break-word;
+  opacity: 0.8;
+}
+
+/* ── Dismiss button ─────────────────────────────────────────────────────── */
+
+.toast__dismiss {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 0 0 0 var(--space-md);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-chrome);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  transition: color var(--transition-fast);
+  user-select: none;
+}
+
+.toast__dismiss:hover {
+  color: var(--color-text-primary);
+}
+
+.toast__dismiss:active {
+  opacity: 0.7;
+}
+
+/* ── Limit visible stack to 5 items ─────────────────────────────────────── */
+
+.toast-container__item:nth-child(n + 6) {
+  display: none;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastFadeOut {
+  from {
+    opacity: 1;
+    max-height: 100px;
+  }
+  to {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-width: 0;
+  }
+}
