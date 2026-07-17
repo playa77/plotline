@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { invoke } from '../ipc/client';
+import { useToastStore } from '../stores/toastStore';
 import type { Project } from '../../shared/schemas/project';
 
 import '../styles/settings-workspace.css';
@@ -78,6 +79,8 @@ export function SettingsWorkspace({
         // Apply theme on load
         document.documentElement.setAttribute('data-theme', p.settings.theme);
       } catch (err) {
+        const e = err as { code?: string; message?: string; detail?: string };
+        useToastStore.getState().error(e.code ?? 'SETTINGS_LOAD_ERROR', e.message ?? 'Failed to load project settings', e.detail);
         console.warn('[SettingsWorkspace] project:open failed:', err);
       }
 
@@ -107,6 +110,8 @@ export function SettingsWorkspace({
         setSaveStatus('Saved');
         setTimeout(() => setSaveStatus(null), 2000);
       } catch (err) {
+        const e = err as { code?: string; message?: string; detail?: string };
+        useToastStore.getState().error(e.code ?? 'SETTINGS_ERROR', e.message ?? 'Failed to save settings', e.detail);
         console.error('[SettingsWorkspace] save failed:', err);
         setSaveStatus('Save failed');
         setTimeout(() => setSaveStatus(null), 3000);
@@ -125,6 +130,8 @@ export function SettingsWorkspace({
       setShowKeyInput(false);
       setKeyInput('');
     } catch (err) {
+      const e = err as { code?: string; message?: string; detail?: string };
+      useToastStore.getState().error(e.code ?? 'KEY_STORE_ERROR', e.message ?? 'Key operation failed', e.detail);
       console.error('[SettingsWorkspace] secrets:setApiKey failed:', err);
     }
   }, [keyInput]);
@@ -136,6 +143,8 @@ export function SettingsWorkspace({
       setShowKeyInput(false);
       setKeyInput('');
     } catch (err) {
+      const e = err as { code?: string; message?: string; detail?: string };
+      useToastStore.getState().error(e.code ?? 'KEY_STORE_ERROR', e.message ?? 'Key operation failed', e.detail);
       console.error('[SettingsWorkspace] secrets:deleteApiKey failed:', err);
     }
   }, []);
