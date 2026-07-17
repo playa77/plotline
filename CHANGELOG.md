@@ -4,9 +4,9 @@ All notable changes to Plotline are recorded here. This project follows a
 docs-first development model against a versioned document suite in `docs/`;
 entries reference work packages (WP-xx) from `docs/plotline-roadmap-v0.1.0.md`
 where applicable. Format is loosely [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
-versions follow the document suite version (currently `0.1.0-dev`).
+versions follow the document suite version (currently `0.1.0`).
 
-## [0.1.0-dev] — unreleased
+## [0.1.0] — 2026-07-17
 
 ### Added
 - **2026-07-16** — WP-18: DiffView component — Side-by-side HTML diff review
@@ -144,6 +144,12 @@ versions follow the document suite version (currently `0.1.0-dev`).
   grouping, context-dependent availability, event dispatch) and 27
   CommandPalette component tests (visibility, filtering, keyboard nav,
   backdrop, groupings, shortcuts, edge cases). (this commit)
+- **2026-07-17** — WP-30: Packaging & release — Electron Forge makers configured
+  for Linux (deb, AppImage) and Windows (Squirrel). AppImage sandbox workaround
+  via `scripts/apprun.sh` with `--no-sandbox` wrapper. App icon generated at
+  `assets/icon.png` (512×512). Version bumped to `0.1.0`. README updated to
+  reference release version. Changelog finalized for 0.1.0 release.
+  (this commit)
 - **2026-07-17** — WP-27: Settings surface — Full settings workspace with
   collapsible sections for API Key (keychain-backed set/check/delete),
   Models (per-role model selectors for Expand/Write/Iterate), Inference URL,

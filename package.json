@@ -1,7 +1,7 @@
 {
   "name": "plotline",
   "productName": "Plotline",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "description": "Distraction-free long-form writing for Substack",
   "main": ".vite/build/main.js",
   "scripts": {
@@ -28,8 +28,11 @@
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
     "@electron-forge/plugin-vite": "^7.4.0",
     "@eslint/js": "^9.0.0",
+    "@reforged/maker-appimage": "^5.2.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/turndown": "^5.0.6",

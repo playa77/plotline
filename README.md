@@ -3,7 +3,7 @@
 **A local-first, AI-assisted book writing application.**
 From book outline to written chapter in two clicks — with every draft, revision, and alternative version preserved forever.
 
-> Document 4 of 4 · README v0.1.0 · App version `0.1.0-dev` (pre-release)
+> Document 4 of 4 · README v0.1.0 · App version `0.1.0`
 
 ---
 
