@@ -17,6 +17,7 @@ import { Editor } from './Editor';
 import { invoke } from '../ipc/client';
 import { useIpcEvent } from '../ipc/useEvent';
 import { useGenerationStore } from '../stores/generationStore';
+import { useToastStore } from '../stores/toastStore';
 import { countWords } from '../../shared/utils/wordCount';
 
 import '../styles/chapter-workspace.css';
@@ -280,6 +281,8 @@ export function ChapterWorkspace({
       await invoke('generate:cancel', { jobId: activeJob.jobId });
       resetGen();
     } catch (err) {
+      const e = err as { code?: string; message?: string; detail?: string };
+      useToastStore.getState().error(e.code ?? 'GEN_ERROR', e.message ?? 'Failed to stop generation', e.detail);
       console.warn('[ChapterWorkspace] generate:cancel failed:', err);
     }
   }, [activeJob, resetGen]);
@@ -307,6 +310,8 @@ export function ChapterWorkspace({
       await invoke('export:substack', { projectId, chapterId, mode: 'clipboard' });
       // Could show a toast/success indicator — skip for now
     } catch (err) {
+      const e = err as { code?: string; message?: string; detail?: string };
+      useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export failed', e.detail);
       console.error('[ChapterWorkspace] export:substack failed:', err);
     }
   }, [projectId, chapterId]);
@@ -317,6 +322,8 @@ export function ChapterWorkspace({
     try {
       await invoke('export:substack', { projectId, chapterId, mode: 'file', filePath: '' });
     } catch (err) {
+      const e = err as { code?: string; message?: string; detail?: string };
+      useToastStore.getState().error(e.code ?? 'EXPORT_ERROR', e.message ?? 'Export failed', e.detail);
       console.error('[ChapterWorkspace] export file failed:', err);
     }
   }, [projectId, chapterId]);
