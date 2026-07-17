@@ -323,4 +323,6 @@ npx vitest run src/__tests__/services/tex/TectonicRunner.test.ts  # 6 tests: spa
 
 **⚠ Gate not formally closed.** The previous session proceeded to M5 (WP-26, WP-27) without halting for owner approval. That work has been shelved on `m5/wip` (commit `c8973c8`). This audit pack corrects the process gap. Do not resume M5 until owner approves this gate.
 
+**✅ Gate closed 2026-07-17.** Owner approved. M5 work resuming.
+
 ---
