@@ -48,6 +48,9 @@ export interface EditorProps {
 
   /** When true the editor content is not editable (streaming preview). */
   readOnly?: boolean;
+
+  /** When true, throttles content sync to ~150ms for smooth streaming. */
+  streamMode?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,12 +84,15 @@ export function Editor({
   onChange,
   onSave,
   readOnly = false,
+  streamMode = false,
 }: EditorProps): JSX.Element {
   // Keep a ref to the latest content for the debounce closure
   const latestHtmlRef = useRef<string>(content);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   const onChangeRef = useRef(onChange);
+  const lastRenderedContentRef = useRef<string>(content);
+  const streamTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep callback refs current without re-creating the editor
   onSaveRef.current = onSave;
@@ -106,11 +112,20 @@ export function Editor({
     }, 2000);
   }, []);
 
-  // Cleanup timer on unmount
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Clean up stream timer on unmount
+  useEffect(() => {
+    return () => {
+      if (streamTimerRef.current) {
+        clearTimeout(streamTimerRef.current);
       }
     };
   }, []);
@@ -179,13 +194,31 @@ export function Editor({
     }
   }, [editor, readOnly]);
 
-  // Sync content when it changes externally
+  // Sync content when it changes externally — throttled for streaming
   useEffect(() => {
-    if (editor && content !== latestHtmlRef.current) {
-      editor.commands.setContent(content);
-      latestHtmlRef.current = content;
+    if (!editor) return;
+
+    if (streamMode) {
+      // Throttle: schedule a content update, cancelling any pending one
+      if (streamTimerRef.current) {
+        clearTimeout(streamTimerRef.current);
+      }
+      streamTimerRef.current = setTimeout(() => {
+        const currentHTML = editor.getHTML();
+        if (content !== currentHTML) {
+          editor.commands.setContent(content);
+          lastRenderedContentRef.current = content;
+        }
+        streamTimerRef.current = null;
+      }, 150);
+    } else {
+      // Non-streaming: immediate update
+      if (content !== lastRenderedContentRef.current) {
+        editor.commands.setContent(content);
+        lastRenderedContentRef.current = content;
+      }
     }
-  }, [editor, content]);
+  }, [editor, content, streamMode]);
 
   return (
     <div className="editor-content" role="textbox" aria-multiline="true">

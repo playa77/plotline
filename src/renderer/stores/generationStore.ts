@@ -30,6 +30,9 @@ export interface GenerationState {
   /** Error payload when status === 'error', null otherwise. */
   error: { code: string; message: string } | null;
 
+  /** Current section being written (for per-section write). Null when not in sectioned write. */
+  currentSection: { index: number; total: number; title: string } | null;
+
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   /** Start tracking a new generation job. Sets streamingContent to ''. */
@@ -46,6 +49,12 @@ export interface GenerationState {
 
   /** Reset to idle, clearing streaming content and error. */
   reset: () => void;
+
+  /** Record that a new section is being generated. */
+  startSection: (jobId: string, sectionIndex: number, totalSections: number, sectionTitle: string) => void;
+
+  /** Record that a section completed. */
+  finishSection: (jobId: string, sectionIndex: number) => void;
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────────
@@ -55,6 +64,7 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
   streamingContent: '',
   status: 'idle',
   error: null,
+  currentSection: null,
 
   startStream: (jobId: string, chapterId: string, step: string) => {
     set({
@@ -98,6 +108,21 @@ export const useGenerationStore = create<GenerationState>()((set, get) => ({
       streamingContent: '',
       status: 'idle',
       error: null,
+      currentSection: null,
     });
+  },
+
+  startSection: (jobId: string, sectionIndex: number, totalSections: number, sectionTitle: string) => {
+    const { activeJob } = get();
+    if (!activeJob || activeJob.jobId !== jobId) return;
+    set({
+      currentSection: { index: sectionIndex, total: totalSections, title: sectionTitle },
+    });
+  },
+
+  finishSection: (jobId: string, sectionIndex: number) => {
+    const { activeJob } = get();
+    if (!activeJob || activeJob.jobId !== jobId) return;
+    // Don't clear currentSection — keep showing last section info until done
   },
 }));

@@ -64,6 +64,7 @@ export const ALLOWED_PLACEHOLDERS = new Set([
   'continuity_context',
   'word_target',
   'output_format_contract',
+  'section_slice',
 ]);
 
 /**

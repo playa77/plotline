@@ -280,6 +280,9 @@ export interface IpcEventMap {
   'project:changed': { projectId: string; action: 'opened' | 'closed' };
   // ── Generation events (§7.6) ──────────────────────────
   'generation:token': { jobId: string; delta: string };
+  // ── Generation events
+  'generation:section-start': { jobId: string; sectionIndex: number; totalSections: number; sectionTitle: string };
+  'generation:section-done': { jobId: string; sectionIndex: number };
   'generation:done': { jobId: string; chapterId: string; stage: string; html?: string; genRecord?: GenRecord };
   'generation:error': { jobId: string; code: string; message: string };
   // ── Staleness events (§7.6) ──────────────────────────

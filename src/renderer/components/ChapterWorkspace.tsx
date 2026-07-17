@@ -11,7 +11,7 @@
  * Version: 0.1.0 | 2026-07-16
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import { Editor } from './Editor';
 import { invoke } from '../ipc/client';
@@ -82,12 +82,19 @@ export function ChapterWorkspace({
     streamingContent,
     status: genStatus,
     error: genError,
+    currentSection,
     startStream,
     appendToken,
     finishStream,
+    startSection,
+    finishSection,
     setError: setGenError,
     reset: resetGen,
   } = useGenerationStore();
+
+  // ── Streaming stage ref for auto-scroll ──────────────────────────────────
+
+  const streamStageRef = useRef<HTMLDivElement>(null);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Effects
@@ -140,6 +147,13 @@ export function ChapterWorkspace({
       cancelled = true;
     };
   }, [projectId, chapterId, activeStage]);
+
+  // Auto-scroll streaming panel when new content arrives
+  useEffect(() => {
+    if (genStatus === 'streaming' && streamStageRef.current) {
+      streamStageRef.current.scrollTop = streamStageRef.current.scrollHeight;
+    }
+  }, [streamingContent, genStatus]);
 
   // ── IPC event subscriptions ───────────────────────────────────────────
 
@@ -201,6 +215,26 @@ export function ChapterWorkspace({
   );
 
   useIpcEvent('generation:error', handleError);
+
+  // generation:section-start — per-section write progress
+  const handleSectionStart = useCallback(
+    (payload: { jobId: string; sectionIndex: number; totalSections: number; sectionTitle: string }) => {
+      startSection(payload.jobId, payload.sectionIndex, payload.totalSections, payload.sectionTitle);
+    },
+    [startSection],
+  );
+
+  useIpcEvent('generation:section-start', handleSectionStart);
+
+  // generation:section-done
+  const handleSectionDone = useCallback(
+    (payload: { jobId: string; sectionIndex: number }) => {
+      finishSection(payload.jobId, payload.sectionIndex);
+    },
+    [finishSection],
+  );
+
+  useIpcEvent('generation:section-done', handleSectionDone);
 
   // staleness:changed — refresh dots when upstream changes (outline mutations, variable edits)
   const handleStalenessChanged = useCallback(
@@ -746,11 +780,13 @@ export function ChapterWorkspace({
         <div className="chapter-workspace__streaming-bar">
           <span className="chapter-workspace__streaming-label">
             <span className="chapter-workspace__pulse" />
-            {activeJob?.step === 'write'
-              ? 'Writing…'
-              : activeJob?.step === 'expand'
-                ? 'Expanding…'
-                : 'Generating…'}
+            {activeJob?.step === 'write' && currentSection
+              ? `Writing section ${currentSection.index + 1} of ${currentSection.total}: ${currentSection.title}`
+              : activeJob?.step === 'write'
+                ? 'Writing…'
+                : activeJob?.step === 'expand'
+                  ? 'Expanding…'
+                  : 'Generating…'}
           </span>
           <button
             type="button"
@@ -761,11 +797,12 @@ export function ChapterWorkspace({
           </button>
         </div>
 
-        <div className="chapter-workspace__stage">
+        <div className="chapter-workspace__stage chapter-workspace__stage--streaming" ref={streamStageRef}>
           <Editor
             content={streamingContent}
             readOnly={true}
             wordTarget={wordTarget}
+            streamMode={true}
           />
         </div>
 

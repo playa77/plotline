@@ -180,10 +180,13 @@ export class GenerationService {
   }
 
   /**
-   * Start a write generation job.
+   * Start a write generation job — one LLM call per section, spliced in the app.
    *
-   * Similar to expand but reads `expanded-outline.html` as the upstream
-   * artifact and commits `chapter.html` on completion.
+   * 1. Reads outline sections (each with their own word targets).
+   * 2. Reads the full expanded outline as upstream artifact.
+   * 3. For each section: assembles a per-section prompt using write-v2 template,
+   *    streams the output, captures the result.
+   * 4. Splices all section outputs into the final chapter.html, sanitizes, commits.
    */
   async startWrite(
     projectId: string,
@@ -204,29 +207,32 @@ export class GenerationService {
       await this.createVersionRef(service, chapterId, versionSlugResolved, asNewVersion);
     }
 
-    // Read upstream artifact (expanded-outline.html)
-    let upstreamArtifact = '';
+    // Read upstream artifact (expanded-outline.html) — full document for context
+    let expandedOutline = '';
     let upstreamSha: string | null = null;
     try {
       const tree = await service.readTree(refPath);
       const upstreamPath = 'expanded-outline.html';
       if (tree[upstreamPath]) {
         const buf = await service.readBlob(refPath, upstreamPath);
-        upstreamArtifact = buf.toString('utf-8');
+        expandedOutline = buf.toString('utf-8');
         const { computeBlobSha } = await import('./StalenessService');
-        upstreamSha = computeBlobSha(upstreamArtifact);
+        upstreamSha = computeBlobSha(expandedOutline);
       }
     } catch {
-      upstreamArtifact = '';
+      expandedOutline = '';
     }
 
-    // Read outline
+    // Read outline + get chapter sections
     const outline = await this.readOutline(projectId);
+    const chapter = this.findChapterInOutline(outline, chapterId);
+    if (!chapter) throw new Error(`Chapter ${chapterId} not found in outline`);
+    const sections = [...chapter.sections];
     const chapterSlice = this.formatChapterSlice(outline, chapterId);
     const bookOutline = this.formatOutlineText(outline);
 
-    // ── Continuity context ────────────────────────────────────────────
-    let continuityContext = '';
+    // ── T1 continuity from preceding chapter ──
+    let precedingChapterContext = '';
     if (project.settings.continuityContext.enabled) {
       const allChapters = outline.parts.flatMap((p) => p.chapters);
       const currentIdx = allChapters.findIndex((c) => c.chapterId === chapterId);
@@ -239,9 +245,9 @@ export class GenerationService {
           const text = html.replace(/<[^>]+>/g, '');
           const words = text.split(/\s+/).filter(Boolean);
           const wordCount = project.settings.continuityContext.words;
-          continuityContext = words.slice(-wordCount).join(' ');
+          precedingChapterContext = words.slice(-wordCount).join(' ');
         } catch {
-          // Preceding chapter has no chapter.html — continuity context stays empty
+          // Preceding chapter has no chapter.html — context stays empty
         }
       }
     }
@@ -253,15 +259,7 @@ export class GenerationService {
       excludeVariableIds,
     );
 
-    const context: Record<string, string> = {
-      book_outline: bookOutline,
-      chapter_slice: chapterSlice,
-      story_variables: storyVariables,
-      upstream_artifact: upstreamArtifact,
-      continuity_context: continuityContext,
-    };
-    const prompt = await this.assemblePrompt('write', context);
-
+    // API key
     const apiKey = await this.secretsService.getApiKey();
     if (!apiKey) throw new Error('No API key configured. Please set your API key in Settings.');
 
@@ -272,10 +270,12 @@ export class GenerationService {
       temperature: 0.7,
     });
 
+    // Build fingerprints
     const fingerprints = await this.buildFingerprints(
       service, projectId, chapterId, upstreamSha, 'write',
     );
 
+    // Create job
     const jobId = generateULID();
     const job: GenerationJob = {
       id: jobId,
@@ -288,18 +288,210 @@ export class GenerationService {
     };
     this.jobs.set(chapterId, job);
 
-    this.runGeneration(
+    // Run sectioned write in background
+    this.runSectionedWrite(
       job,
       project,
       service,
       client,
-      prompt,
+      chapter,
+      sections,
+      expandedOutline,
+      chapterSlice,
+      bookOutline,
+      storyVariables,
+      precedingChapterContext,
       refPath,
       fingerprints,
       window,
-    ).catch(() => {});
+    ).catch(() => {
+      /* errors handled inside runSectionedWrite */
+    });
 
     return jobId;
+  }
+
+  /**
+   * Write a chapter section by section — one LLM call per section,
+   * then splice the outputs together.
+   *
+   * For each section:
+   *   - Emits `generation:section-start`
+   *   - Builds per-section context (section_slice, continuity, word target)
+   *   - Streams the LLM output into job.partialOutput
+   *   - Captures sanitized output and emits `generation:section-done`
+   *
+   * After all sections: splices outputs with chapter heading, sanitizes,
+   * commits chapter.html + meta.json, emits `generation:done`.
+   */
+  private async runSectionedWrite(
+    job: GenerationJob,
+    project: Project,
+    service: StorageService,
+    client: InferenceClient,
+    chapter: { title: string },
+    sections: Array<{ id: string; number: string; title: string; wordTarget: number | null; beats: string[] }>,
+    expandedOutline: string,
+    chapterSlice: string,
+    bookOutline: string,
+    storyVariables: string,
+    precedingChapterContext: string,
+    refPath: string,
+    fingerprints: GenRecord['fingerprints'],
+    window: BrowserWindow,
+  ): Promise<void> {
+    try {
+      const sectionOutputs: string[] = [];
+
+      for (let i = 0; i < sections.length; i++) {
+        if (job.status === 'cancelled') break;
+
+        const section = sections[i]!;
+
+        // Emit section start
+        emitEvent(window, 'generation:section-start', {
+          jobId: job.id,
+          sectionIndex: i,
+          totalSections: sections.length,
+          sectionTitle: section.title,
+        });
+
+        // Continuity: T1 preceding-chapter context for section 0,
+        // otherwise last ~300 words of the previous section's output
+        let continuity: string;
+        if (i === 0) {
+          continuity = precedingChapterContext;
+        } else {
+          const prevSectionOutput = sectionOutputs[i - 1]!;
+          const text = prevSectionOutput.replace(/<[^>]+>/g, '');
+          const words = text.split(/\s+/).filter(Boolean);
+          continuity = words.slice(-300).join(' ');
+        }
+
+        // Build section-level word target string
+        const wordTarget = section.wordTarget
+          ? `${section.wordTarget.toLocaleString()} words`
+          : '';
+
+        // Build section slice
+        const sectionSlice = this.formatSectionSlice(section);
+
+        // Build context for the template
+        const context: Record<string, string> = {
+          book_outline: bookOutline,
+          chapter_slice: chapterSlice,
+          upstream_artifact: expandedOutline,
+          section_slice: sectionSlice,
+          story_variables: storyVariables,
+          continuity_context: continuity,
+          word_target: wordTarget,
+        };
+
+        // Load write-v2 template explicitly (not write-v1)
+        const template = await this.templateEngine.loadTemplate('write', undefined, undefined, 'write-v2');
+        const prompt = this.templateEngine.assemble(template, context);
+
+        // Reset partial output for this section's streaming
+        job.partialOutput = '';
+
+        // Stream this section
+        await this.streamToJob(job, client, prompt, window);
+
+        if ((job.status as GenerationJob['status']) === 'cancelled') break;
+
+        // Capture this section's output
+        sectionOutputs.push(job.partialOutput);
+
+        // Emit section done
+        emitEvent(window, 'generation:section-done', {
+          jobId: job.id,
+          sectionIndex: i,
+        });
+      }
+
+      // ── Cancellation check ──
+      if ((job.status as GenerationJob['status']) === 'cancelled') {
+        emitEvent(window, 'generation:error', {
+          jobId: job.id,
+          code: 'CANCELLED',
+          message: 'Generation cancelled by user',
+        });
+        return;
+      }
+
+      // ── Splice: concat sections under chapter heading ──
+      const chapterHtml = `<h2>${chapter.title}</h2>\n${sectionOutputs.join('\n')}`;
+      const sanitized = sanitize(chapterHtml);
+
+      // ── Build GenRecord ──
+      const genRecord: GenRecord = {
+        generatedAt: new Date().toISOString(),
+        model: project.settings.models.write,
+        templateId: 'write-v2',
+        templateVersion: '2.0.0',
+        kind: 'write',
+        instruction: null,
+        fingerprints,
+      };
+
+      // ── Merge with existing meta.json ──
+      let meta: Record<string, unknown> = {
+        schemaVersion: 1,
+        chapterId: job.chapterId,
+        expanded: null,
+        chapter: null,
+      };
+      try {
+        const metaBuf = await service.readBlob(refPath, 'meta.json');
+        const parsed = JSON.parse(metaBuf.toString('utf-8'));
+        meta = { ...meta, ...parsed, schemaVersion: 1, chapterId: job.chapterId };
+      } catch {
+        // No existing meta — use default
+      }
+      meta.chapter = genRecord;
+
+      // ── Commit ──
+      await service.commit(refPath, {
+        'chapter.html': Buffer.from(sanitized, 'utf-8'),
+        'meta.json': Buffer.from(JSON.stringify(meta, null, 2), 'utf-8'),
+      }, {
+        label: 'Generated — Write',
+        kind: 'write',
+      });
+
+      this.stalenessService?.invalidateAll();
+
+      job.status = 'done';
+      job.completedAt = new Date().toISOString();
+
+      emitEvent(window, 'generation:done', {
+        jobId: job.id,
+        chapterId: job.chapterId,
+        stage: 'chapter',
+        html: sanitized,
+        genRecord,
+      });
+    } catch (err: unknown) {
+      if (job.status === 'cancelled') {
+        emitEvent(window, 'generation:error', {
+          jobId: job.id,
+          code: 'CANCELLED',
+          message: 'Generation cancelled',
+        });
+      } else {
+        const message = err instanceof Error ? err.message : 'Unknown write error';
+        job.status = 'error';
+        job.error = { code: 'GENERATION_ERROR', message };
+        job.completedAt = new Date().toISOString();
+        emitEvent(window, 'generation:error', {
+          jobId: job.id,
+          code: 'GENERATION_ERROR',
+          message,
+        });
+      }
+    } finally {
+      this.jobs.delete(job.chapterId);
+    }
   }
 
   /**
@@ -938,6 +1130,42 @@ export class GenerationService {
   }
 
   /**
+   * Format a single section's outline entry as a readable text block.
+   * Used for per-section writing (write-v2).
+   */
+  private formatSectionSlice(section: { id: string; number: string; title: string; wordTarget: number | null; beats: string[] }): string {
+    const lines: string[] = [];
+    lines.push(`### ${section.number}. ${section.title}`);
+    if (section.wordTarget) {
+      lines.push(`Target: ${section.wordTarget.toLocaleString()} words`);
+    }
+    if (section.beats.length > 0) {
+      lines.push('Beats:');
+      for (let i = 0; i < section.beats.length; i++) {
+        lines.push(`  ${i + 1}. ${section.beats[i]!}`);
+      }
+    }
+    return lines.join('\n');
+  }
+
+  /**
+   * Find a chapter in the outline by its chapterId.
+   */
+  private findChapterInOutline(
+    outline: Outline,
+    chapterId: string,
+  ): import('../../shared/schemas/outline').OutlineChapter | null {
+    for (const part of outline.parts) {
+      for (const chapter of part.chapters) {
+        if (chapter.chapterId === chapterId) {
+          return chapter;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Build GenRecord fingerprints from the current state of the repo.
    *
    * Uses per-chapter section canonicalised JSON for outlineSlice (matching
@@ -961,7 +1189,7 @@ export class GenerationService {
       const outlineBuf = await service.readBlob('refs/heads/main', 'outline/outline.json');
       const { OutlineSchema } = await import('../../shared/schemas/outline');
       const outline = OutlineSchema.parse(JSON.parse(outlineBuf.toString('utf-8')));
-      const chapter = findChapterInOutline(outline, chapterId);
+      const chapter = this.findChapterInOutline(outline, chapterId);
       if (chapter) {
         const sections = chapter.sections.map((s) => ({
           id: s.id,
@@ -1022,23 +1250,4 @@ export class GenerationService {
       continuity: null,
     };
   }
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Find a chapter in the outline by its chapterId.
- */
-function findChapterInOutline(
-  outline: import('../../shared/schemas/outline').Outline,
-  chapterId: string,
-): import('../../shared/schemas/outline').OutlineChapter | null {
-  for (const part of outline.parts) {
-    for (const chapter of part.chapters) {
-      if (chapter.chapterId === chapterId) {
-        return chapter;
-      }
-    }
-  }
-  return null;
-}
+} // ── End GenerationService ──

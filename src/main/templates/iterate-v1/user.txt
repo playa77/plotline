@@ -2,12 +2,12 @@ CURRENT DOCUMENT:
 {{current_artifact}}
 
 {{#if upstream_artifact}}
-UPSTREAM ARTIFACT (for grounding):
+UPSTREAM ARTIFACT (grounding only — does not expand the instruction):
 {{upstream_artifact}}
 {{/if}}
 
 {{#if story_variables}}
-STORY CONTEXT:
+STORY CONTEXT (grounding only — does not expand the instruction):
 {{story_variables}}
 {{/if}}
 

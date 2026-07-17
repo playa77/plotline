@@ -1,0 +1,6 @@
+{
+  "id": "write-v2",
+  "version": "2.1.0",
+  "step": "write",
+  "description": "Write ONE section (subchapter) of a chapter from an expanded outline, with per-section word targets, scope discipline, seamless-continuation continuity, and splice-safe output"
+}

@@ -1,6 +1,6 @@
 {
   "id": "iterate-v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "step": "iterate",
-  "description": "Revise an existing artifact based on a specific instruction"
+  "description": "Revise an existing artifact per a single instruction with minimal-diff discipline (verbatim preservation outside the instruction's scope)"
 }

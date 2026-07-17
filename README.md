@@ -3,7 +3,7 @@
 **A local-first, AI-assisted book writing application.**
 From book outline to written chapter in two clicks — with every draft, revision, and alternative version preserved forever.
 
-> Document 4 of 4 · README v0.1.0 · App version `0.1.0`
+> Document 3 of 3 (Design Doc → Tech Spec → README) · App version `0.2.0`
 
 ---
 
@@ -15,7 +15,7 @@ Everything is local. Your manuscript never leaves your machine except as prompts
 
 ## Core concepts
 
-**The pipeline.** `Book Outline → Expanded Chapter Outline → Written Chapter → Export`. Selecting a chapter and clicking **Expand** produces its expanded outline; **Write** produces the chapter. Plotline assembles all context — outline slice, story variables, upstream artifacts, continuity from the preceding chapter — automatically. No dialogs on the happy path; that's a design guarantee, not an aspiration.
+**The pipeline.** `Book Outline → Expanded Chapter Outline → Written Chapter → Export`. Selecting a chapter and clicking **Expand** produces its expanded outline; **Write** produces the chapter one section at a time — each subchapter is a separate LLM call with its own word target, and the app splices them into a complete chapter. Plotline assembles all context — outline slice, story variables, upstream artifacts, continuity from the preceding chapter — automatically. No dialogs on the happy path; that's a design guarantee, not an aspiration.
 
 **Versions and History.** Every chapter can hold multiple named **Versions** — parallel alternatives of its expanded-outline-plus-chapter pair. Chapter 3 can sit on *cold-open* while Chapter 7 stays on *Main*. Inside each version, **History** records every save, generation, and accepted revision as a restore point. Nothing is ever destroyed; any past state can be restored or branched into a new version. Under the hood this is a local Git repository used as an object database — but you will never see a branch, commit, or checkout. That's deliberate.
 
@@ -25,33 +25,34 @@ Everything is local. Your manuscript never leaves your machine except as prompts
 
 ## Status
 
-Pre-release, under active development against a versioned document suite:
+Working prototype under active development. The full pipeline (Outline → Expand → Write → Export) is implemented end-to-end. Current test suite: 712 tests (711 passing, 1 skipped) covering services, IPC handlers, renderer components, and benchmarks.
+
+Built so far: project lifecycle with multi-book library, book outline editor with drag-and-drop reorder, Substack-safe TipTap rich-text editor with sanitizer, markdown outline importer, three-stage AI generation pipeline (expand/write/iterate) with per-section streaming output, story variables studio with scope-filtered injection, chapter versions and full history (restore any past state), command palette (⌘K), staleness detection with visual stage dots, settings workspace (API key, model selection, continuity context, theme, typography), and export to Substack HTML, Markdown, and PDF (via bundled Tectonic with selectable LaTeX templates).
 
 | Document | File |
 |---|---|
-| Design Doc v0.1.0 | `docs/plotline-design-doc-v0.1.0.md` |
-| Technical Specification v0.1.0 | `docs/plotline-tech-spec-v0.1.0.md` |
-| Granular Roadmap v0.1.0 | `docs/plotline-roadmap-v0.1.0.md` |
+| Design Doc v0.4.0 | `docs/plotline-design-doc-v0.4.0.md` |
+| Technical Specification v0.3.0 | `docs/plotline-tech-spec-v0.3.0.md` |
 | Decision ledger | `DECISIONS.md` |
 | Changelog | `CHANGELOG.md` |
 
-The Roadmap defines 31 work packages (WP-00–WP-30) across six gated milestones. Current milestone status lives in `CHANGELOG.md`.
+Work packages and current milestone status live in `CHANGELOG.md`.
 
 ## Tech stack
 
-Electron · Node.js (main process services) · React + TypeScript (renderer) · local Git as the persistence and versioning layer · OpenRouter-compatible streaming inference · Tectonic for PDF rendering. The renderer never touches disk, Git, or network — all durable operations cross a typed IPC contract.
+Electron 31 · Node.js (main process services) · React 18 + TypeScript 5 (sandboxed renderer) · isomorphic-git as the storage and versioning layer · OpenRouter-compatible streaming inference · TipTap rich-text editor · Vitest test runner · Zustand state management · Zod validation · Tectonic for PDF rendering. The renderer never touches disk, Git, or network — all durable operations cross a typed IPC contract.
 
 ## Getting started
 
-**Prerequisites:** Node.js ≥ 20, npm ≥ 10. Git is *not* required on the machine unless the storage layer was built against system git — see `DECISIONS.md` (T3).
+**Prerequisites:** Node.js ≥ 20, npm ≥ 10. Git is not required on the machine — the storage layer uses bundled isomorphic-git.
 
 ```bash
 git clone <repo-url> plotline
 cd plotline
 npm install
-npm run dev        # launch in development mode
-npm test           # run the test suite
-npm run build      # produce a packaged desktop build (see release/)
+npm run dev        # launch in development mode (Electron + Vite HMR)
+npm test           # run the test suite (711 passing)
+npm run build      # produce a packaged desktop build (deb, AppImage, Squirrel)
 ```
 
 **First run:**
@@ -71,8 +72,8 @@ Local-first is a hard commitment: the only network egress is your configured inf
 
 ## Contributing
 
-Development follows the Roadmap's execution conventions: one commit per work package, acceptance criteria as tests, deviations from the Design Doc or Tech Spec logged in the milestone audit pack with a reversibility tag, and every open library choice recorded in `DECISIONS.md`. Read all three documents in `docs/` before touching code — they are the contract.
+Development follows execution conventions from `AGENTS.md`: one commit per work package, acceptance criteria as tests, deviations from the Design Doc or Tech Spec logged in the milestone audit pack with a reversibility tag (R1/R2/R3), and every non-trivial decision recorded in `DECISIONS.md`. Read all documents in `docs/` before touching code — they are the contract.
 
 ## License
 
-TBD before `0.1.0` release.
+MIT. See `LICENSE`.

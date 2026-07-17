@@ -6,11 +6,10 @@ Project-specific guidance for OpenCode sessions. The global `~/.config/opencode/
 
 ## Read the docs first — every run
 
-Before any code or planning work, read all three documents in `docs/`. They are the contract, not background reference:
+Before any code or planning work, read the two documents in `docs/`. They are the contract, not background reference:
 
 - `docs/plotline-design-doc-v0.4.0.md` — product behavior, revision model, UI flows, open questions
 - `docs/plotline-tech-spec-v0.3.0.md` — architecture, Git model, data schemas, main-process services, IPC contract, testing contract
-- `docs/plotline-roadmap-v0.4.0.md` — work packages across gated milestones
 
 If a decision isn't in these docs, it's undecided — don't infer it from filenames or generic framework conventions. When the docs conflict with the README, trust the docs (they are versioned; the README is a summary).
 

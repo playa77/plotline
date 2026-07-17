@@ -443,7 +443,7 @@ describe('TemplateEngine — assembly', () => {
 // ── ALLOWED_PLACEHOLDERS ──────────────────────────────────────────────────────
 
 describe('TemplateEngine — ALLOWED_PLACEHOLDERS', () => {
-  it('contains all nine expected placeholders', () => {
+  it('contains all ten expected placeholders', () => {
     const expected = [
       'book_outline',
       'chapter_slice',
@@ -454,6 +454,7 @@ describe('TemplateEngine — ALLOWED_PLACEHOLDERS', () => {
       'continuity_context',
       'word_target',
       'output_format_contract',
+      'section_slice',
     ];
 
     for (const name of expected) {
@@ -606,7 +607,11 @@ describe('Built-in templates — placeholder lint', () => {
       it('template.json has correct step', () => {
         expect(template.meta.step).toBe(step);
         expect(template.meta.id).toBe(`${step}-v1`);
-        expect(template.meta.version).toBe('1.0.0');
+        if (template.meta.id === 'expand-v1') {
+          expect(template.meta.version).toBe('1.1.0');
+        } else {
+          expect(template.meta.version).toBe('1.0.0');
+        }
       });
     });
   }

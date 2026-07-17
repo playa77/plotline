@@ -9,7 +9,10 @@ STORY CONTEXT:
 {{story_variables}}
 {{/if}}
 
-CHAPTER TARGET: {{word_target}}
+{{#if continuity_context}}
+END OF PRECEDING CHAPTER (for transition planning):
+{{continuity_context}}
+{{/if}}
 
 {{output_format_contract}}
 

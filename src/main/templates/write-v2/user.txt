@@ -1,0 +1,24 @@
+FULL CHAPTER OUTLINE (for context):
+{{chapter_slice}}
+
+FULL EXPANDED OUTLINE (for context):
+{{upstream_artifact}}
+
+{{#if story_variables}}
+STORY CONTEXT:
+{{story_variables}}
+{{/if}}
+
+{{#if continuity_context}}
+PRECEDING TEXT (continue seamlessly from this):
+{{continuity_context}}
+{{/if}}
+
+THIS SECTION TO WRITE:
+{{section_slice}}
+
+SECTION WORD TARGET: {{word_target}}
+
+{{output_format_contract}}
+
+Write this section now:

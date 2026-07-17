@@ -1,6 +1,6 @@
 {
   "id": "expand-v1",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "step": "expand",
-  "description": "Expand a chapter outline entry into a detailed expanded outline with section-by-section development"
+  "description": "Expand a chapter outline entry into a detailed expanded outline with section-by-section development, structural heading contract, and optional preceding-chapter transition context"
 }

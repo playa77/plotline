@@ -1,6 +1,6 @@
 {
   "id": "write-v1",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "step": "write",
-  "description": "Write a full chapter from an expanded outline, producing complete prose"
+  "description": "Write a full chapter from an expanded outline in a single pass (legacy whole-chapter template; write-v2 is the active per-section template)"
 }

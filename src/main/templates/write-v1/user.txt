@@ -10,7 +10,7 @@ STORY CONTEXT:
 {{/if}}
 
 {{#if continuity_context}}
-CONTINUITY (final paragraphs of preceding chapter):
+CONTINUITY (final paragraphs of preceding chapter — continue naturally from this):
 {{continuity_context}}
 {{/if}}
 
