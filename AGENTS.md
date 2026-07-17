@@ -2,7 +2,7 @@
 
 Project-specific guidance for OpenCode sessions. The global `~/.config/opencode/AGENTS.md` (working guidelines, decision ledger, self-grading ban, approval discipline, invariant guards, worktrees, filesystem deny list, Electron/AppImage pitfall) applies in full and is **not duplicated here** — this file adds only what is specific to Plotline.
 
-**Version: 0.1.0 | 2026-07-16**
+**Version: 0.3.0 | 2026-07-17**
 
 ## Read the docs first — every run
 
@@ -13,11 +13,19 @@ Before any code or planning work, read the two documents in `docs/`. They are th
 
 If a decision isn't in these docs, it's undecided — don't infer it from filenames or generic framework conventions. When the docs conflict with the README, trust the docs (they are versioned; the README is a summary).
 
+## Canonical working material
+
+The novel used for development and testing is **"Tether"**, a generation-ship story. The full extended outline lives at:
+
+- `src/__tests__/fixtures/Full_extended_outline.md`
+
+When the user refers to "the outline" or "the book outline" without qualification, they mean this file. It contains 17 chapters across 4 parts with per-chapter style/tone instructions, word targets, and beats. Use it for import testing, generation testing, and any manual workflow verification.
+
 ## Current state
 
-- **Docs-only / greenfield.** No `package.json` or source code is committed. The `npm install` / `npm run dev` / `npm test` / `npm run build` commands in the README are the *planned* interface, not yet executable — don't report them as broken if they fail today.
-- `DECISIONS.md` and `CHANGELOG.md` are referenced by the README but do **not** exist yet. Per global §1/§2, create `CHANGELOG.md` before the first code modification and `DECISIONS.md` before the first non-trivial decision.
-- Prerequisites once code lands: Node.js ≥ 20, npm ≥ 10.
+- **v0.2.0 app** with full toolchain: `npm run dev` (Electron + Vite HMR), `npm test` (729 tests, 21 pre-existing failures), `npm run build` (deb + AppImage).
+- Story variable system (v2.0.0 schema): unified registry with four built-ins, Global Constraints system variable, user-defined custom variables with per-variable scopes, context-rail manual toggles.
+- Prerequisites: Node.js ≥ 20, npm ≥ 10.
 
 ## Architecture invariants (do not violate)
 
