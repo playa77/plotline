@@ -102,6 +102,14 @@ export function AppShell(): JSX.Element {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   const [selection, setSelection] = useState<WorkspaceSelection>({ type: 'none' });
 
+  // Command palette state
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // Store hooks
+  const genStore = useGenerationStore();
+  const versionStore = useVersionStore();
+  const variableStore = useVariableStore();
+
   // Resize state
   const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
   const resizeStartXRef = useRef<number>(0);
@@ -177,6 +185,22 @@ export function AppShell(): JSX.Element {
     };
   }, [resizeTarget]);
 
+  // ── Command palette keyboard listener ───────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      } else if (e.key === 'Escape' && paletteOpen) {
+        setPaletteOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [paletteOpen]);
+
   // ── Rail toggle ──────────────────────────────────────────────────────────────
 
   const handleToggleRail = useCallback(() => {
@@ -190,6 +214,170 @@ export function AppShell(): JSX.Element {
   // ── Compute effective right width ────────────────────────────────────────────
 
   const effectiveRightWidth = railCollapsed ? 36 : rightWidth;
+
+  // ── Command palette context & callbacks ────────────────────────────────────
+
+  const actionContext: ActionContext = useMemo(
+    () => ({
+      projectId: 'demo',
+      chapterId: selectedChapterId,
+      selection,
+      genStatus: genStore.status,
+      railCollapsed,
+      chapters: demoParts.flatMap((part) =>
+        part.chapters.map((ch) => ({
+          id: ch.chapterId,
+          title: ch.title,
+        })),
+      ),
+      versions: versionStore.versions.map((v) => ({
+        slug: v.slug,
+        name: v.name,
+        selected: v.selected,
+      })),
+      variables: variableStore.variables.map((v) => ({
+        id: v.id,
+        name: v.name,
+        scope: v.scope,
+        active: v.active,
+      })),
+      hasIterateProposal:
+        genStore.status === 'done' && genStore.activeJob?.step === 'iterate',
+    }),
+    [
+      selectedChapterId,
+      selection,
+      genStore.status,
+      genStore.activeJob,
+      railCollapsed,
+      versionStore.versions,
+      variableStore.variables,
+    ],
+  );
+
+  const actionCallbacks: ActionCallbacks = useMemo(
+    () => ({
+      navigate: (sel) => setSelection(sel),
+
+      selectChapter: (chapterId, title) => {
+        setSelectedChapterId(chapterId);
+        setSelection({ type: 'chapter', chapterId, chapterTitle: title });
+      },
+
+      toggleRail: handleToggleRail,
+
+      expand: async () => {
+        if (selectedChapterId)
+          await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId });
+      },
+
+      reExpand: async () => {
+        if (selectedChapterId)
+          await invoke('generate:expand', { projectId: 'demo', chapterId: selectedChapterId, asNewVersion: undefined });
+      },
+
+      write: async () => {
+        if (selectedChapterId)
+          await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+      },
+
+      reWrite: async () => {
+        if (selectedChapterId)
+          await invoke('generate:write', { projectId: 'demo', chapterId: selectedChapterId });
+      },
+
+      stopGeneration: async () => {
+        const jobId = genStore.activeJob?.jobId;
+        if (jobId) await invoke('generate:cancel', { jobId });
+      },
+
+      focusIterate: () => {
+        if (selectedChapterId) {
+          setSelection({
+            type: 'chapter',
+            chapterId: selectedChapterId,
+            chapterTitle:
+              selection.type === 'chapter' ? selection.chapterTitle : '',
+          });
+        }
+      },
+
+      createVersion: (name) =>
+        versionStore.createVersion('demo', selectedChapterId ?? '', name),
+      selectVersion: (slug) =>
+        versionStore.selectVersion('demo', selectedChapterId ?? '', slug),
+      renameVersion: (slug, newName) =>
+        versionStore.renameVersion('demo', selectedChapterId ?? '', slug, newName),
+      archiveVersion: (slug) =>
+        versionStore.archiveVersion('demo', selectedChapterId ?? '', slug),
+
+      restoreRevision: (sha) => {
+        if (selectedChapterId)
+          invoke('history:restore', { projectId: 'demo', ref: selectedChapterId, sha });
+      },
+
+      createVariable: (name) => {
+        variableStore.createVariable('demo', name);
+      },
+      setVariableActive: (id, active) =>
+        variableStore.toggleActive('demo', id, active),
+      setVariableScope: (id, scope) =>
+        variableStore.updateScope('demo', id, scope),
+
+      addCard: (variableId, title) => {
+        variableStore.addCard('demo', title);
+      },
+
+      acceptProposal: async () => {
+        const jobId = genStore.activeJob?.jobId;
+        if (jobId) await invoke('iterate:accept', { projectId: 'demo', jobId });
+      },
+
+      discardProposal: async () => {
+        const jobId = genStore.activeJob?.jobId;
+        if (jobId) await invoke('iterate:discard', { jobId });
+      },
+
+      acceptAsVersion: async (name) => {
+        const jobId = genStore.activeJob?.jobId;
+        if (jobId)
+          await invoke('iterate:acceptAsVersion', { projectId: 'demo', jobId, versionName: name });
+      },
+
+      exportSubstack: async () => {
+        if (selectedChapterId)
+          await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'clipboard' });
+      },
+
+      exportHtml: async () => {
+        if (selectedChapterId)
+          await invoke('export:substack', { projectId: 'demo', chapterId: selectedChapterId, mode: 'file', filePath: '' });
+      },
+
+      exportMarkdownChapter: async () => {
+        if (selectedChapterId)
+          await invoke('export:markdown', { projectId: 'demo', scope: 'chapter', chapterId: selectedChapterId, filePath: '' });
+      },
+
+      exportMarkdownBook: async () => {
+        await invoke('export:markdown', { projectId: 'demo', scope: 'book', filePath: '' });
+      },
+
+      exportPdf: async () => {
+        await invoke('export:pdf', { projectId: 'demo', templateId: 'trade-paperback', chapterIds: 'all', options: {}, outputPath: '' });
+      },
+
+      promptInput: (placeholder) => window.prompt(placeholder),
+    }),
+    [
+      selectedChapterId,
+      genStore.activeJob,
+      selection,
+      versionStore,
+      variableStore,
+      handleToggleRail,
+    ],
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -265,6 +453,14 @@ export function AppShell(): JSX.Element {
           chapterId={selectedChapterId ?? undefined}
         />
       </aside>
+
+      {paletteOpen && (
+        <CommandPalette
+          open={paletteOpen}
+          actions={getAvailableActions(actionContext, actionCallbacks)}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
     </div>
   );
 }
