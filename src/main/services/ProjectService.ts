@@ -230,6 +230,11 @@ export class ProjectService {
     this.openProjects.set(projectId, service);
     this.currentProject = { id: projectId, service };
 
+    // Seed built-in story variables (idempotent — skips existing vars)
+    if (this.variableService) {
+      await this.variableService.seedBuiltins(projectId);
+    }
+
     // Persist as the active project
     await this.setActiveProject(projectId, project.title);
 

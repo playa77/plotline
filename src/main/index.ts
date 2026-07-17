@@ -72,6 +72,41 @@ async function createWindow(): Promise<void> {
     },
   });
 
+  // Right-click context menu with Copy/Cut/Paste
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const menuItems: Electron.MenuItemConstructorOptions[] = [];
+
+    if (params.selectionText) {
+      menuItems.push({
+        label: 'Copy',
+        accelerator: 'CmdOrCtrl+C',
+        click: () => {
+          mainWindow?.webContents.copy();
+        },
+      });
+    }
+
+    if (params.isEditable) {
+      menuItems.push(
+        { type: 'separator' },
+        {
+          label: 'Cut',
+          accelerator: 'CmdOrCtrl+X',
+          click: () => mainWindow?.webContents.cut(),
+        },
+        {
+          label: 'Paste',
+          accelerator: 'CmdOrCtrl+V',
+          click: () => mainWindow?.webContents.paste(),
+        },
+      );
+    }
+
+    if (menuItems.length > 0) {
+      Menu.buildFromTemplate(menuItems).popup();
+    }
+  });
+
   // Initialize IPC after window creation so handlers have a window context
   initIpcRegistry();
   registerPingHandler();
