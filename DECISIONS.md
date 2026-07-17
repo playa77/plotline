@@ -629,3 +629,19 @@ instruction block is unchanged — style guidance comes from the full Story Vari
 Removing it restores the original Expand-required behavior.
 
 ---
+
+### D028 — Text selection allowed on content-bearing UI (R1)
+
+**Context:** `user-select: none` was applied to virtually all UI chrome across 8 CSS files, making chapter names, variable names, settings labels, and command palette items unselectable for debugging/copy purposes. Only the TipTap editor supported text selection.
+
+**Chosen:** Remove `user-select: none` from 20 content-bearing selectors. Keep on interactive chrome only (drag grips, decorative bullets, toolbar, resize handles, icons, toast buttons). Users can now select and copy text from any content-bearing element.
+
+**R1:** Reversible <1h — adding `user-select: none` back is a CSS-only edit.
+
+### D029 — Generation action bar in command palette (R1)
+
+**Context:** Generation actions (Expand, Write) were only available via filtered search results in the command palette. The user wanted always-visible buttons at the bottom of the palette.
+
+**Chosen:** Add a `.command-palette__gen-bar` footer with 4 buttons (Expand, Write, Re-expand, Re-write) showing current model names and keyboard shortcuts. Buttons are disabled when no chapter is selected or generation is streaming. Hover shows accent color highlight.
+
+**R1:** Reversible <1h — removing the bar is a component prop + CSS edit.

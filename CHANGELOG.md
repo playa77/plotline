@@ -357,3 +357,8 @@ versions follow the document suite version (currently `0.1.0`).
   fixture), session lessons SL-001 through SL-005 covering: untracked fixture files, outline
   structure verification, blind revert discipline, per-chapter style instruction intent, and
   specialist scope creep prevention. (commit `c90d0a0`)
+
+- **2026-07-17** — Fix: Seed built-in and system variables on new project creation — `ProjectService.create()` now calls `VariableService.seedBuiltins()` to seed all 5 variables (Global Constraints + 4 built-ins). Previously, `seedBuiltins` existed but was only ever called in tests. (this commit)
+- **2026-07-17** — Fix: Allow text selection on content-bearing GUI elements — Removed `user-select: none` from 20 content-bearing selectors across 8 CSS files (tree, outline-workspace, variable-workspace, context-rail, chapter-workspace, settings-workspace, command-palette, diff-view). Kept on interactive chrome. (this commit)
+- **2026-07-17** — Command palette: generation action bar — Always-visible Expand/Write/Re-expand/Re-write buttons at the bottom of the palette with model names and keyboard shortcuts. New `GenAction` interface and `.command-palette__gen-bar` CSS. (this commit)
+- **2026-07-17** — Fix: SettingsWorkspace tests — Updated section count 9→8 after Writing Style section was moved to VariableWorkspace (managed as a built-in StoryVariable per PKG-VARS). (this commit)
