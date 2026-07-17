@@ -620,7 +620,7 @@ describe('ProjectService', () => {
       const gc = list.find((v) => v.id === 'global-constraints')!;
       expect(gc).toBeDefined();
       expect(gc.kind).toBe('system');
-      expect(gc.scopeLocked).toBe(true);
+      expect(gc.scopeLocked).toBe(false);
 
       // Migration commit exists in history
       const history = await vs.list(pid);

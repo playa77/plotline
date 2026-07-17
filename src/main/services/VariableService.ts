@@ -49,7 +49,7 @@ const BUILTIN_DEFS: BuiltinDef[] = [
 ];
 
 const SYSTEM_DEFS: BuiltinDef[] = [
-  { slug: 'global-constraints', name: 'Global Constraints', kind: 'system', scope: 'always', scopeLocked: true, position: 0 },
+  { slug: 'global-constraints', name: 'Global Constraints', kind: 'system', scope: 'always', scopeLocked: false, position: 0 },
 ];
 
 // ── Error types ─────────────────────────────────────────────────────────────
@@ -224,7 +224,7 @@ export class VariableService {
           name: 'Global Constraints',
           kind: 'system',
           scope: 'always',
-          scopeLocked: true,
+          scopeLocked: false,
           deletable: false,
           renamable: false,
           position: 0,

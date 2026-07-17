@@ -362,3 +362,6 @@ versions follow the document suite version (currently `0.1.0`).
 - **2026-07-17** — Fix: Allow text selection on content-bearing GUI elements — Removed `user-select: none` from 20 content-bearing selectors across 8 CSS files (tree, outline-workspace, variable-workspace, context-rail, chapter-workspace, settings-workspace, command-palette, diff-view). Kept on interactive chrome. (this commit)
 - **2026-07-17** — Command palette: generation action bar — Always-visible Expand/Write/Re-expand/Re-write buttons at the bottom of the palette with model names and keyboard shortcuts. New `GenAction` interface and `.command-palette__gen-bar` CSS. (this commit)
 - **2026-07-17** — Fix: SettingsWorkspace tests — Updated section count 9→8 after Writing Style section was moved to VariableWorkspace (managed as a built-in StoryVariable per PKG-VARS). (this commit)
+
+- **2026-07-17** — Change: Unlock Global Constraints scope — `scopeLocked` changed to `false` so the scope dropdown is editable in VariableWorkspace (previously hard-locked to `always`). User can now target GC to `write`-only. (this commit)
+- **2026-07-17** — Docs: `PERCHAPTER.md` guide on per-chapter tone/style setup — documents what exists (style-instruction.txt pipeline in GenerationService, no UI), what works (per-project Story Variables + Iterate), and how to use them.

@@ -48,7 +48,7 @@ function validSystemVariable() {
     name: 'Global Constraints',
     kind: 'system' as const,
     scope: 'always' as const,
-    scopeLocked: true,
+    scopeLocked: false,
     deletable: false,
     renamable: false,
     position: 0,
@@ -85,7 +85,7 @@ describe('StoryVariableSchema', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.kind).toBe('system');
-      expect(result.data.scopeLocked).toBe(true);
+      expect(result.data.scopeLocked).toBe(false);
       expect(result.data.deletable).toBe(false);
     }
   });

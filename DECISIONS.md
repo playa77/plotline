@@ -645,3 +645,11 @@ Removing it restores the original Expand-required behavior.
 **Chosen:** Add a `.command-palette__gen-bar` footer with 4 buttons (Expand, Write, Re-expand, Re-write) showing current model names and keyboard shortcuts. Buttons are disabled when no chapter is selected or generation is streaming. Hover shows accent color highlight.
 
 **R1:** Reversible <1h — removing the bar is a component prop + CSS edit.
+
+### D030 — Global Constraints scope unlocked (R1)
+
+**Context:** Global Constraints was created as a scope-locked system variable (scope=always, scopeLocked=true per AD-3). User needed it set to `write` only — their constraint text (gravity tether, hollow people, prose register) is specific to prose generation, not outline expansion.
+
+**Chosen:** Change `scopeLocked: true` → `false` in SYSTEM_DEFS and migrateFromV1. No service/UI code changes needed — all guards work from runtime value. Global Constraints now behaves like built-in variables: scope dropdown active, user selects any scope.
+
+**R1:** Reversible <1h — revert is a one-word edit in two locations plus test expectations.

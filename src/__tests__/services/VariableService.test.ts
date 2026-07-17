@@ -45,7 +45,7 @@ describe('VariableService', () => {
       // System first: global-constraints
       expect(list[0]!.id).toBe('global-constraints');
       expect(list[0]!.kind).toBe('system');
-      expect(list[0]!.scopeLocked).toBe(true);
+      expect(list[0]!.scopeLocked).toBe(false);
 
       // Then builtins in slug order
       expect(list[1]!.id).toBe('tone');
@@ -288,15 +288,14 @@ describe('VariableService', () => {
       expect(updated.scope).toBe('write');
     });
 
-    it('rejects SCOPE_LOCKED on system variable', async () => {
+    it('sets scope on system variable (scopeLocked = false)', async () => {
       const project = await projectService.create('Test');
       const pid = project.projectId;
       await variableService.seedBuiltins(pid);
 
       const gc = (await variableService.list(pid)).find((v) => v.id === 'global-constraints')!;
-      await expect(
-        variableService.setScope(pid, gc.id, 'write'),
-      ).rejects.toMatchObject({ code: 'SCOPE_LOCKED' });
+      const updated = await variableService.setScope(pid, gc.id, 'write');
+      expect(updated.scope).toBe('write');
     });
   });
 
@@ -691,7 +690,7 @@ describe('VariableService', () => {
       const gc = list.find((v) => v.id === 'global-constraints')!;
       expect(gc).toBeDefined();
       expect(gc.kind).toBe('system');
-      expect(gc.scopeLocked).toBe(true);
+      expect(gc.scopeLocked).toBe(false);
       expect(gc.deletable).toBe(false);
       expect(gc.renamable).toBe(false);
       expect(gc.position).toBe(0);
