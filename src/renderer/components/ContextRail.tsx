@@ -14,10 +14,11 @@
 
 import { useState, useCallback, useEffect } from 'react';
 
-import { useVariableStore, SCOPE_LABELS } from '../stores/variableStore';
+import { useVariableStore } from '../stores/variableStore';
+import { useGenerationStore } from '../stores/generationStore';
 import { useHistoryStore } from '../stores/historyStore';
 import type { CommitInfo } from '../stores/historyStore';
-import type { VariableScope } from '../../shared/schemas/variable';
+import type { StoryVariable, VariableScope } from '../../shared/schemas/variable';
 
 import { IteratePanel } from './IteratePanel';
 import { VersionPanel } from './VersionPanel';
@@ -49,7 +50,26 @@ const RAIL_SECTIONS: RailSectionDef[] = [
   { id: 'versions', label: 'Versions' },
 ];
 
-// ── Scope badge colors (matching variable-workspace) ───────────────────────────
+// ── Scope labels (local, since no longer exported from variableStore) ──────────
+
+const SCOPE_LABELS: Record<VariableScope, string> = {
+  always: 'Always',
+  expand: 'On Expand',
+  write: 'On Write',
+  manual: 'Manual',
+};
+
+// ── Ordering: system → builtin → custom, by position within each group ────────
+
+function byInjectionOrder(variables: StoryVariable[]): StoryVariable[] {
+  const kindOrder = { system: 0, builtin: 1, custom: 2 };
+  return [...variables].sort((a, b) => {
+    const kindA = kindOrder[a.kind] ?? 3;
+    const kindB = kindOrder[b.kind] ?? 3;
+    if (kindA !== kindB) return kindA - kindB;
+    return a.position - b.position;
+  });
+}
 
 const SCOPE_COLORS: Record<VariableScope, string> = {
   always: 'var(--color-accent)',
@@ -140,14 +160,53 @@ export function ContextRail({
   // ── Variable data (read from store, auto-load on mount) ──────────────────────
 
   const { variables, loadVariables } = useVariableStore();
+  const genStore = useGenerationStore();
 
   useEffect(() => {
-    // Use the projectId prop when available; fall back to 'demo' for now
     loadVariables(projectId ?? 'demo');
   }, [loadVariables, projectId]);
 
-  const activeVariables = variables.filter((v) => v.active);
-  const pausedVariables = variables.filter((v) => !v.active);
+  // Determine the pending generation type from the active job.
+  // When idle, we show all scopes as a preview of what COULD be injected.
+  const pendingStep: 'expand' | 'write' | 'iterate' | null =
+    genStore.activeJob?.step as 'expand' | 'write' | 'iterate' | null;
+
+  // Manual variable toggles: per-generation state (resets when gen completes).
+  const [toggledManualIds, setToggledManualIds] = useState<Set<string>>(new Set());
+
+  // Reset toggled manual vars when generation finishes
+  useEffect(() => {
+    if (genStore.status === 'idle') {
+      setToggledManualIds(new Set());
+    }
+  }, [genStore.status]);
+
+  const handleToggleManual = useCallback((varId: string) => {
+    setToggledManualIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(varId)) {
+        next.delete(varId);
+      } else {
+        next.add(varId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Variables in effect for the pending generation:
+  //   always-scope: always shown
+  //   expand-scope: shown when pending = expand (or idle)
+  //   write-scope: shown when pending = write (or idle)
+  //   manual-scope: always shown with toggle
+  const variablesInEffect = byInjectionOrder(variables).filter((v) => {
+    if (v.scope === 'always') return true;
+    if (v.scope === 'manual') return true;
+    if (pendingStep === 'expand' && v.scope === 'expand') return true;
+    if (pendingStep === 'write' && v.scope === 'write') return true;
+    if (pendingStep === null && (v.scope === 'expand' || v.scope === 'write'))
+      return true;
+    return false;
+  });
 
   // ── History data (read from store, auto-load when chapter changes) ───────────
 
@@ -229,59 +288,59 @@ export function ContextRail({
                     <div className="rail-variables">
                       {variables.length === 0 ? (
                         <div className="rail-placeholder-text">
-                          No variables active in the current selection.
+                          No variables configured. Open the Variable Studio to create context for generation.
                         </div>
                       ) : (
-                        <>
-                          {activeVariables.length > 0 && (
-                            <div className="rail-variables__group">
-                              <div className="rail-variables__group-label">
-                                Active ({activeVariables.length})
-                              </div>
-                              {activeVariables.map((v) => (
-                                <div key={v.id} className="rail-variable-item">
-                                  <span
-                                    className="rail-variable-item__dot rail-variable-item__dot--active"
-                                    title="Active"
-                                  />
-                                  <span className="rail-variable-item__name">
-                                    {v.name}
-                                  </span>
-                                  <span
-                                    className="rail-variable-item__scope"
-                                    style={{ color: SCOPE_COLORS[v.scope] }}
+                        <div className="rail-variables__list">
+                          {variablesInEffect.map((v) => {
+                            const isManual = v.scope === 'manual';
+                            const isToggled = isManual && toggledManualIds.has(v.id);
+                            const isGlobalConstraints = v.kind === 'system' && v.id === 'global-constraints';
+                            const isMuted = isManual && !isToggled;
+
+                            return (
+                              <div
+                                key={v.id}
+                                className={`rail-variable-item${isMuted ? ' rail-variable-item--muted' : ''}`}
+                              >
+                                {/* Manual toggle checkbox */}
+                                {isManual ? (
+                                  <label
+                                    className="rail-variable-item__toggle"
+                                    title={
+                                      isToggled
+                                        ? 'Will be included in this generation'
+                                        : 'Toggle to include in this generation'
+                                    }
                                   >
-                                    {SCOPE_LABELS[v.scope]}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {pausedVariables.length > 0 && (
-                            <div className="rail-variables__group">
-                              <div className="rail-variables__group-label">
-                                Paused ({pausedVariables.length})
-                              </div>
-                              {pausedVariables.map((v) => (
-                                <div key={v.id} className="rail-variable-item">
+                                    <input
+                                      type="checkbox"
+                                      checked={isToggled}
+                                      onChange={() => handleToggleManual(v.id)}
+                                      className="rail-variable-item__checkbox"
+                                    />
+                                  </label>
+                                ) : (
                                   <span
-                                    className="rail-variable-item__dot"
-                                    title="Paused"
+                                    className={`rail-variable-item__dot rail-variable-item__dot--always`}
+                                    title="Always injected"
                                   />
-                                  <span className="rail-variable-item__name">
-                                    {v.name}
-                                  </span>
-                                  <span
-                                    className="rail-variable-item__scope"
-                                    style={{ color: SCOPE_COLORS[v.scope] }}
-                                  >
-                                    {SCOPE_LABELS[v.scope]}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
+                                )}
+                                <span className="rail-variable-item__name">
+                                  {isGlobalConstraints
+                                    ? 'Global Constraints (book-wide invariants)'
+                                    : v.name}
+                                </span>
+                                <span
+                                  className="rail-variable-item__scope"
+                                  style={{ color: SCOPE_COLORS[v.scope] }}
+                                >
+                                  {SCOPE_LABELS[v.scope]}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   )}

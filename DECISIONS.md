@@ -545,3 +545,44 @@ functionally identical — `--no-sandbox` is always applied on AppImage launch.
 `forge.config.js` edits and a rebuild.
 
 ---
+
+## WP-38: Unified Story Variable Registry
+
+### D024 — Unified variable registry over parallel legacy/custom paths (R3)
+
+**Context:** The product spec calls for custom user-defined variables alongside the
+four built-in variables (Tone, Writing Style, Plot Constraints, Character/Voice
+Sheets). Implementing custom variables as a separate code path parallel to built-ins
+was the cheaper first commit — but every subsequent commit would have doubled the
+testing surface, GUI complexity, and injection logic.
+
+**Chosen:** Built-ins migrate into the same registry and schema as custom variables.
+One `StoryVariable` schema with `kind: 'builtin' | 'system' | 'custom'`, one
+`VariableService`, one `assemble()` injection path, one GUI workspace. No parallel
+code paths for "legacy" vs "custom" variables anywhere in services, IPC, context
+assembly, or GUI.
+
+**R3:** Once user-created variables exist in projects, splitting the registry back
+would lose user-authored structure. The migration from old schema (v1, core-based)
+to new schema (v2, kind-based) is forward-only in normal operation.
+
+---
+
+## WP-39: Context Rail Manual Toggles
+
+### D025 — Manual scope as per-generation toggle, not sticky state (R1)
+
+**Context:** Manual-scope variables are intended for one-off generation guidance —
+a specific instruction you want in one call but not the next. A sticky toggle
+(where the state persists across generations) would be invisible state that
+violates the design guarantee "what the model reads is never a mystery."
+
+**Chosen:** Manual-scope variables are opted in per generation via an inline
+checkbox in the context rail. The toggle resets after each generation completes
+— the next generation starts with all manual toggles off. The user explicitly
+activates the variables they want for each call.
+
+**R1:** Reversible <1h — the toggle mechanism is a single boolean in the context
+rail component; making it sticky would be a Zustand store change.
+
+---

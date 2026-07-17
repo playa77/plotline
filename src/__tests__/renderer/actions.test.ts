@@ -65,7 +65,6 @@ function makeCallbacks(overrides: Partial<ActionCallbacks> = {}): ActionCallback
     archiveVersion: vi.fn(),
     restoreRevision: vi.fn(),
     createVariable: vi.fn(),
-    setVariableActive: vi.fn(),
     setVariableScope: vi.fn(),
     addCard: vi.fn(),
     acceptProposal: vi.fn(),
@@ -377,21 +376,17 @@ describe('getAvailableActions', () => {
     expect(ids).not.toContain('ver:archive:main');
   });
 
-  it('dynamically adds variable toggle and scope actions per context', () => {
+  it('dynamically adds variable scope actions per context', () => {
     const ctx = makeContext({
       variables: [
-        { id: 'var-1', name: 'Tone', scope: 'always', active: true },
-        { id: 'var-2', name: 'Characters', scope: 'manual', active: false },
+        { id: 'var-1', name: 'Tone', scope: 'always', kind: 'builtin' },
+        { id: 'var-2', name: 'Characters', scope: 'manual', kind: 'builtin' },
       ],
     });
     const cb = makeCallbacks();
     const actions = getAvailableActions(ctx, cb);
 
     const ids = actions.map((a) => a.id);
-
-    // Toggle actions — one per variable
-    expect(ids).toContain('var:toggle:var-1');
-    expect(ids).toContain('var:toggle:var-2');
 
     // Scope change actions — 3 per variable (all scopes except current)
     expect(ids).toContain('var:scope:var-1:expand');
@@ -408,8 +403,7 @@ describe('getAvailableActions', () => {
     expect(ids).toContain('var:addCard:var-1');
     expect(ids).toContain('var:addCard:var-2');
 
-    // All are always available
-    expect(actions.find((a) => a.id === 'var:toggle:var-1')?.available()).toBe(true);
+    // Variable create is always available
     expect(actions.find((a) => a.id === 'var:create')?.available()).toBe(true);
   });
 

@@ -56,8 +56,8 @@ export interface ActionContext {
   chapters: Array<{ id: string; title: string }>;
   /** Current versions for the selected chapter. */
   versions: Array<{ slug: string; name: string; selected: boolean }>;
-  /** Current variables for "Change variable scope" / toggle actions. */
-  variables: Array<{ id: string; name: string; scope: VariableScope; active: boolean }>;
+  /** Current variables for "Change variable scope" actions. */
+  variables: Array<{ id: string; name: string; scope: VariableScope; kind: string }>;
   /** Whether there is an active iterate proposal. */
   hasIterateProposal: boolean;
 }
@@ -78,7 +78,6 @@ export interface ActionCallbacks {
   archiveVersion: (slug: string) => Promise<void>;
   restoreRevision: (sha: string) => void;
   createVariable: (name: string) => void;
-  setVariableActive: (id: string, active: boolean) => void;
   setVariableScope: (id: string, scope: VariableScope) => void;
   addCard: (variableId: string, title: string) => void;
   acceptProposal: () => Promise<void>;
@@ -765,18 +764,20 @@ export function getAvailableActions(
     },
   });
 
-  // Dynamic: toggle variable active/paused
-  for (const v of ctx.variables) {
-    const actionLabel = v.active ? `Pause variable: ${v.name}` : `Activate variable: ${v.name}`;
-    actions.push({
-      id: `var:toggle:${v.id}`,
-      label: actionLabel,
-      category: 'variables',
-      keywords: [v.active ? 'pause' : 'activate', 'toggle', v.name],
-      available: () => true,
-      execute: () => cb.setVariableActive(v.id, !v.active),
-    });
-  }
+  actions.push({
+    id: 'var:new-and-focus',
+    label: 'New Story Variable',
+    category: 'variables',
+    keywords: ['create', 'add', 'variable', 'context'],
+    available: () => true,
+    execute: () => {
+      const name = cb.promptInput('Variable name');
+      if (name) {
+        cb.createVariable(name);
+        cb.navigate({ type: 'variables' });
+      }
+    },
+  });
 
   // Dynamic: change variable scope
   const scopes: VariableScope[] = ['always', 'expand', 'write', 'manual'];

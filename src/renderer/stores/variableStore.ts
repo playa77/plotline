@@ -2,15 +2,17 @@
  * Variable store — Zustand-based state for the Variable Studio.
  *
  * Wraps the typed IPC client so the VariableWorkspace never calls
- * window.plotline directly. Handles errors gracefully: the IPC
- * backend (WP-11 main process) is built in parallel and may not
- * be wired yet, so every action logs failures instead of throwing.
+ * window.plotline directly. Handles errors gracefully: every action
+ * logs failures and surfaces them via toast rather than throwing.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Schema: StoryVariable (v2) — no active field, kind replaces core,
+ * position replaces order. Content is fetched separately via variables:get.
+ *
+ * Version: 0.2.0 | 2026-07-17
  */
 
 import { create } from 'zustand';
-import type { Variable, VariableScope } from '../../shared/schemas/variable';
+import type { StoryVariable, VariableScope } from '../../shared/schemas/variable';
 import { invoke } from '../ipc/client';
 import { useToastStore } from './toastStore';
 
@@ -24,9 +26,10 @@ interface CardSummary {
 export interface VariableStore {
   // ── State ────────────────────────────────────────────────────────────────────
 
-  variables: Variable[];
+  /** All variables (metadata only — no content). */
+  variables: StoryVariable[];
   selectedVariableId: string | null;
-  /** variableId → HTML content (as stored on disk) */
+  /** variableId → HTML content (loaded on demand via variables:get). */
   variableContent: Record<string, string>;
   loading: boolean;
 
@@ -45,25 +48,29 @@ export interface VariableStore {
   createVariable: (
     projectId: string,
     name: string,
-    core?: string | null,
-    scope?: string,
-  ) => Promise<Variable | null>;
+    scope?: VariableScope,
+  ) => Promise<StoryVariable | null>;
+  renameVariable: (
+    projectId: string,
+    variableId: string,
+    name: string,
+  ) => Promise<void>;
   updateScope: (
     projectId: string,
     variableId: string,
     scope: VariableScope,
-  ) => Promise<void>;
-  toggleActive: (
-    projectId: string,
-    variableId: string,
-    active: boolean,
   ) => Promise<void>;
   saveContent: (
     projectId: string,
     variableId: string,
     content: string,
   ) => Promise<void>;
-  archiveVariable: (projectId: string, variableId: string) => Promise<void>;
+  deleteVariable: (projectId: string, variableId: string) => Promise<void>;
+  reorderVariables: (
+    projectId: string,
+    variableId: string,
+    newPosition: number,
+  ) => Promise<void>;
   loadContent: (projectId: string, variableId: string) => Promise<void>;
 
   // ── Card actions ─────────────────────────────────────────────────────────────
@@ -75,17 +82,6 @@ export interface VariableStore {
   removeCard: (projectId: string, cardId: string) => Promise<void>;
   loadCardContent: (projectId: string, cardId: string) => Promise<void>;
 }
-
-// ── Scope label map ────────────────────────────────────────────────────────────
-
-const SCOPE_LABELS: Record<VariableScope, string> = {
-  always: 'Always',
-  expand: 'On Expand',
-  write: 'On Write',
-  manual: 'Manual',
-};
-
-export { SCOPE_LABELS };
 
 // ── Store ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +98,7 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
   cardContent: {},
 
   // ── loadVariables ────────────────────────────────────────────────────────────
+  // Calls variables:list which returns StoryVariable[] (metadata only, no content).
 
   loadVariables: async (projectId: string) => {
     set({ loading: true });
@@ -110,16 +107,18 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       set({ variables, loading: false });
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variables');
-      console.warn(
-        `[variableStore] variables:list failed (IPC may not be wired yet):`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to load variables',
       );
+      console.warn('[variableStore] variables:list failed:', err);
       set({ loading: false });
     }
   },
 
   // ── selectVariable ───────────────────────────────────────────────────────────
+  // Loads content via variables:get. For Character / Voice Sheet variables
+  // (builtin kind with id 'characters'), also loads the card list.
 
   selectVariable: async (projectId: string, id: string | null) => {
     set({
@@ -144,9 +143,9 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
         },
       }));
 
-      // If this is a Character / Voice Sheet, load cards too
+      // If this is the Character / Voice Sheet builtin, load cards too
       const variable = get().variables.find((v) => v.id === id);
-      if (variable?.core === 'characters') {
+      if (variable && variable.kind === 'builtin' && variable.id === 'characters') {
         try {
           const cards = await invoke('variables:listCards', {
             projectId,
@@ -155,38 +154,37 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
           set({ cards });
         } catch (cardErr) {
           const e2 = cardErr as { code?: string; message?: string };
-          useToastStore.getState().error(e2.code ?? 'VARIABLE_ERROR', e2.message ?? 'Failed to load character cards');
-          console.warn(
-            `[variableStore] variables:listCards failed:`,
-            cardErr,
+          useToastStore.getState().error(
+            e2.code ?? 'VARIABLE_ERROR',
+            e2.message ?? 'Failed to load character cards',
           );
+          console.warn('[variableStore] variables:listCards failed:', cardErr);
           set({ cards: [] });
         }
       }
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variable');
-      console.warn(
-        `[variableStore] variables:get failed (IPC may not be wired yet):`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to load variable',
       );
+      console.warn('[variableStore] variables:get failed:', err);
     }
   },
 
   // ── createVariable ───────────────────────────────────────────────────────────
+  // No `core` parameter — the kind is determined server-side.
 
   createVariable: async (
     projectId: string,
     name: string,
-    core?: string | null,
-    scope?: string,
+    scope?: VariableScope,
   ) => {
     try {
       const variable = await invoke('variables:create', {
         projectId,
         name,
-        core: (core as Variable['core']) ?? null,
-        scope: (scope as VariableScope) ?? 'manual',
+        scope: scope ?? 'manual',
       });
       set((state) => ({
         variables: [...state.variables, variable],
@@ -194,12 +192,36 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       return variable;
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to create variable');
-      console.warn(
-        `[variableStore] variables:create failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to create variable',
       );
+      console.warn('[variableStore] variables:create failed:', err);
       return null;
+    }
+  },
+
+  // ── renameVariable ───────────────────────────────────────────────────────────
+
+  renameVariable: async (projectId, variableId, name) => {
+    try {
+      const updated = await invoke('variables:rename', {
+        projectId,
+        variableId,
+        name,
+      });
+      set((state) => ({
+        variables: state.variables.map((v) =>
+          v.id === variableId ? updated : v,
+        ),
+      }));
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to rename variable',
+      );
+      console.warn('[variableStore] variables:rename failed:', err);
     }
   },
 
@@ -219,42 +241,18 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to update scope');
-      console.warn(
-        `[variableStore] variables:setScope failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to update scope',
       );
-    }
-  },
-
-  // ── toggleActive ─────────────────────────────────────────────────────────────
-
-  toggleActive: async (projectId, variableId, active) => {
-    try {
-      const updated = await invoke('variables:setActive', {
-        projectId,
-        variableId,
-        active,
-      });
-      set((state) => ({
-        variables: state.variables.map((v) =>
-          v.id === variableId ? updated : v,
-        ),
-      }));
-    } catch (err) {
-      const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to toggle variable');
-      console.warn(
-        `[variableStore] variables:setActive failed:`,
-        err,
-      );
+      console.warn('[variableStore] variables:setScope failed:', err);
     }
   },
 
   // ── saveContent ──────────────────────────────────────────────────────────────
+  // Calls variables:setContent (was variables:save in legacy). Optimistic update.
 
   saveContent: async (projectId, variableId, content) => {
-    // Optimistic update: store content locally immediately
     set((state) => ({
       variableContent: {
         ...state.variableContent,
@@ -262,22 +260,27 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       },
     }));
     try {
-      await invoke('variables:save', { projectId, variableId, content });
+      await invoke('variables:setContent', { projectId, variableId, content });
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to save content');
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to save content',
+      );
       console.warn(
-        `[variableStore] variables:save failed (content held in memory):`,
+        '[variableStore] variables:setContent failed (content held in memory):',
         err,
       );
     }
   },
 
-  // ── archiveVariable ──────────────────────────────────────────────────────────
+  // ── deleteVariable ───────────────────────────────────────────────────────────
+  // Calls variables:delete (was variables:archive in legacy). Confirmation
+  // happens in the component, not here.
 
-  archiveVariable: async (projectId, variableId) => {
+  deleteVariable: async (projectId, variableId) => {
     try {
-      await invoke('variables:archive', { projectId, variableId });
+      await invoke('variables:delete', { projectId, variableId });
       set((state) => ({
         variables: state.variables.filter((v) => v.id !== variableId),
         selectedVariableId:
@@ -287,11 +290,31 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to archive variable');
-      console.warn(
-        `[variableStore] variables:archive failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to delete variable',
       );
+      console.warn('[variableStore] variables:delete failed:', err);
+    }
+  },
+
+  // ── reorderVariables ─────────────────────────────────────────────────────────
+
+  reorderVariables: async (projectId, variableId, newPosition) => {
+    try {
+      const updated = await invoke('variables:reorder', {
+        projectId,
+        variableId,
+        newPosition,
+      });
+      set({ variables: updated });
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to reorder variables',
+      );
+      console.warn('[variableStore] variables:reorder failed:', err);
     }
   },
 
@@ -311,11 +334,11 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load variable');
-      console.warn(
-        `[variableStore] variables:get failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to load variable content',
       );
+      console.warn('[variableStore] variables:get failed:', err);
     }
   },
 
@@ -330,41 +353,28 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       set({ cards, selectedCardId: null, cardContent: {} });
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to load cards');
-      console.warn(
-        `[variableStore] variables:listCards failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to load cards',
       );
+      console.warn('[variableStore] variables:listCards failed:', err);
     }
   },
 
-  selectCard: async (projectId, cardId) => {
+  selectCard: async (_projectId, cardId) => {
     set({ selectedCardId: cardId });
 
     if (cardId === null) return;
 
-    // Load card content if not already loaded
-    try {
-      // The IPC doesn't have a dedicated "getCard" command; we reload
-      // cards list for now. Card content loads via loadCardContent.
-      const state = get();
-      if (!(cardId in state.cardContent)) {
-        // Content will be loaded when switching; for now just ensure
-        // cardContent has an entry so the editor doesn't error.
-        set((s) => ({
-          cardContent: {
-            ...s.cardContent,
-            [cardId]: s.cardContent[cardId] ?? '<p></p>',
-          },
-        }));
-      }
-    } catch (err) {
-      const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to select card');
-      console.warn(
-        `[variableStore] selectCard failed:`,
-        err,
-      );
+    // Ensure cardContent has a fallback entry so the editor doesn't error
+    const state = get();
+    if (!(cardId in state.cardContent)) {
+      set((s) => ({
+        cardContent: {
+          ...s.cardContent,
+          [cardId]: s.cardContent[cardId] ?? '<p></p>',
+        },
+      }));
     }
   },
 
@@ -388,11 +398,11 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to add card');
-      console.warn(
-        `[variableStore] variables:addCard failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to add card',
       );
+      console.warn('[variableStore] variables:addCard failed:', err);
     }
   },
 
@@ -417,9 +427,12 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       });
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to save card content');
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to save card content',
+      );
       console.warn(
-        `[variableStore] variables:saveCard failed (content held in memory):`,
+        '[variableStore] variables:saveCard failed (content held in memory):',
         err,
       );
     }
@@ -442,20 +455,15 @@ export const useVariableStore = create<VariableStore>()((set, get) => ({
       }));
     } catch (err) {
       const e = err as { code?: string; message?: string };
-      useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Failed to remove card');
-      console.warn(
-        `[variableStore] variables:removeCard failed:`,
-        err,
+      useToastStore.getState().error(
+        e.code ?? 'VARIABLE_ERROR',
+        e.message ?? 'Failed to remove card',
       );
+      console.warn('[variableStore] variables:removeCard failed:', err);
     }
   },
 
-  loadCardContent: async (projectId, cardId) => {
-    // Card content is stored as part of the variable content system.
-    // The variables:saveCard command saves card content, but there's no
-    // dedicated card-load IPC — cards are fetched via listCards and their
-    // content would be loaded differently. For now, load from local state
-    // or initialize with empty content.
+  loadCardContent: async (_projectId, cardId) => {
     if (!(cardId in get().cardContent)) {
       set((state) => ({
         cardContent: {

@@ -382,7 +382,7 @@ export function AppShell(): JSX.Element {
         id: v.id,
         name: v.name,
         scope: v.scope,
-        active: v.active,
+        kind: v.kind,
       })),
       hasIterateProposal:
         genStore.status === 'done' && genStore.activeJob?.step === 'iterate',
@@ -519,14 +519,6 @@ export function AppShell(): JSX.Element {
         } catch (err: unknown) {
           const e = err as { code?: string; message?: string; detail?: string };
           useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Create variable failed', e.detail);
-        }
-      },
-      setVariableActive: async (id, active) => {
-        try {
-          await variableStore.toggleActive(projectId, id, active);
-        } catch (err: unknown) {
-          const e = err as { code?: string; message?: string; detail?: string };
-          useToastStore.getState().error(e.code ?? 'VARIABLE_ERROR', e.message ?? 'Toggle variable failed', e.detail);
         }
       },
       setVariableScope: async (id, scope) => {

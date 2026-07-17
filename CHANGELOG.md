@@ -295,3 +295,41 @@ versions follow the document suite version (currently `0.1.0`).
   integration (711 passed, 0 failed, 1 skipped). Dead-instruction audit and
   IPC coverage CI both green. F1–F6 manual flow paths marked PENDING-OWNER
   per §0 rule 5. (this commit)
+
+---
+## [0.3.0] — 2026-07-17 (M7)
+
+### Added
+- **2026-07-17** — WP-38: Unified Story Variable registry, services, IPC, injection (R3) — Backend-only.
+  Rewrote variable schema from `Variable` (core-based, active toggle) to `StoryVariable`
+  (kind-based: builtin/system/custom, scopeLocked/deletable/renamable, position,
+  timestamps). Schema version 2. New VariableService API: `create`, `rename`, `setScope`,
+  `setContent` (replaces `save`), `reorder`, `delete` (replaces `archive`). Removed
+  `setActive`/`toggleActive` (all variables always active; manual scope provides opt-in).
+  7 new/updated IPC commands: `variables:rename`, `variables:setContent`,
+  `variables:reorder`, `variables:delete` added; `variables:create` updated (no `core`
+  param); `variables:setScope` updated (enforces `scopeLocked`). Context assembly
+  (`assemble`) updated for AD-4/5: three-group injection order (system → builtin →
+  custom by position), Markdown section headings (not fenced blocks), Global Constraints
+  special heading, manual variable IDs parameter, empty variables inject nothing.
+  Updated `StalenessService` variable fingerprinting for new schema (removed `active`,
+  uses `kind`). Updated `GenerationService` context building for manual variable
+  support. Error codes: `SCOPE_LOCKED`, `NOT_DELETABLE`, `NOT_RENAMABLE`, `NAME_TAKEN`,
+  `NAME_RESERVED`. All 54 VariableSchema tests + 582 backend tests green. Zero
+  regressions (same 17 pre-existing failures). 22 files changed, +1174/-845.
+  (commit `5bc5d31`)
+- **2026-07-17** — WP-39: Story Variables Studio + Context Rail GUI (R1) — Renderer-only.
+  Complete rewrite of `VariableWorkspace.tsx`: three-group sidebar layout (System /
+  Built-in / Custom) with kind badges, disabled scope + tooltip on Global Constraints,
+  inline rename for custom variables, up/down reorder buttons, delete with inline
+  confirmation dialog stating restorability via History. Complete rewrite of
+  `variableStore.ts`: removed `toggleActive`/`archiveVariable`, added `renameVariable`/
+  `deleteVariable`/`reorderVariables`, updated all IPC calls for new WP-38 contract.
+  Updated `ContextRail.tsx`: removed active/paused groups, variables now shown in
+  AD-5 injection order filtered by pending generation type, manual-scope variables
+  with inline checkbox toggles (per-generation, not sticky), muted styling for
+  untoggled manual vars. Updated `AppShell.tsx` action wiring and `actions.ts` with
+  "New Story Variable" palette action. Added `variable-workspace.css` and
+  `context-rail.css` styles. `tsc --noEmit` clean: zero errors. 101/105 renderer
+  tests passing (4 pre-existing failures: ipcCoverage, SettingsWorkspace).
+  8 files changed.

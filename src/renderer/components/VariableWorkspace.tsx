@@ -1,44 +1,47 @@
 /**
  * VariableWorkspace — Variable Studio for managing story variables.
  *
- * Two-column layout: scrollable sidebar list on the left (~280px),
- * selected variable's content and controls on the right.
+ * Three-group layout in the left sidebar:
+ *   - System: Global Constraints (scope locked, name not editable, no delete)
+ *   - Built-in: Tone, Writing Style, Plot Constraints, Character Sheets
+ *              (scope editable, name not editable, no delete)
+ *   - Custom: user-created variables (full editing, reorder, delete)
  *
- * Core variables (tone, style, constraints, characters) are always
- * shown — if not yet created they appear dimmed with a "+ Create" action.
- * Custom variables appear in their own section.
+ * Right panel: TipTap rich-text editor for the selected variable's content.
+ * Character / Voice Sheet variables show card tabs above the editor.
  *
- * Version: 0.1.0 | 2026-07-16
+ * Version: 0.2.0 | 2026-07-17
  */
 
 import { useState, useCallback, useEffect, useRef, type FormEvent } from 'react';
 
 import { Editor } from './Editor';
-import { useVariableStore, SCOPE_LABELS } from '../stores/variableStore';
-import type { Variable, VariableScope, CoreVariableType } from '../../shared/schemas/variable';
+import { useVariableStore } from '../stores/variableStore';
+import type { StoryVariable, VariableScope } from '../../shared/schemas/variable';
+import {
+  VARIABLE_SCOPES,
+  BUILTIN_SLUGS,
+  RESERVED_DISPLAY_NAMES,
+} from '../../shared/schemas/variable';
 
 import './Editor.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-/** Human-readable labels for the four core variable types. */
-const CORE_LABELS: Record<CoreVariableType, string> = {
-  tone: 'Tone',
-  style: 'Writing Style',
-  constraints: 'Plot Constraints',
-  characters: 'Character / Voice Sheets',
-};
-
-/** Default scope for newly created core variables. */
-const DEFAULT_CORE_SCOPE: VariableScope = 'manual';
-
 /** Scope options for the dropdown. */
-const SCOPE_OPTIONS: VariableScope[] = ['always', 'expand', 'write', 'manual'];
+const SCOPE_OPTIONS: VariableScope[] = [...VARIABLE_SCOPES];
+
+/** Scope labels for the dropdown. */
+const SCOPE_LABELS: Record<VariableScope, string> = {
+  always: 'Always',
+  expand: 'On Expand',
+  write: 'On Write',
+  manual: 'Manual',
+};
 
 // ── Props ───────────────────────────────────────────────────────────────────────
 
 interface VariableWorkspaceProps {
-  /** Project ID. Hardcoded to 'demo' until project selection exists. */
   projectId?: string;
 }
 
@@ -57,10 +60,11 @@ export function VariableWorkspace({
     loadVariables,
     selectVariable,
     createVariable,
+    renameVariable,
     updateScope,
-    toggleActive,
     saveContent,
-    loadCards,
+    deleteVariable,
+    reorderVariables,
     selectCard,
     addCard,
     saveCardContent,
@@ -69,13 +73,20 @@ export function VariableWorkspace({
 
   // ── Local UI state ──────────────────────────────────────────────────────────
 
-  const [creatingCore, setCreatingCore] = useState<CoreVariableType | null>(null);
   const [addingCard, setAddingCard] = useState(false);
   const [newCardTitle, setNewCardTitle] = useState('');
   const [deletingCard, setDeletingCard] = useState<string | null>(null);
   const [newVariableName, setNewVariableName] = useState('');
   const [addingCustom, setAddingCustom] = useState(false);
   const newVarInputRef = useRef<HTMLInputElement>(null);
+
+  // Inline rename state
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Delete confirmation state
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // ── Load variables on mount ──────────────────────────────────────────────────
 
@@ -87,21 +98,30 @@ export function VariableWorkspace({
 
   const selectedVariable = variables.find((v) => v.id === selectedVariableId) ?? null;
 
-  /** Which core types have a corresponding variable already. */
-  const existingCoreTypes = new Set(
-    variables.filter((v) => v.core !== null).map((v) => v.core as CoreVariableType),
-  );
+  /** System variables (Global Constraints). */
+  const systemVars = variables
+    .filter((v) => v.kind === 'system')
+    .sort((a, b) => a.position - b.position);
 
-  /** Variables that are not core (user-created). */
-  const customVariables = variables.filter((v) => v.core === null);
+  /** Built-in variables (tone, style, constraints, characters). */
+  const builtinVars = variables
+    .filter((v) => v.kind === 'builtin')
+    .sort((a, b) => a.position - b.position);
+
+  /** Custom variables, sorted by position. */
+  const customVars = variables
+    .filter((v) => v.kind === 'custom')
+    .sort((a, b) => a.position - b.position);
+
+  // Which builtin slugs are not yet created
+  const existingBuiltinIds = new Set(builtinVars.map((v) => v.id));
+  const missingBuiltins = BUILTIN_SLUGS.filter((s) => !existingBuiltinIds.has(s));
 
   // ── Determine which content to show in the editor ───────────────────────────
 
-  const isCharacterVariable = selectedVariable?.core === 'characters';
-  const activeCard = cards.find((c) => c.cardId === selectedCardId) ?? null;
+  const isCharacterVariable =
+    selectedVariable?.kind === 'builtin' && selectedVariable.id === 'characters';
 
-  // If viewing a character variable with a selected card, show card content;
-  // otherwise show the variable content directly.
   const editorContent: string = (() => {
     if (isCharacterVariable && selectedCardId) {
       return cardContent[selectedCardId] ?? '<p></p>';
@@ -121,32 +141,12 @@ export function VariableWorkspace({
     [projectId, selectVariable],
   );
 
-  const handleCreateCore = useCallback(
-    async (core: CoreVariableType) => {
-      setCreatingCore(core);
-      const variable = await createVariable(projectId, CORE_LABELS[core], core, DEFAULT_CORE_SCOPE);
-      setCreatingCore(null);
-      if (variable) {
-        selectVariable(projectId, variable.id);
-      }
-    },
-    [projectId, createVariable, selectVariable],
-  );
-
   const handleScopeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (selectedVariableId) {
-        updateScope(projectId, selectedVariableId, e.target.value as VariableScope);
-      }
+    (varId: string, scope: VariableScope) => {
+      updateScope(projectId, varId, scope);
     },
-    [projectId, selectedVariableId, updateScope],
+    [projectId, updateScope],
   );
-
-  const handleToggleActive = useCallback(() => {
-    if (selectedVariable) {
-      toggleActive(projectId, selectedVariable.id, !selectedVariable.active);
-    }
-  }, [projectId, selectedVariable, toggleActive]);
 
   const handleSave = useCallback(
     (html: string) => {
@@ -195,13 +195,12 @@ export function VariableWorkspace({
   const handleStartAddCustom = useCallback(() => {
     setAddingCustom(true);
     setNewVariableName('');
-    // Focus the input after render
     setTimeout(() => newVarInputRef.current?.focus(), 0);
   }, []);
 
   const handleConfirmAddCustom = useCallback(() => {
     if (newVariableName.trim()) {
-      createVariable(projectId, newVariableName.trim(), null);
+      createVariable(projectId, newVariableName.trim());
     }
     setAddingCustom(false);
     setNewVariableName('');
@@ -212,6 +211,55 @@ export function VariableWorkspace({
     setNewVariableName('');
   }, []);
 
+  // ── Inline rename handlers ──────────────────────────────────────────────────
+
+  const handleStartRename = useCallback((varId: string, currentName: string) => {
+    setRenamingId(varId);
+    setRenameValue(currentName);
+    setTimeout(() => renameInputRef.current?.focus(), 0);
+  }, []);
+
+  const handleConfirmRename = useCallback(() => {
+    if (renamingId && renameValue.trim()) {
+      renameVariable(projectId, renamingId, renameValue.trim());
+    }
+    setRenamingId(null);
+    setRenameValue('');
+  }, [projectId, renamingId, renameValue, renameVariable]);
+
+  const handleCancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenameValue('');
+  }, []);
+
+  // ── Delete handler ──────────────────────────────────────────────────────────
+
+  const handleDelete = useCallback(
+    (varId: string) => {
+      deleteVariable(projectId, varId);
+      setDeletingId(null);
+    },
+    [projectId, deleteVariable],
+  );
+
+  // ── Reorder handlers ────────────────────────────────────────────────────────
+
+  const handleMoveUp = useCallback(
+    (varId: string, currentPos: number) => {
+      if (currentPos > 0) {
+        reorderVariables(projectId, varId, currentPos - 1);
+      }
+    },
+    [projectId, reorderVariables],
+  );
+
+  const handleMoveDown = useCallback(
+    (varId: string, currentPos: number) => {
+      reorderVariables(projectId, varId, currentPos + 1);
+    },
+    [projectId, reorderVariables],
+  );
+
   // ── Render helpers ───────────────────────────────────────────────────────────
 
   const renderScopeBadge = (scope: VariableScope): JSX.Element => (
@@ -220,12 +268,176 @@ export function VariableWorkspace({
     </span>
   );
 
-  const renderActiveDot = (active: boolean): JSX.Element => (
-    <span
-      className={`variable-active-dot${active ? ' variable-active-dot--active' : ' variable-active-dot--paused'}`}
-      title={active ? 'Active' : 'Paused'}
-    />
-  );
+  const renderScopeSelect = (
+    v: StoryVariable,
+    disabled: boolean,
+    tooltip?: string,
+  ): JSX.Element => {
+    const select = (
+      <select
+        className={`variable-scope-select${disabled ? ' variable-scope-select--disabled' : ''}`}
+        value={v.scope}
+        onChange={(e) => handleScopeChange(v.id, e.target.value as VariableScope)}
+        disabled={disabled}
+        aria-label="Variable scope"
+        title={tooltip}
+      >
+        {SCOPE_OPTIONS.map((opt) => (
+          <option key={opt} value={opt}>
+            {SCOPE_LABELS[opt]}
+          </option>
+        ))}
+      </select>
+    );
+
+    if (tooltip && disabled) {
+      return (
+        <span className="variable-tooltip-wrapper" title={tooltip}>
+          {select}
+        </span>
+      );
+    }
+    return select;
+  };
+
+  const renderRowName = (v: StoryVariable): JSX.Element => {
+    if (renamingId === v.id) {
+      return (
+        <input
+          ref={renameInputRef}
+          className="variable-row__name-input"
+          type="text"
+          value={renameValue}
+          onChange={(e) => setRenameValue(e.target.value)}
+          onBlur={handleCancelRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleConfirmRename();
+            if (e.key === 'Escape') handleCancelRename();
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      );
+    }
+
+    return (
+      <span
+        className={`variable-row__name${v.renamable ? ' variable-row__name--editable' : ''}`}
+        onClick={
+          v.renamable
+            ? (e) => {
+                e.stopPropagation();
+                handleStartRename(v.id, v.name);
+              }
+            : undefined
+        }
+        title={v.renamable ? 'Click to rename' : undefined}
+      >
+        {v.name}
+      </span>
+    );
+  };
+
+  const renderRow = (v: StoryVariable, isSelected: boolean): JSX.Element => {
+    const showDelete = v.deletable;
+    const showReorder = v.kind === 'custom';
+    const scopeDisabled = v.scopeLocked;
+    const scopeTooltip = scopeDisabled
+      ? 'Global Constraints are injected into every generation call. Scope is not configurable.'
+      : undefined;
+
+    return (
+      <div
+        key={v.id}
+        className={`variable-row${isSelected ? ' variable-row--selected' : ''}`}
+        onClick={() => handleSelectRow(v.id)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') handleSelectRow(v.id);
+        }}
+      >
+        {showReorder && (
+          <span className="variable-row__grip" title="Drag to reorder">
+            ⠿
+          </span>
+        )}
+        {renderRowName(v)}
+        {v.kind === 'system' && (
+          <span className="variable-kind-badge variable-kind-badge--system">
+            System
+          </span>
+        )}
+        {renderScopeSelect(v, scopeDisabled, scopeTooltip)}
+        {showReorder && (
+          <span className="variable-row__reorder-arrows">
+            <button
+              type="button"
+              className="variable-row__reorder-btn"
+              title="Move up"
+              aria-label="Move up"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMoveUp(v.id, v.position);
+              }}
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              className="variable-row__reorder-btn"
+              title="Move down"
+              aria-label="Move down"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMoveDown(v.id, v.position);
+              }}
+            >
+              ▼
+            </button>
+          </span>
+        )}
+        {showDelete &&
+          (deletingId === v.id ? (
+            <span className="variable-delete-inline">
+              <span className="variable-delete-inline__text">Delete?</span>
+              <button
+                type="button"
+                className="variable-delete-inline__btn variable-delete-inline__btn--confirm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(v.id);
+                }}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                className="variable-delete-inline__btn variable-delete-inline__btn--cancel"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeletingId(null);
+                }}
+              >
+                No
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="variable-row__delete-btn"
+              title="Delete variable"
+              aria-label={`Delete ${v.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletingId(v.id);
+              }}
+            >
+              ×
+            </button>
+          ))}
+      </div>
+    );
+  };
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -234,87 +446,36 @@ export function VariableWorkspace({
       {/* ═══ Left sidebar ═══════════════════════════════════════════════════════ */}
       <aside className="variable-sidebar">
         <div className="variable-sidebar__list">
-          {/* ── Core section ───────────────────────────────────────────────── */}
-          <div className="variable-sidebar__section-header">Core</div>
+          {/* ── System group ─────────────────────────────────────────────────── */}
+          <div className="variable-sidebar__section-header">System</div>
+          {systemVars.length > 0 ? (
+            systemVars.map((v) => renderRow(v, v.id === selectedVariableId))
+          ) : (
+            <div className="variable-empty-group">
+              Global Constraints not yet initialized.
+            </div>
+          )}
 
-          {CORE_VARIABLE_TYPES.map((coreType) => {
-            const existing = variables.find((v) => v.core === coreType);
-            const isSelected = existing?.id === selectedVariableId;
+          {/* ── Built-in group ───────────────────────────────────────────────── */}
+          <div className="variable-sidebar__section-header">Built-in</div>
+          {builtinVars.map((v) => renderRow(v, v.id === selectedVariableId))}
+          {missingBuiltins.map((slug) => (
+            <div key={slug} className="variable-row variable-row--dimmed">
+              <span className="variable-row__name">
+                {RESERVED_DISPLAY_NAMES[slug as keyof typeof RESERVED_DISPLAY_NAMES]}
+              </span>
+              <span className="variable-row__create-placeholder">Not created</span>
+            </div>
+          ))}
 
-            if (existing) {
-              return (
-                <div
-                  key={coreType}
-                  className={`variable-row${isSelected ? ' variable-row--selected' : ''}`}
-                  onClick={() => handleSelectRow(existing.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSelectRow(existing.id);
-                  }}
-                >
-                  <span className="variable-row__name">{existing.name}</span>
-                  {renderScopeBadge(existing.scope)}
-                  {renderActiveDot(existing.active)}
-                </div>
-              );
-            }
-
-            // Not yet created — show dimmed placeholder
-            return (
-              <div
-                key={coreType}
-                className="variable-row variable-row--dimmed"
-              >
-                <span className="variable-row__name">{CORE_LABELS[coreType]}</span>
-                {creatingCore === coreType ? (
-                  <span className="variable-row__create">Creating...</span>
-                ) : (
-                  <span
-                    className="variable-row__create"
-                    role="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCreateCore(coreType);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.stopPropagation();
-                        handleCreateCore(coreType);
-                      }
-                    }}
-                  >
-                    + Create
-                  </span>
-                )}
-              </div>
-            );
-          })}
-
-          {/* ── Custom section ──────────────────────────────────────────────── */}
-          {customVariables.length > 0 && (
-            <>
-              <div className="variable-sidebar__section-header">
-                Custom
-              </div>
-              {customVariables.map((v) => (
-                <div
-                  key={v.id}
-                  className={`variable-row${v.id === selectedVariableId ? ' variable-row--selected' : ''}`}
-                  onClick={() => handleSelectRow(v.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSelectRow(v.id);
-                  }}
-                >
-                  <span className="variable-row__name">{v.name}</span>
-                  {renderScopeBadge(v.scope)}
-                  {renderActiveDot(v.active)}
-                </div>
-              ))}
-            </>
+          {/* ── Custom group ─────────────────────────────────────────────────── */}
+          <div className="variable-sidebar__section-header">Custom</div>
+          {customVars.length > 0 ? (
+            customVars.map((v) => renderRow(v, v.id === selectedVariableId))
+          ) : (
+            <div className="variable-empty-group">
+              No custom variables yet. Create one to guide generation with your own context.
+            </div>
           )}
         </div>
 
@@ -364,34 +525,22 @@ export function VariableWorkspace({
               <span className="variable-content__name">
                 {selectedVariable.name}
               </span>
+              {selectedVariable.kind === 'system' && (
+                <span className="variable-kind-badge variable-kind-badge--system">
+                  System
+                </span>
+              )}
 
               <div className="variable-content__spacer" />
 
               {/* Scope selector */}
-              <select
-                className="variable-scope-select"
-                value={selectedVariable.scope}
-                onChange={handleScopeChange}
-                aria-label="Variable scope"
-              >
-                {SCOPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {SCOPE_LABELS[opt]}
-                  </option>
-                ))}
-              </select>
-
-              {/* Active toggle */}
-              <button
-                type="button"
-                className={`variable-active-toggle${selectedVariable.active ? ' variable-active-toggle--active' : ''}`}
-                onClick={handleToggleActive}
-                title={selectedVariable.active ? 'Click to pause' : 'Click to activate'}
-                aria-label={selectedVariable.active ? 'Pause variable' : 'Activate variable'}
-              >
-                <span className="variable-active-toggle__dot" />
-                <span>{selectedVariable.active ? 'Active' : 'Paused'}</span>
-              </button>
+              {renderScopeSelect(
+                selectedVariable,
+                selectedVariable.scopeLocked,
+                selectedVariable.scopeLocked
+                  ? 'Global Constraints are injected into every generation call. Scope is not configurable.'
+                  : undefined,
+              )}
             </div>
 
             {/* ── Card list (character variables only) ──────────────────────── */}
@@ -401,7 +550,7 @@ export function VariableWorkspace({
                   deletingCard === card.cardId ? (
                     <div key={card.cardId} className="variable-delete-confirm">
                       <span className="variable-delete-confirm__text">
-                        Delete "{card.title}"?
+                        Delete &ldquo;{card.title}&rdquo;?
                       </span>
                       <button
                         type="button"
@@ -477,10 +626,7 @@ export function VariableWorkspace({
             {/* ── Editor ────────────────────────────────────────────────────── */}
             <div className="variable-content__body">
               <div className="variable-content__editor">
-                <Editor
-                  content={editorContent}
-                  onSave={handleSave}
-                />
+                <Editor content={editorContent} onSave={handleSave} />
               </div>
             </div>
           </>
@@ -500,8 +646,3 @@ export function VariableWorkspace({
     </div>
   );
 }
-
-// ── Re-export for convenience ──────────────────────────────────────────────────
-
-// The four core variable types as a tuple for iteration
-const CORE_VARIABLE_TYPES: CoreVariableType[] = ['tone', 'style', 'constraints', 'characters'];

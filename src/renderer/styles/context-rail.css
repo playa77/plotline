@@ -189,6 +189,47 @@
   border-color: var(--color-on-target);
 }
 
+/* ── Always-injected dot (no toggle) ─────────────────────────────────── */
+
+.rail-variable-item__dot--always {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ── Muted variable (manual, not toggled on) ─────────────────────────── */
+
+.rail-variable-item--muted .rail-variable-item__name {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: calc(var(--font-size-sm) - 1px);
+}
+
+.rail-variable-item--muted .rail-variable-item__scope {
+  opacity: 0.5;
+}
+
+/* ── Manual toggle checkbox ──────────────────────────────────────────── */
+
+.rail-variable-item__toggle {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rail-variable-item__checkbox {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* ── Variable list (flat, no groups) ─────────────────────────────────── */
+
+.rail-variables__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
 .rail-variable-item__name {
   flex: 1;
   min-width: 0;
