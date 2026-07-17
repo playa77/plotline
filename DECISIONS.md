@@ -211,3 +211,55 @@ would bump `updatedAt` and create noise in history.
 was made (invalid `selectedVersion` reset, orphan ref adoption). Otherwise the
 manifest is returned as-is. The `updatedAt` timestamp is only updated on actual
 changes.
+
+---
+
+## WP-24: Markdown Export
+
+### D014 — turndown for HTML→MD conversion (R1)
+
+**Context:** Need a deterministic HTML→Markdown converter for the Substack-safe
+HTML subset. Options: hand-rolled converter, turndown, remark/rehype toolchain.
+
+**Chosen:** turndown (with @types/turndown). Battle-tested HTML→MD converter with
+custom rules API for non-standard elements (figure/figcaption, `<s>` strikethrough).
+DOM-based parsing matches linkedom we already use for the sanitizer. Deterministic
+output with configurable heading style, list markers, code-fence style.
+
+**Rejected:** Hand-rolled (wasted effort for well-solved problem); remark/rehype
+(adds AST complexity without benefit for output-only pipeline).
+
+## WP-25: PDF via Tectonic
+
+### D015 — Tectonic binary via download script, not npm package (R2)
+
+**Context:** Tectonic (T2) is the chosen LaTeX engine. Distribution: download
+script at build time vs npm package wrapping binary vs system package manager.
+
+**Chosen:** Download script at build time placing binary in `vendor/tectonic/`
+(gitignored). Platform-aware script handles Linux/macOS. TectonicRunner falls
+back to PATH if vendored binary is absent. Matches TS §9 "fetched at build time,
+never committed."
+
+**Rejected:** npm binary package (version coupling to system binary, cross-platform
+uncertainty); system package manager (defeats zero-install goal).
+
+### D016 — HTML→LaTeX via recursive DOM walk (R1)
+
+**Context:** Convert Substack-safe HTML to LaTeX. Options: recursive DOM walk,
+XSLT-like template engine, regex-based replacement.
+
+**Chosen:** Recursive DOM walk using linkedom (already installed). `nodeToLatex()`
+dispatches on tagName, recursively processes child nodes, text nodes escape 10
+LaTeX special characters. Well-formed LaTeX for the strictly-constrained 20-element
+subset.
+
+**Rejected:** Regex-based (fragile for nesting, can't handle mixed formatting).
+
+### D017 — Template placeholder syntax: %%PLACEHOLDER%% (R1)
+
+**Context:** LaTeX template variable substitution syntax.
+
+**Chosen:** `%%PLACEHOLDER%%` syntax. Visually distinct from prompt template
+system's `{{placeholder}}` (avoids confusion between two template systems).
+Doesn't conflict with LaTeX syntax. Simple `replace` without a template library.
