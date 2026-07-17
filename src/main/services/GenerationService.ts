@@ -232,6 +232,13 @@ export class GenerationService {
     const chapterSlice = this.formatChapterSlice(outline, chapterId);
     const bookOutline = this.formatOutlineText(outline);
 
+    // Fallback: when no expanded outline exists (Expand never run), use the
+    // chapter outline slice as upstream — the user can Write directly from
+    // the concise outline.
+    if (!expandedOutline) {
+      expandedOutline = chapterSlice;
+    }
+
     // ── T1 continuity from preceding chapter ──
     let precedingChapterContext = '';
     if (project.settings.continuityContext.enabled) {
