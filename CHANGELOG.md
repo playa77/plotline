@@ -333,3 +333,15 @@ versions follow the document suite version (currently `0.1.0`).
   `context-rail.css` styles. `tsc --noEmit` clean: zero errors. 101/105 renderer
   tests passing (4 pre-existing failures: ipcCoverage, SettingsWorkspace).
   8 files changed.
+- **2026-07-17** — WP-40: Global Constraints system variable + persisted migration (R2) —
+  Backend migration from old (v1, `core`-based) to new (v2, `kind`-based) variable
+  schema. `VariableService.migrateFromV1()` converts old-format variable.json files
+  to StoryVariable schema and seeds Global Constraints (system, scope-locked,
+  `always`). `ProjectService.open()` auto-triggers migration when manifest
+  `schemaVersion` is 1, creating a single commit with kind `variable:migration`
+  and label "Upgraded story variables". Idempotent: repeat opens produce zero
+  changes. New projects created directly on v2 with all 5 default variables present
+  (Global Constraints at position 0 in system group). Added `variable:migration`
+  to `CommitMessage.kind`. 6 migration tests (3 unit + 3 integration). `tsc --noEmit`
+  clean. 75/75 service tests passing. 6 files changed, +525/-9.
+  (commit `2d0da0a`)

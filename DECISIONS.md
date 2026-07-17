@@ -586,3 +586,27 @@ activates the variables they want for each call.
 rail component; making it sticky would be a Zustand store change.
 
 ---
+
+## WP-40: Global Constraints System Variable
+
+### D026 — Global Constraints as scope-locked system variable (R2)
+
+**Context:** Book-wide invariants (e.g., "no profanity", "MC never uses contractions",
+"all dialogue in past tense") must be unconditionally respected across every
+per-section Write call and every Expand and Iterate. Making scope user-configurable
+for such invariants risks drift — a user could accidentally set the scope to "manual"
+and lose the constraint for an entire generation run.
+
+**Chosen:** Global Constraints is a dedicated system variable with `kind: 'system'`,
+`scopeLocked: true`, and scope hard-locked to `always`. The scope selector in the GUI
+is rendered as disabled with a tooltip. Enforcement is server-side: `setScope` on a
+`scopeLocked` variable returns `SCOPE_LOCKED`.
+
+**Rejected alternative:** User-managed scope on Global Constraints (same as built-ins).
+Rejected because it defeats the structural guarantee. Deliberate flexibility reduction
+in exchange for a guarantee that invariants structurally reach every generation call.
+
+**R2:** Bounded cost — unlocking the scope would require schema changes, IPC handler
+updates, GUI changes, and migration of existing projects.
+
+---
