@@ -610,3 +610,22 @@ in exchange for a guarantee that invariants structurally reach every generation 
 updates, GUI changes, and migration of existing projects.
 
 ---
+
+## Write without Expand
+
+### D027 — Write from concise outline when no expanded outline exists (R1)
+
+**Context:** The original pipeline required Expand → Write: the Write step always needed
+`expanded-outline.html` as its upstream artifact. The user demanded that any chapter be
+generatable from either the concise or the expanded outline — one outline is the source
+of truth, and Expand is a user choice.
+
+**Chosen:** When `startWrite` reads a chapter ref and finds no `expanded-outline.html`,
+it falls back to using the chapter's formatted outline slice (from `formatChapterSlice`)
+as the upstream artifact. No schema changes, no template changes. The per-chapter style
+instruction block is unchanged — style guidance comes from the full Story Variable system.
+
+**R1:** Reversible <1h — the fallback is a 3-line `if` block in `GenerationService.ts`.
+Removing it restores the original Expand-required behavior.
+
+---

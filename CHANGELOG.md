@@ -344,4 +344,16 @@ versions follow the document suite version (currently `0.1.0`).
   (Global Constraints at position 0 in system group). Added `variable:migration`
   to `CommitMessage.kind`. 6 migration tests (3 unit + 3 integration). `tsc --noEmit`
   clean. 75/75 service tests passing. 6 files changed, +525/-9.
-  (commit `2d0da0a`)
+   (commit `2d0da0a`)
+- **2026-07-17** — Allow Write without Expand: when no `expanded-outline.html` exists for a chapter
+  (Expand was never run), the formatted chapter outline slice is used as the upstream artifact.
+  The user can Write directly from the concise outline — Expand remains optional. One file
+  changed (`GenerationService.ts`), +7 lines. (commit `8cb7c78`)
+- **2026-07-17** — Fix: `Full_extended_outline.md` fixture — `## PART THREE` heading was missing
+  the `##` markdown prefix, causing the outline importer to report 3 parts instead of 4.
+  Added `## ` prefix. Also committed the file (was previously untracked on disk).
+  (commit `d7fd0d9`)
+- **2026-07-17** — AGENTS.md v0.3.0: added canonical working material section (Tether outline
+  fixture), session lessons SL-001 through SL-005 covering: untracked fixture files, outline
+  structure verification, blind revert discipline, per-chapter style instruction intent, and
+  specialist scope creep prevention. (commit `c90d0a0`)
